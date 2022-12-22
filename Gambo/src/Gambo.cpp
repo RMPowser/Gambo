@@ -2,7 +2,6 @@
 //#include "olcPixelGameEngine.h"
 #include <SDL2/SDL.h>
 #include "Bus.h"
-#include <assert.h>
 #include <iostream>
 
 constexpr auto WindowTitle		= "Gambo";
