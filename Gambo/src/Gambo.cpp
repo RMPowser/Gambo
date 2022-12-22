@@ -25,6 +25,7 @@ std::string hex(uint32_t n, uint8_t d)
 class Gambo
 {
 public:
+	SDL_Window* window = nullptr;
 	Bus gb;
 	bool running = false;
 
@@ -32,7 +33,24 @@ public:
 
 	Gambo()
 	{
-		std::shared_ptr<SDL_Window> window(SDL_CreateWindow(WindowTitle, 100, 100, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_OPENGL), SDL_DestroyWindow);
+		if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
+		{
+			std::cout << "SDL Init Error: " << SDL_GetError() << std::endl;
+		}
+		else
+		{
+			window = SDL_CreateWindow(WindowTitle, 100, 100, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+		}
+
+		SDL_assert(window != nullptr);
+	}
+
+	~Gambo()
+	{
+		if (window != nullptr)
+		{
+			SDL_DestroyWindow(window);
+		}
 	}
 
 	bool OnUserCreate() override
