@@ -30,16 +30,13 @@ public:
 
 	Gambo()
 	{
-		if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
-		{
-			std::cout << "SDL Init Error: " << SDL_GetError() << std::endl;
-		}
-		else
-		{
-			window = SDL_CreateWindow(WindowTitle, 100, 100, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
-		}
+		SDL_assert(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 
+		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 		SDL_assert(window);
+
+		SDL_GLContext glContext = SDL_GL_CreateContext(window);
+		SDL_assert(glContext);
 	}
 
 	~Gambo()
