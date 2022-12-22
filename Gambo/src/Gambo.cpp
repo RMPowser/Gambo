@@ -1,10 +1,11 @@
 #define OLC_PGE_APPLICATION
-#include "olcPixelGameEngine.h"
+//#include "olcPixelGameEngine.h"
 #include <SDL2/SDL.h>
 #include "Bus.h"
 #include <assert.h>
 #include <iostream>
 
+constexpr auto WindowTitle		= "Gambo";
 constexpr auto DMGScreenWidth	= 640;
 constexpr auto DMGScreenHeight	= 480;
 constexpr auto PixelWidth		= 2;
@@ -21,7 +22,7 @@ std::string hex(uint32_t n, uint8_t d)
 	return s;
 };
 
-class Gambo : public olc::PixelGameEngine
+class Gambo
 {
 public:
 	Bus gb;
@@ -31,7 +32,7 @@ public:
 
 	Gambo()
 	{
-		sAppName = "Gambo";
+		std::shared_ptr<SDL_Window> window(SDL_CreateWindow(WindowTitle, 100, 100, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_OPENGL), SDL_DestroyWindow);
 	}
 
 	bool OnUserCreate() override
@@ -160,10 +161,7 @@ private:
 
 int main(int argc, char* argv[])
 {
-	SDL_Init(SDL_INIT_EVERYTHING);
-	SDL_Quit();
-
-	//Gambo* emu = new Gambo;
+	Gambo* emu = new Gambo;
 	//if (emu->Construct(DMGScreenWidth, DMGScreenHeight, PixelWidth, PixelHeight, FullScreen, Vsync, Cohesion))
 	//{
 	//	emu->Start();
