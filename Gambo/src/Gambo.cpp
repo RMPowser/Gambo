@@ -1,8 +1,9 @@
-#include <iostream>
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
+#include <SDL2/SDL.h>
 #include "Bus.h"
 #include <assert.h>
+#include <iostream>
 
 constexpr auto DMGScreenWidth	= 640;
 constexpr auto DMGScreenHeight	= 480;
@@ -159,11 +160,14 @@ private:
 
 int main(int argc, char* argv[])
 {
-	Gambo* emu = new Gambo;
-	if (emu->Construct(DMGScreenWidth, DMGScreenHeight, PixelWidth, PixelHeight, FullScreen, Vsync, Cohesion))
-	{
-		emu->Start();
-	}
+	SDL_Init(SDL_INIT_EVERYTHING);
+	SDL_Quit();
+
+	//Gambo* emu = new Gambo;
+	//if (emu->Construct(DMGScreenWidth, DMGScreenHeight, PixelWidth, PixelHeight, FullScreen, Vsync, Cohesion))
+	//{
+	//	emu->Start();
+	//}
 
 	return 0;
 }
