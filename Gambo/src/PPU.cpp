@@ -1,3 +1,4 @@
+#include "SDL2/SDL.h"
 #include "PPU.h"
 #include "Bus.h"
 #include "HardwareRegisterAdresses.h"
@@ -11,7 +12,7 @@ enum ColorIndex
 	Transparent // for use in sprites
 };
 
-olc::Pixel GameBoyColors[5]
+SDL_Color GameBoyColors[5]
 {
 	{ 255, 255, 255, 255 },
 	{ 192, 192, 192, 255 },
@@ -39,7 +40,7 @@ void PPU::Write(u16 addr, u8 data)
 	bus->Write(addr, data);
 }
 
-void PPU::Clock(olc::Sprite* target)
+void PPU::Clock(char* target)
 {
 	static u8 mode = -1;
 	static int totalCycles = 0;

@@ -1,6 +1,5 @@
 #pragma once
 #include "ShortTypes.h"
-//#include "olcPixelGameEngine.h"
 
 class Bus;
 
@@ -15,5 +14,5 @@ public:
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	void Clock(olc::Sprite* target);
+	void Clock(char* target);
 };
