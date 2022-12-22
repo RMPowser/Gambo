@@ -39,7 +39,7 @@ public:
 			window = SDL_CreateWindow(WindowTitle, 100, 100, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 		}
 
-		SDL_assert(window != nullptr);
+		SDL_assert(window);
 	}
 
 	~Gambo()
