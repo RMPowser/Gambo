@@ -14,5 +14,5 @@ public:
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	void Clock(char* target);
+	void Clock(void* target);
 };

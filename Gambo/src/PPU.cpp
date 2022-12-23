@@ -40,7 +40,7 @@ void PPU::Write(u16 addr, u8 data)
 	bus->Write(addr, data);
 }
 
-void PPU::Clock(char* target)
+void PPU::Clock(void* target)
 {
 	static u8 mode = -1;
 	static int totalCycles = 0;
@@ -108,7 +108,7 @@ void PPU::Clock(char* target)
 		static int DMATransferCycles = 0;
 		if (DMATransferCycles == 0) { DMATransferCycles = 160; }
 
-
+		DoDMATransfer = false;
 	}
 
 	if (LY > 143)

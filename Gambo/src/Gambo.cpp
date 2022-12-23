@@ -1,10 +1,10 @@
 #include <SDL2/SDL.h>
 #include "Bus.h"
-#include <iostream>
+#include <fstream>
 
 constexpr auto WindowTitle		= "Gambo";
-constexpr auto DMGScreenWidth	= 640;
-constexpr auto DMGScreenHeight	= 480;
+constexpr auto DMGScreenWidth	= 160;
+constexpr auto DMGScreenHeight	= 144;
 constexpr auto PixelWidth		= 2;
 constexpr auto PixelHeight		= 2;
 constexpr auto FullScreen		= false;
@@ -32,11 +32,25 @@ public:
 	{
 		SDL_assert(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 
-		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, DMGScreenWidth, DMGScreenHeight, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 576, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 		SDL_assert(window);
 
-		SDL_GLContext glContext = SDL_GL_CreateContext(window);
-		SDL_assert(glContext);
+		SDL_assert(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED));
+
+		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\Gambo\\Gambo\\test roms\\cpu_instrs.gb", std::ios::binary);
+		
+		// copies all data into buffer
+		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
+		uint16_t offset = 0x0000;
+		
+		for (auto& byte : buffer)
+		{
+			gb.ram[offset++] = byte;
+		}
+		
+		mapAsm = gb.cpu.Disassemble(0x0000, 0xFFFF);
+		
+		gb.cpu.Reset();
 	}
 
 	~Gambo()
@@ -49,58 +63,81 @@ public:
 		SDL_Quit();
 	}
 
-	bool OnUserCreate()
+	void Run()
 	{
-		//std::ifstream input("C:\\Users\\Ryan\\source\\repos\\Gambo\\Gambo\\test roms\\cpu_instrs.gb", std::ios::binary);
-		//
-		//// copies all data into buffer
-		//std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
-		//uint16_t offset = 0x0000;
-		//
-		//for (auto& byte : buffer)
-		//{
-		//	gb.ram[offset++] = byte;
-		//}
-		//
-		//mapAsm = gb.cpu.Disassemble(0x0000, 0xFFFF);
-		//
-		//gb.cpu.Reset();
-		//return true;
-	}
+		while (true)
+		{
+			static int cycles;
+			bool step = false;
 
-	bool OnUserUpdate(float deltaTime)
-	{
-		//static olc::Sprite* drawTarget = GetDrawTarget();
-		//Clear(olc::BLACK);
-		//
-		//if (GetKey(olc::Key::P).bPressed)
-		//{
-		//	running = !running;
-		//}
-		//
-		//static int cycles;
-		//if (running || (!running && GetKey(olc::Key::SPACE).bPressed))
-		//{
-		//	cycles = gb.cpu.Clock();
-		//	for (size_t i = 0; i < cycles; i++)
-		//	{
-		//		gb.ppu.Clock(drawTarget);
-		//	}
-		//}
-		//
-		//if (GetKey(olc::Key::R).bPressed)
-		//	gb.cpu.Reset();
-		//
-		//// Draw Ram Page 0x00		
-		////DrawRam(2, 2, 0x0000, 16, 16);
-		////DrawRam(2, 182, 0x0100, 16, 16);
-		//DrawCpu(448, 2);
-		//DrawCode(448, 112, 22);
-		//
-		//DrawString(10, 370, "SPACE = Step Instruction    R = RESET    P = PLAY");
-		//
-		//
-		//return true;
+			static SDL_Renderer* renderer = nullptr;
+			renderer = SDL_GetRenderer(window);
+			SDL_assert(renderer);
+
+			static SDL_Texture* renderTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DMGScreenWidth, DMGScreenHeight);
+			SDL_assert(renderTexture);
+
+			SDL_Event e;
+			while (SDL_PollEvent(&e))
+			{
+				switch (e.type)
+				{
+				case SDL_KEYDOWN:
+					if (e.key.keysym.sym == SDLK_p)
+					{
+						running = !running;
+					}
+					else if (e.key.keysym.sym == SDLK_r)
+					{
+						gb.cpu.Reset();
+					}
+					else if (e.key.keysym.sym == SDLK_SPACE)
+					{
+						step = true;
+					}
+					break;
+
+				case SDL_WINDOWEVENT:
+					switch (e.window.event)
+					{
+					case SDL_WINDOWEVENT_CLOSE:
+						return;
+					default:
+						break;
+					}
+					break;
+
+				default:
+					break;
+				}
+			}
+
+			if (running || (!running && step))
+			{
+				cycles = gb.cpu.Clock();
+				void* screenBuffer = nullptr;
+				int rowByteLength = 0;
+				SDL_LockTexture(renderTexture, NULL, &screenBuffer, &rowByteLength);
+				for (size_t i = 0; i < cycles; i++)
+				{
+					gb.ppu.Clock(screenBuffer);
+				}
+				SDL_UnlockTexture(renderTexture);
+			}
+
+			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+			SDL_RenderClear(renderer);
+			SDL_RenderCopy(renderer, renderTexture, NULL, NULL);
+			SDL_RenderPresent(renderer);
+		
+			//// Draw Ram Page 0x00		
+			////DrawRam(2, 2, 0x0000, 16, 16);
+			////DrawRam(2, 182, 0x0100, 16, 16);
+			//DrawCpu(448, 2);
+			//DrawCode(448, 112, 22);
+			//
+			//DrawString(10, 370, "SPACE = Step Instruction    R = RESET    P = PLAY");
+		}
 	}
 
 
@@ -175,10 +212,7 @@ private:
 int main(int argc, char* argv[])
 {
 	std::unique_ptr<Gambo> emu = std::make_unique<Gambo>();
-	//if (emu->Construct(DMGScreenWidth, DMGScreenHeight, PixelWidth, PixelHeight, FullScreen, Vsync, Cohesion))
-	//{
-	//	emu->Start();
-	//}
+	emu->Run();
 
 	return 0;
 }
