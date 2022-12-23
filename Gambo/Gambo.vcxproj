@@ -25,11 +25,10 @@
     <ClCompile Include="src\Gambo.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\HardwareRegisterAdresses.h" />
+    <ClInclude Include="include\GamboDefine.h" />
     <ClInclude Include="include\Bus.h" />
-    <ClInclude Include="include\olcPixelGameEngine.h" />
     <ClInclude Include="include\PPU.h" />
-    <ClInclude Include="include\ShortTypes.h" />
+    <ClInclude Include="PGEReference.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

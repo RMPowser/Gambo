@@ -29,19 +29,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\olcPixelGameEngine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\Bus.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\PPU.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\HardwareRegisterAdresses.h">
+    <ClInclude Include="include\GamboDefine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\ShortTypes.h">
+    <ClInclude Include="PGEReference.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

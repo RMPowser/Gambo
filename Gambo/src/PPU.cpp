@@ -1,7 +1,6 @@
 #include "SDL2/SDL.h"
 #include "PPU.h"
 #include "Bus.h"
-#include "HardwareRegisterAdresses.h"
 
 enum ColorIndex
 {

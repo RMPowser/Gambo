@@ -1,7 +1,6 @@
 #include <format>
 #include "CPU.h"
 #include "Bus.h"
-#include "HardwareRegisterAdresses.h"
 
 CPU::CPU(Bus* b)
 	: bus(b)

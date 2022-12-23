@@ -3,8 +3,7 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <atomic>
-#include "ShortTypes.h"
+#include "GamboDefine.h"
 
 class Bus;
 
@@ -55,7 +54,7 @@ public:
 	};
 
 	u16 SP = 0x0000; // stack pointer
-	std::atomic<u16> PC = 0x0000; // program counter
+	u16 PC = 0x0000; // program counter
 
 	enum Flags
 	{

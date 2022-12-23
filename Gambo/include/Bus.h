@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include <array>
 #include "CPU.h"
 #include "PPU.h"
+#include "GamboDefine.h"
 
 class Bus
 {
@@ -21,7 +21,7 @@ public:
 	// FF00-FF7F | I / O Registers				  | 
 	// FF80-FFFE | High RAM(HRAM)				  | 
 	// FFFF-FFFF | Interrupt Enable register (IE) |
-	std::array<uint8_t, 0x10000> ram;
+	std::array<u8, 0x10000> ram;
 	CPU cpu;
 	PPU ppu;
 
@@ -34,7 +34,7 @@ public:
 		ram.fill(0x00);
 	};
 
-	uint8_t Read(uint16_t addr) const
+	u8 Read(uint16_t addr) const
 	{
 		if (addr >= 0x0000 && addr <= 0xFFFF)
 		{
@@ -44,7 +44,7 @@ public:
 		return 0x00;
 	}
 
-	void Write(uint16_t addr, uint8_t data)
+	void Write(u16 addr, u8 data)
 	{
 		if (addr >= 0x0000 && addr <= 0xFFFF)
 		{

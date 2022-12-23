@@ -1,5 +1,5 @@
 #pragma once
-#include "ShortTypes.h"
+#include "GamboDefine.h"
 
 class Bus;
 
