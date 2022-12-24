@@ -1,24 +1,8 @@
 #include "SDL2/SDL.h"
 #include "PPU.h"
 #include "Bus.h"
+#include <random>
 
-enum ColorIndex
-{
-	White,
-	LightGray,
-	DarkGray,
-	Black,
-	Transparent // for use in sprites
-};
-
-SDL_Color GameBoyColors[5]
-{
-	{ 255, 255, 255, 255 },
-	{ 192, 192, 192, 255 },
-	{ 96, 96, 96, 255 },
-	{ 0, 0, 0, 255 },
-	{ 255, 255, 255, 0 }, // transparent for use in sprites
-};
 
 PPU::PPU(Bus* b)
 	:bus(b)
@@ -39,10 +23,9 @@ void PPU::Write(u16 addr, u8 data)
 	bus->Write(addr, data);
 }
 
-void PPU::Clock(void* target)
+void PPU::Clock(SDL_Texture* dmgScreen)
 {
-	static u8 mode = -1;
-	static int totalCycles = 0;
+	static int mode = -1;
 	static int currScanlineCycles = 0;
 
 	static u8& LCDC = bus->ram[HWAddr::LCDC];
@@ -110,6 +93,7 @@ void PPU::Clock(void* target)
 		DoDMATransfer = false;
 	}
 
+
 	if (LY > 143)
 	{
 		mode = 1; // vblank
@@ -122,10 +106,12 @@ void PPU::Clock(void* target)
 	{
 		mode = 3; // drawing pixels
 	}
-	else
+	else if (currScanlineCycles < 456)
 	{
 		mode = 0; // hblank
 	}
+
+
 
 	switch (mode)
 	{
@@ -157,17 +143,39 @@ void PPU::Clock(void* target)
 			throw;
 	}
 
-	
+	currScanlineCycles = (currScanlineCycles + 1) % 456;
+	if (currScanlineCycles == 0)
+	{
+		LY = (LY + 1) % 153;
+	}
 
-	// drawing pixels
-	static u16 BGTileMapAddr;
-	BGTileMapAddr = BGTileMapArea ? HWAddr::BGTileMap1 : HWAddr::BGTileMap0;
+	static bool frameComplete;
+	frameComplete = false;
 
-	// horizontal blank
+	cycles = (cycles + 1) % 70224;
+	if (cycles == 0)
+	{
+		frameComplete = true;
 
-	// vertical blank
+		static SDL_Color* target = new SDL_Color[DMGScreenWidth * DMGScreenHeight];
+		static int rowByteLength = 0;
 
-	//target->SetPixel
-	totalCycles++;
-	currScanlineCycles++;
+		static std::random_device rd;
+		static std::mt19937 gen(rd());
+		static std::uniform_int_distribution<> dist(0, 3);
+		for (size_t row = 0; row < DMGScreenWidth; row++)
+		{
+			for (size_t col = 0; col < DMGScreenHeight; col++)
+			{
+				target[row + (col * DMGScreenWidth)] = GameBoyColors[dist(gen)];
+			}
+		}
+
+		SDL_UpdateTexture(dmgScreen, NULL, target, DMGScreenWidth * BytesPerPixel);
+	}
+}
+
+bool PPU::FrameComplete()
+{
+	return cycles == 0;
 }

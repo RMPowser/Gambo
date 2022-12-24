@@ -14,5 +14,9 @@ public:
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	void Clock(void* target);
+	void Clock(SDL_Texture* dmgScreen);
+	bool FrameComplete();
+
+private:
+	int cycles = 0;
 };

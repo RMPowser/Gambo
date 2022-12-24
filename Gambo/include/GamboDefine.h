@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <profileapi.h>
 
 typedef uint64_t u64;
 typedef  int64_t s64;
@@ -165,3 +166,27 @@ static inline std::string hex(uint32_t n, uint8_t d)
 		s[i] = "0123456789ABCDEF"[n & 0xF];
 	return s;
 };
+
+enum ColorIndex
+{
+	White,
+	LightGray,
+	DarkGray,
+	Black,
+	Transparent // for use in sprites
+};
+
+static SDL_Color GameBoyColors[5]
+{
+	{ 255, 255, 255, 255 },
+	{ 192, 192, 192, 255 },
+	{ 96, 96, 96, 255 },
+	{ 0, 0, 0, 255 },
+	{ 255, 255, 255, 0 }, // transparent for use in sprites
+};
+
+static const auto BytesPerPixel = 4;
+static const auto DesiredFPS = 60;
+static auto FrameStart = 0.f;
+static auto FrameTime = 0.f;
+static LARGE_INTEGER PerformanceFrequency = {};

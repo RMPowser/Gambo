@@ -1,41 +1,59 @@
 ﻿#include "Bus.h"
 #include <fstream>
 #include <random>
+#include <format>
+#include <chrono>
+#include <iostream>
+
 
 class Gambo
 {
 public:
 	SDL_Window* window = nullptr;
+	SDL_Renderer* renderer = nullptr;
+	SDL_Texture* dmgScreen = nullptr;
+	SDL_Texture* windowTexture = nullptr;
 	Bus gb;
-
-	bool running = false;
-
 	std::map<uint16_t, std::string> mapAsm;
+	bool running = false;
 
 	Gambo()
 	{
-		SDL_assert(SDL_Init(SDL_INIT_EVERYTHING) == 0);
+		SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) != 0);
 
 		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640 * PixelScale, 540 * PixelScale, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
-		SDL_assert(window);
+		SDL_assert_release(window);
 
-		SDL_assert(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED));
+		SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
+
+		renderer = SDL_GetRenderer(window);
+		SDL_assert_release(renderer);
+
+		dmgScreen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DMGScreenWidth, DMGScreenHeight);
+		SDL_assert_release(dmgScreen);
+
+		int windowWidth, windowHeight;
+		SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+		windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
+		SDL_assert_release(windowTexture);
 
 		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\Gambo\\Gambo\\test roms\\cpu_instrs.gb", std::ios::binary);
-		
+
 		// copies all data into buffer
 		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
 		uint16_t offset = 0x0000;
-		
+
 		// copy the buffer into ram
 		for (auto& byte : buffer)
 		{
 			gb.ram[offset++] = byte;
 		}
-		
+
 		mapAsm = gb.cpu.Disassemble(0x0000, 0xFFFF);
-		
+
 		gb.cpu.Reset();
+
+		Render();
 	}
 
 	~Gambo()
@@ -48,125 +66,128 @@ public:
 		SDL_Quit();
 	}
 
+	Gambo(const Gambo& other) = delete;
+	Gambo& operator=(const Gambo&) = delete;
+
 	void Run()
 	{
+		using clock = std::chrono::high_resolution_clock;
+		using frames = std::chrono::duration<double, std::ratio<1, 60>>;
+
+		LARGE_INTEGER nextFrame;
+
 		while (true)
 		{
-			static int cycles;
-			bool step = false;
+			QueryPerformanceCounter(&nextFrame);
+			nextFrame.QuadPart += (PerformanceFrequency.QuadPart / DesiredFPS);
 
-			static SDL_Renderer* renderer = nullptr;
-			renderer = SDL_GetRenderer(window);
-			SDL_assert(renderer);
-
-			static SDL_Texture* dmgScreen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DMGScreenWidth, DMGScreenHeight);
-			SDL_assert(dmgScreen);
-
-			int windowWidth, windowHeight;
-			SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-			static SDL_Texture* windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
-			SDL_assert(windowTexture);
+			static bool step = false;
 
 			SDL_Event e;
 			while (SDL_PollEvent(&e))
 			{
 				switch (e.type)
 				{
-				case SDL_KEYDOWN:
-					if (e.key.keysym.sym == SDLK_p)
-					{
-						running = !running;
-					}
-					else if (e.key.keysym.sym == SDLK_r)
-					{
-						gb.cpu.Reset();
-					}
-					else if (e.key.keysym.sym == SDLK_SPACE)
-					{
-						step = true;
-					}
-					break;
+					case SDL_KEYDOWN:
+						if (e.key.keysym.sym == SDLK_p)
+						{
+							running = !running;
+						}
+						else if (e.key.keysym.sym == SDLK_r)
+						{
+							gb.cpu.Reset();
+						}
+						else if (e.key.keysym.sym == SDLK_SPACE)
+						{
+							step = true;
+						}
+						break;
 
-				case SDL_WINDOWEVENT:
-					switch (e.window.event)
-					{
-					case SDL_WINDOWEVENT_CLOSE:
-						return;
+					case SDL_WINDOWEVENT:
+						switch (e.window.event)
+						{
+							case SDL_WINDOWEVENT_CLOSE:
+								return;
+							default:
+								break;
+						}
+						break;
+
 					default:
 						break;
-					}
-					break;
-
-				default:
-					break;
 				}
 			}
 
-			static SDL_Color* target = nullptr;
-			static int rowByteLength = 0;
 
-			if (running || (!running && step))
+			if (running)
 			{
-				cycles = gb.cpu.Clock();
-
-				SDL_LockTexture(dmgScreen, NULL, (void**) &target, &rowByteLength);
+				do
 				{
-					for (size_t i = 0; i < cycles; i++)
-					{
-						gb.ppu.Clock(target);
-					}
-
-					static std::random_device rd;
-					static std::mt19937 gen(rd());
-					static std::uniform_int_distribution<> dist(0, 255);
-					for (size_t row = 0; row < DMGScreenWidth; row++)
-					{
-						for (size_t col = 0; col < DMGScreenHeight; col++)
-						{
-							int value = dist(gen);
-							target[row + (col * DMGScreenWidth)].r = value;
-							target[row + (col * DMGScreenWidth)].g = value;
-							target[row + (col * DMGScreenWidth)].b = value;
-							target[row + (col * DMGScreenWidth)].a = 255;
-						}
-					}
-				}
-				SDL_UnlockTexture(dmgScreen);
+					gb.cpu.Clock();
+					gb.ppu.Clock(dmgScreen);
+				} while (!gb.ppu.FrameComplete());
 			}
-
-			u64 targetSize = 0;
-			int targetWidth;
-			int targetHeight;
-			SDL_QueryTexture(windowTexture, NULL, NULL, &targetWidth, &targetHeight);
-
-			SDL_LockTexture(windowTexture, NULL, (void**)&target, &rowByteLength);
+			else if (step)
 			{
-				SDL_memset(target, 0x00, targetWidth * targetHeight * 4);
-				// Draw Ram Page 0x00
-				//DrawRam(2, 2, 0x0000, 16, 16);
-				//DrawRam(2, 182, 0x0100, 16, 16);
-				DrawCpu(target, targetWidth, targetHeight, 448, 2);
-				DrawCode(target, targetWidth, targetHeight, 448, 112, 22);
-
-				DrawString(target, targetWidth, targetHeight, 10, 500, "SPACE = Step Instruction    R = RESET    P = PLAY", WHITE);
+				do
+				{
+					gb.cpu.Clock();
+					gb.ppu.Clock(dmgScreen);
+				} while (!gb.cpu.InstructionComplete());
+				step = false;
 			}
-			SDL_UnlockTexture(windowTexture);
-			
 
-			SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
-			SDL_RenderClear(renderer);
-			SDL_RenderCopy(renderer, windowTexture, NULL, NULL);
-			static SDL_Rect destRect = { 0, 0, DMGScreenWidth * PixelScale * 2, DMGScreenHeight * PixelScale * 2 };
-			SDL_RenderCopy(renderer, dmgScreen, NULL, &destRect);
-			SDL_RenderPresent(renderer);
+
+			Render();
+
+
+			decltype(nextFrame) i = {};
+			QueryPerformanceCounter(&i);
+			while (i.QuadPart < nextFrame.QuadPart)
+			{
+				QueryPerformanceCounter(&i);
+			}
 		}
+	}
+
+private:
+	void Render()
+	{
+		static SDL_Color* target = nullptr;
+		static int rowByteLength = 0;
+
+		int targetWidth;
+		int targetHeight;
+		SDL_QueryTexture(windowTexture, NULL, NULL, &targetWidth, &targetHeight);
+
+		SDL_LockTexture(windowTexture, NULL, (void**)&target, &rowByteLength);
+		{
+			memset(target, 32, targetWidth * targetHeight * 4);
+			// Draw Ram Page 0x00
+			//DrawRam(2, 2, 0x0000, 16, 16);
+			//DrawRam(2, 182, 0x0100, 16, 16);
+			DrawCpu(target, targetWidth, targetHeight, 448, 2);
+			DrawCode(target, targetWidth, targetHeight, 448, 112, 22);
+
+			DrawString(target, targetWidth, targetHeight, 10, 500, "SPACE = Step Instruction    R = RESET    P = PLAY");
+			DrawString(target, targetWidth, targetHeight, 10, 510, std::format("FPS: {}", "???"));
+		}
+		SDL_UnlockTexture(windowTexture);
+
+
+		SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, windowTexture, NULL, NULL);
+		static SDL_Rect destRect = { 0, 0, DMGScreenWidth * PixelScale * 2, DMGScreenHeight * PixelScale * 2 };
+		SDL_RenderCopy(renderer, dmgScreen, NULL, &destRect);
+		SDL_RenderPresent(renderer);
 	}
 
 	void DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, SDL_Color col = WHITE, u32 scale = 1)
 	{
 		static u64 targetSize;
 		static u32 trueScale;
-		targetSize = (u64)targetWidth* (u64)targetHeight;
+		targetSize = (u64)targetWidth * (u64)targetHeight;
 		trueScale = scale * PixelScale;
 
 		s32 screenX = 0;
@@ -176,7 +197,7 @@ public:
 		{
 			if (c == '\n')
 			{
-				screenX = 0; 
+				screenX = 0;
 				screenY += 8 * trueScale;
 			}
 			else if (c == '\t')
@@ -207,28 +228,12 @@ public:
 		}
 	}
 
-	void DrawRam(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, uint16_t nAddr, int nRows, int nColumns)
-	{
-		//int nRamX = x, nRamY = y;
-		//for (int row = 0; row < nRows; row++)
-		//{
-		//	std::string sOffset = "$" + hex(nAddr, 4) + ":";
-		//	for (int col = 0; col < nColumns; col++)
-		//	{
-		//		sOffset += " " + hex(gb.Read(nAddr), 2);
-		//		nAddr += 1;
-		//	}
-		//	DrawString(nRamX, nRamY, sOffset);
-		//	nRamY += 10;
-		//}
-	}
-
 	void DrawCpu(SDL_Color* target, int targetWidth, int targetHeight, int x, int y)
 	{
 		DrawString(target, targetWidth, targetHeight, x, y, "FLAGS:");
-		DrawString(target, targetWidth, targetHeight, x +  56, y, "Z", gb.cpu.F & CPU::fZ ? GREEN : RED);
-		DrawString(target, targetWidth, targetHeight, x +  72, y, "N", gb.cpu.F & CPU::fN ? GREEN : RED);
-		DrawString(target, targetWidth, targetHeight, x +  88, y, "H", gb.cpu.F & CPU::fH ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x + 56, y, "Z", gb.cpu.F & CPU::fZ ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x + 72, y, "N", gb.cpu.F & CPU::fN ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x + 88, y, "H", gb.cpu.F & CPU::fH ? GREEN : RED);
 		DrawString(target, targetWidth, targetHeight, x + 104, y, "C", gb.cpu.F & CPU::fC ? GREEN : RED);
 		DrawString(target, targetWidth, targetHeight, x, y + 10, "PC: $" + hex(gb.cpu.PC, 4));
 		DrawString(target, targetWidth, targetHeight, x, y + 20, "AF: $" + hex(gb.cpu.AF, 4));
@@ -242,7 +247,8 @@ public:
 	{
 		auto it_a = mapAsm.find(gb.cpu.PC);
 		SDL_assert(it_a != mapAsm.end());
-		
+		SDL_assert(it_a != mapAsm.end());
+
 		int nLineY = (nLines >> 1) * 10 + y;
 		if (it_a != mapAsm.end())
 		{
@@ -256,7 +262,7 @@ public:
 				}
 			}
 		}
-		
+
 		it_a = mapAsm.find(gb.cpu.PC);
 		nLineY = (nLines >> 1) * 10 + y;
 		if (it_a != mapAsm.end())
@@ -271,12 +277,11 @@ public:
 			}
 		}
 	}
-
-private:
 };
 
 int main(int argc, char* argv[])
 {
+	QueryPerformanceFrequency(&PerformanceFrequency);
 	std::unique_ptr<Gambo> emu = std::make_unique<Gambo>();
 	emu->Run();
 

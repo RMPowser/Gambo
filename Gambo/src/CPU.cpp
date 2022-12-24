@@ -25,33 +25,38 @@ void CPU::Write(u16 addr, u8 data)
 	}
 }
 
-u8 CPU::Clock()
+void CPU::Clock()
 {
-	static u8 cycles = 0;
-
-	opcode = Read(PC++);
-	if (opcode == 0xCB)
+	if (cycles == 0)
 	{
-		// its a 16bit opcode
 		opcode = Read(PC++);
+		if (opcode == 0xCB)
+		{
+			// its a 16bit opcode
+			opcode = Read(PC++);
 
-		// lookup the initial number of clock cycles this instruction takes
-		cycles = instructions16bit[opcode].cycles;
+			// lookup the initial number of clock cycles this instruction takes
+			cycles = instructions16bit[opcode].cycles;
 
-		// execute the instruction and see if we require additional clock cycles
-		cycles += (this->*instructions16bit[opcode].Execute)();
+			// execute the instruction and see if we require additional clock cycles
+			cycles += (this->*instructions16bit[opcode].Execute)();
+		}
+		else
+		{
+			// lookup the initial number of cycles this instruction takes
+			cycles = instructions8bit[opcode].cycles;
+
+			// execute the instruction and see if we require additional clock cycles
+			cycles += (this->*instructions8bit[opcode].Execute)();
+		}
 	}
-	else
-	{
-		// lookup the initial number of cycles this instruction takes
-		cycles = instructions8bit[opcode].cycles;
 
-		// execute the instruction and see if we require additional clock cycles
-		cycles += (this->*instructions8bit[opcode].Execute)();
-	}
+	cycles--;
+}
 
-	// return the number of cycles the instruction took.
-	return cycles;
+bool CPU::InstructionComplete()
+{
+	return cycles == 0;
 }
 
 void CPU::Reset()
@@ -115,11 +120,11 @@ void CPU::Reset()
 	Write(HWAddr::WX,	 0x00);
 	Write(HWAddr::KEY1,	 0xFF);
 	Write(HWAddr::VBK,	 0xFF);
-	Write(HWAddr::HDMA1,	 0xFF);
-	Write(HWAddr::HDMA2,	 0xFF);
-	Write(HWAddr::HDMA3,	 0xFF);
-	Write(HWAddr::HDMA4,	 0xFF);
-	Write(HWAddr::HDMA5,	 0xFF);
+	Write(HWAddr::HDMA1, 0xFF);
+	Write(HWAddr::HDMA2, 0xFF);
+	Write(HWAddr::HDMA3, 0xFF);
+	Write(HWAddr::HDMA4, 0xFF);
+	Write(HWAddr::HDMA5, 0xFF);
 	Write(HWAddr::RP,	 0xFF);
 	Write(HWAddr::BCPS,	 0xFF);
 	Write(HWAddr::BCPD,	 0xFF);

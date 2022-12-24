@@ -122,7 +122,8 @@ public:
 	CPU(Bus* b);
 	~CPU();
 
-	u8 Clock();
+	void Clock();
+	bool InstructionComplete();
 	void Reset();
 
 	u8 Read(u16 addr);
@@ -139,6 +140,8 @@ public:
 	std::map<u16, std::string> Disassemble(u16 startAddr, u16 endAddr);
 
 private:
+	u8 cycles = 0;
+
 #pragma region CPU Control Instructions
 	u8 XXX(); // catch all non existing instructions8bit
 	u8 NOP();
