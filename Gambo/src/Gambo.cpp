@@ -19,7 +19,7 @@ public:
 
 	Gambo()
 	{
-		SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) != 0);
+		SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 
 		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640 * PixelScale, 540 * PixelScale, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 		SDL_assert_release(window);
