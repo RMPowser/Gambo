@@ -1,4 +1,4 @@
-﻿#include "Bus.h"
+#include "Bus.h"
 #include <fstream>
 #include <random>
 #include <format>
@@ -21,7 +21,7 @@ public:
 	{
 		SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 
-		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640 * PixelScale, 540 * PixelScale, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+		window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640 * PixelScale, 350 * PixelScale, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 		SDL_assert_release(window);
 
 		SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
@@ -169,8 +169,8 @@ private:
 			DrawCpu(target, targetWidth, targetHeight, 448, 2);
 			DrawCode(target, targetWidth, targetHeight, 448, 112, 22);
 
-			DrawString(target, targetWidth, targetHeight, 10, 500, "SPACE = Step Instruction    R = RESET    P = PLAY");
-			DrawString(target, targetWidth, targetHeight, 10, 510, std::format("FPS: {}", "???"));
+			DrawString(target, targetWidth, targetHeight, 10, 332, "SPACE = Step Instruction    R = RESET    P = PLAY");
+			//DrawString(target, targetWidth, targetHeight, 10, 510, std::format("FPS: {}", "???"));
 		}
 		SDL_UnlockTexture(windowTexture);
 
