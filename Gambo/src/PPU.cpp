@@ -146,7 +146,7 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	currScanlineCycles = (currScanlineCycles + 1) % 456;
 	if (currScanlineCycles == 0)
 	{
-		LY = (LY + 1) % 153;
+		LY = (LY + 1) % 154;
 	}
 
 	static bool frameComplete;
