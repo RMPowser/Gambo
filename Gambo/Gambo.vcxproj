@@ -28,7 +28,6 @@
     <ClInclude Include="include\GamboDefine.h" />
     <ClInclude Include="include\Bus.h" />
     <ClInclude Include="include\PPU.h" />
-    <ClInclude Include="PGEReference.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

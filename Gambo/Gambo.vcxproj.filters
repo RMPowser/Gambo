@@ -38,8 +38,5 @@
     <ClInclude Include="include\GamboDefine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PGEReference.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
