@@ -279,7 +279,6 @@ private:
 
 int main(int argc, char* argv[])
 {
-	QueryPerformanceFrequency(&PerformanceFrequency);
 	std::unique_ptr<Gambo> emu = std::make_unique<Gambo>();
 	emu->Run();
 
