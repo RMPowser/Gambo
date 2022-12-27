@@ -59,7 +59,13 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	static u8 OBP1ColorForIndex1;
 	static u8 OBP1ColorForIndex0 = ColorIndex::Transparent;
 	static u8& DMA = bus->ram[HWAddr::DMA];
-
+	static u8& STAT = bus->ram[HWAddr::STAT];
+	static u8 modeFlag;
+	static bool LYC_equals_LYFlag;
+	static bool Mode0StatInterruptSrc;
+	static bool Mode1StatInterruptSrc;
+	static bool Mode2StatInterruptSrc;
+	static bool LYC_equals_LYStatInterruptSrc;
 
 	LCDAndPPUEnable			= LCDC & (1 << 7);
 	WindowTileMapArea		= LCDC & (1 << 6);
@@ -79,6 +85,12 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	OBP1ColorForIndex3		= OBP1 & 0b11000000;
 	OBP1ColorForIndex2		= OBP1 & 0b00110000;
 	OBP1ColorForIndex1		= OBP1 & 0b00001100;
+	modeFlag				= STAT & 0b00000011;
+	LYC_equals_LYFlag		= STAT & 0b00000100;
+	Mode0StatInterruptSrc	= STAT & 0b00001000;
+	Mode1StatInterruptSrc	= STAT & 0b00010000;
+	Mode2StatInterruptSrc	= STAT & 0b00100000;
+	LYC_equals_LYStatInterruptSrc = STAT & 0b00100000;
 
 	if (!LCDAndPPUEnable)
 	{
