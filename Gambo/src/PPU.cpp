@@ -25,7 +25,6 @@ void PPU::Write(u16 addr, u8 data)
 
 void PPU::Clock(SDL_Texture* dmgScreen)
 {
-	static int mode = -1;
 	static int currScanlineCycles = 0;
 
 	static u8& LCDC = bus->ram[HWAddr::LCDC];
@@ -106,28 +105,28 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	}
 
 
-	if (LY > 143)
+	if (LY >= 144)
 	{
-		mode = 1; // vblank
+		mode = Mode::VBlank; // vblank
 	}
 	else if (currScanlineCycles < 80)
 	{
-		mode = 2; // OAM scan
+		mode = Mode::OAMScan; // OAM scan
 	}
 	else if (currScanlineCycles < 172) // 289
 	{
-		mode = 3; // drawing pixels
+		mode = Mode::Draw; // drawing pixels
 	}
 	else if (currScanlineCycles < 456)
 	{
-		mode = 0; // hblank
+		mode = Mode::HBlank; // hblank
 	}
 
 
 
 	switch (mode)
 	{
-		case 2:
+		case PPU::Mode::OAMScan:
 		{
 			// OAM scan
 			u16 ybase = (SCY + LY);   // calculates the effective scanline
@@ -136,21 +135,12 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 			break;
 		}
 
-		case 3:
-		{
+		case PPU::Mode::Draw:
 			break;
-		}
-
-		case 0:
-		{
+		case PPU::Mode::HBlank:
 			break;
-		}
-
-		case 1:
-		{
+		case PPU::Mode::VBlank:
 			break;
-		}
-
 		default:
 			throw;
 	}
