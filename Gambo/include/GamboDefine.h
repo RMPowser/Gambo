@@ -189,4 +189,3 @@ static const auto BytesPerPixel = 4;
 static const auto DesiredFPS = 60;
 static auto FrameStart = 0.f;
 static auto FrameTime = 0.f;
-static LARGE_INTEGER PerformanceFrequency = {};
