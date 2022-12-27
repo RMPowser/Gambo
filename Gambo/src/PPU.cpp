@@ -97,12 +97,26 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 		return;
 	}
 
-	if (DoDMATransfer)
+	static int DMATransferCycles;
+	if (DoDMATransfer && DMATransferCycles == 0)
 	{
-		static int DMATransferCycles = 0;
-		if (DMATransferCycles == 0) { DMATransferCycles = 160; }
+		DMATransferCycles = 160;
+	}
 
+	if (DMATransferCycles > 0)
+	{
+		DMATransferCycles--;
+		return;
+	}
+	else if (DMATransferCycles == 0)
+	{
 		DoDMATransfer = false;
+
+		static u16 startAddr;
+		startAddr = DMA << 8;
+
+		static auto ram = bus->ram.begin();
+		std::copy(ram + startAddr, ram + startAddr + 160, ram + HWAddr::OAM);
 	}
 
 
