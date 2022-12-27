@@ -1,4 +1,4 @@
-#include "Bus.h"
+﻿#include "Bus.h"
 #include <fstream>
 #include <random>
 #include <format>
@@ -74,12 +74,11 @@ public:
 		using clock = std::chrono::high_resolution_clock;
 		using frames = std::chrono::duration<double, std::ratio<1, 60>>;
 
-		LARGE_INTEGER nextFrame;
+		auto nextFrame = clock::now() + frames{ 0 };
 
 		while (true)
 		{
-			QueryPerformanceCounter(&nextFrame);
-			nextFrame.QuadPart += (PerformanceFrequency.QuadPart / DesiredFPS);
+			nextFrame += frames{ 1 };
 
 			static bool step = false;
 
@@ -141,11 +140,10 @@ public:
 			Render();
 
 
-			decltype(nextFrame) i = {};
-			QueryPerformanceCounter(&i);
-			while (i.QuadPart < nextFrame.QuadPart)
+			decltype(nextFrame) i = clock::now();
+			while (i < nextFrame)
 			{
-				QueryPerformanceCounter(&i);
+				i = clock::now();
 			}
 		}
 	}
