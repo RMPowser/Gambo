@@ -2532,14 +2532,15 @@ u8 CPU::ADD_SP_s8()
 u8 CPU::RLCA()
 {
 	static bool bit7;
-	bit7 = A >> 7;
+	bit7 = A & 0b10000000;
+
+	A = (A << 1) | (u8)bit7;
 
 	SetFlag(fZ, 0);
 	SetFlag(fN, 0);
 	SetFlag(fH, 0);
 	SetFlag(fC, bit7);
 
-	A = (A << 1) | (u8)bit7;
 	return 0;
 }
 
@@ -2548,26 +2549,28 @@ u8 CPU::RRCA()
 	static u8 bit0;
 	bit0 = A & 0b00000001;
 
+	A = (A >> 1) | (bit0 << 7);
+
 	SetFlag(fZ, 0);
 	SetFlag(fN, 0);
 	SetFlag(fH, 0);
 	SetFlag(fC, bit0);
 
-	A = (A >> 1) | (bit0 << 7);
 	return 0;
 }
 
 u8 CPU::RLA()
 {
 	static bool bit7;
-	bit7 = A >> 7;
+	bit7 = A & 0b10000000;
+
+	A = (A << 1) | (u8)GetFlag(fC);
 
 	SetFlag(fZ, 0);
 	SetFlag(fN, 0);
 	SetFlag(fH, 0);
 	SetFlag(fC, bit7);
 
-	A = (A << 1) | (u8)GetFlag(fC);
 	return 0;
 }
 
@@ -2576,19 +2579,20 @@ u8 CPU::RRA()
 	static bool bit0;
 	bit0 = A & 0b00000001;
 
+	A = (A >> 1) | ((u8)GetFlag(fC) << 7);
+
 	SetFlag(fZ, 0);
 	SetFlag(fN, 0);
 	SetFlag(fH, 0);
 	SetFlag(fC, bit0);
 
-	A = (A >> 1) | (u8)GetFlag(fC);
 	return 0;
 }
 
 u8 CPU::RLC_B()
 {
 	static bool bit7;
-	bit7 = B >> 7;
+	bit7 = B & 0b10000000;
 
 	B = (B << 1) | (u8)bit7;
 	
@@ -2603,7 +2607,7 @@ u8 CPU::RLC_B()
 u8 CPU::RLC_C()
 {
 	static bool bit7;
-	bit7 = C >> 7;
+	bit7 = C & 0b10000000;
 
 	C = (C << 1) | (u8)bit7;
 
@@ -2618,7 +2622,7 @@ u8 CPU::RLC_C()
 u8 CPU::RLC_D()
 {
 	static bool bit7;
-	bit7 = D >> 7;
+	bit7 = D & 0b10000000;
 
 	D = (D << 1) | (u8)bit7;
 
@@ -2633,7 +2637,7 @@ u8 CPU::RLC_D()
 u8 CPU::RLC_E()
 {
 	static bool bit7;
-	bit7 = E >> 7;
+	bit7 = E & 0b10000000;
 
 	E = (E << 1) | (u8)bit7;
 
@@ -2648,7 +2652,7 @@ u8 CPU::RLC_E()
 u8 CPU::RLC_H()
 {
 	static bool bit7;
-	bit7 = H >> 7;
+	bit7 = H & 0b10000000;
 
 	H = (H << 1) | (u8)bit7;
 
@@ -2663,7 +2667,7 @@ u8 CPU::RLC_H()
 u8 CPU::RLC_L()
 {
 	static bool bit7;
-	bit7 = L >> 7;
+	bit7 = L & 0b10000000;
 
 	L = (L << 1) | (u8)bit7;
 
@@ -2680,7 +2684,7 @@ u8 CPU::RLC_aHL()
 	static bool bit7;
 	static u8 data;
 	data = Read(HL);
-	bit7 = data >> 7;
+	bit7 = data & 0b10000000;
 
 	Write(HL, (data << 1) | (u8)bit7);
 
@@ -2695,7 +2699,7 @@ u8 CPU::RLC_aHL()
 u8 CPU::RLC_A()
 {
 	static bool bit7;
-	bit7 = A >> 7;
+	bit7 = A & 0b10000000;
 
 	A = (A << 1) | (u8)bit7;
 
@@ -2819,19 +2823,20 @@ u8 CPU::RRC_A()
 	static u8 bit0;
 	bit0 = L & 0b00000001;
 
+	L = (L >> 1) | (bit0 << 7);
+
 	SetFlag(fZ, L == 0);
 	SetFlag(fN, 0);
 	SetFlag(fH, 0);
 	SetFlag(fC, bit0);
 
-	L = (L >> 1) | (bit0 << 7);
 	return 0;
 }
 
 u8 CPU::RL_B()
 {
 	static bool bit7;
-	bit7 = B >> 7;
+	bit7 = B & 0b10000000;
 
 	B = (B << 1) | (u8)GetFlag(fC);
 
@@ -2846,7 +2851,7 @@ u8 CPU::RL_B()
 u8 CPU::RL_C()
 {
 	static bool bit7;
-	bit7 = C >> 7;
+	bit7 = C & 0b10000000;
 
 	C = (C << 1) | (u8)GetFlag(fC);
 
@@ -2861,7 +2866,7 @@ u8 CPU::RL_C()
 u8 CPU::RL_D()
 {
 	static bool bit7;
-	bit7 = D >> 7;
+	bit7 = D & 0b10000000;
 
 	D = (D << 1) | (u8)GetFlag(fC);
 
@@ -2876,7 +2881,7 @@ u8 CPU::RL_D()
 u8 CPU::RL_E()
 {
 	static bool bit7;
-	bit7 = E >> 7;
+	bit7 = E & 0b10000000;
 
 	E = (E << 1) | (u8)GetFlag(fC);
 
@@ -2891,7 +2896,7 @@ u8 CPU::RL_E()
 u8 CPU::RL_H()
 {
 	static bool bit7;
-	bit7 = H >> 7;
+	bit7 = H & 0b10000000;
 
 	H = (H << 1) | (u8)GetFlag(fC);
 
@@ -2906,7 +2911,7 @@ u8 CPU::RL_H()
 u8 CPU::RL_L()
 {
 	static bool bit7;
-	bit7 = L >> 7;
+	bit7 = L & 0b10000000;
 
 	L = (L << 1) | (u8)GetFlag(fC);
 
@@ -2923,7 +2928,7 @@ u8 CPU::RL_aHL()
 	static bool bit7;
 	static u8 data;
 	data = Read(HL);
-	bit7 = data >> 7;
+	bit7 = data & 0b10000000;
 
 	Write(HL, (data << 1) | (u8)GetFlag(fC));
 
@@ -2938,7 +2943,7 @@ u8 CPU::RL_aHL()
 u8 CPU::RL_A()
 {
 	static bool bit7;
-	bit7 = A >> 7;
+	bit7 = A & 0b10000000;
 
 	A = (A << 1) | (u8)GetFlag(fC);
 
@@ -3075,7 +3080,7 @@ u8 CPU::RR_A()
 u8 CPU::SLA_B()
 {
 	static bool bit7;
-	bit7 = B >> 7;
+	bit7 = B & 0b10000000;
 
 	B <<= 1;
 
@@ -3090,7 +3095,7 @@ u8 CPU::SLA_B()
 u8 CPU::SLA_C()
 {
 	static bool bit7;
-	bit7 = C >> 7;
+	bit7 = C & 0b10000000;
 
 	C <<= 1;
 
@@ -3105,7 +3110,7 @@ u8 CPU::SLA_C()
 u8 CPU::SLA_D()
 {
 	static bool bit7;
-	bit7 = D >> 7;
+	bit7 = D & 0b10000000;
 
 	D <<= 1;
 
@@ -3120,7 +3125,7 @@ u8 CPU::SLA_D()
 u8 CPU::SLA_E()
 {
 	static bool bit7;
-	bit7 = E >> 7;
+	bit7 = E & 0b10000000;
 
 	E <<= 1;
 
@@ -3135,7 +3140,7 @@ u8 CPU::SLA_E()
 u8 CPU::SLA_H()
 {
 	static bool bit7;
-	bit7 = H >> 7;
+	bit7 = H & 0b10000000;
 
 	H <<= 1;
 
@@ -3150,7 +3155,7 @@ u8 CPU::SLA_H()
 u8 CPU::SLA_L()
 {
 	static bool bit7;
-	bit7 = L >> 7;
+	bit7 = L & 0b10000000;
 
 	L <<= 1;
 
@@ -3167,7 +3172,7 @@ u8 CPU::SLA_aHL()
 	static bool bit7;
 	static u8 data;
 	data = Read(HL);
-	bit7 = data >> 7;
+	bit7 = data & 0b10000000;
 
 	Write(HL, data << 1);
 
@@ -3182,7 +3187,7 @@ u8 CPU::SLA_aHL()
 u8 CPU::SLA_A()
 {
 	static bool bit7;
-	bit7 = A >> 7;
+	bit7 = A & 0b10000000;
 
 	A <<= 1;
 
