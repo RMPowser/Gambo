@@ -11,6 +11,7 @@ PPU::PPU(Bus* b)
 
 PPU::~PPU()
 {
+	SAFE_DELETE_ARRAY(screen);
 }
 
 u8 PPU::Read(u16 addr)
@@ -151,15 +152,9 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 		LY = (LY + 1) % 154;
 	}
 
-	static bool frameComplete;
-	frameComplete = false;
-
 	cycles = (cycles + 1) % 70224;
 	if (cycles == 0)
 	{
-		frameComplete = true;
-
-		static SDL_Color* target = new SDL_Color[DMGScreenWidth * DMGScreenHeight];
 		static int rowByteLength = 0;
 
 		static std::random_device rd;
@@ -169,11 +164,11 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 		{
 			for (size_t col = 0; col < DMGScreenHeight; col++)
 			{
-				target[row + (col * DMGScreenWidth)] = GameBoyColors[dist(gen)];
+				screen[row + (col * DMGScreenWidth)] = GameBoyColors[dist(gen)];
 			}
 		}
 
-		SDL_UpdateTexture(dmgScreen, NULL, target, DMGScreenWidth * BytesPerPixel);
+		SDL_UpdateTexture(dmgScreen, NULL, screen, DMGScreenWidth * BytesPerPixel);
 	}
 }
 

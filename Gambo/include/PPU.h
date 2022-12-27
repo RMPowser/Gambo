@@ -27,5 +27,6 @@ public:
 	bool FrameComplete();
 
 private:
+	 SDL_Color* screen = new SDL_Color[DMGScreenWidth * DMGScreenHeight];
 	int cycles = 0;
 };
