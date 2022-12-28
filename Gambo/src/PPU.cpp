@@ -26,9 +26,10 @@ void PPU::Write(u16 addr, u8 data)
 
 void PPU::Clock(SDL_Texture* dmgScreen)
 {
+	frameComplete = false;
 	static int currScanlineCycles = 0;
 
-	static u8& LCDC = bus->ram[HWAddr::LCDC];
+	static u8 LCDC;
 	static bool LCDAndPPUEnable;			// 0=Off, 1=On
 	static bool WindowTileMapArea;			// 0=9800-9BFF, 1=9C00-9FFF
 	static bool WindowEnable;				// 0=Off, 1=On
@@ -37,19 +38,19 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	static bool OBJSize;					// 0=8x8, 1=8x16
 	static bool OBJEnable;					// 0=Off, 1=On
 	static bool BGAndWindowEnable;			// BGAndWindowPriority for CGB; 0=Off, 1=On
-	static u8& SCY = bus->ram[HWAddr::SCY];	// viewport y position
-	static u8& SCX = bus->ram[HWAddr::SCX];	// viewport x position
-	static u8& LY = bus->ram[HWAddr::LY];	// LCD Y coordinate
-	static u8& LYC = bus->ram[HWAddr::LYC];	// LY compare
-	static u8& WY = bus->ram[HWAddr::WY];	// window Y position
-	static u8& WX = bus->ram[HWAddr::WX];	// window X position + 7
-	static u8& BGP = bus->ram[HWAddr::BGP];	// BG pallette data
+	static u8 SCY;
+	static u8 SCX;
+	static u8 LY;
+	static u8 LYC;
+	static u8 WY;
+	static u8 WX;
+	static u8 BGP;
 	static u8 BGColorForIndex3;
 	static u8 BGColorForIndex2;
 	static u8 BGColorForIndex1;
 	static u8 BGColorForIndex0;
-	static u8& OBP0 = bus->ram[HWAddr::OBP0];	// BG pallette data
-	static u8& OBP1 = bus->ram[HWAddr::OBP1];	// BG pallette data
+	static u8 OBP0;
+	static u8 OBP1;
 	static u8 OBP0ColorForIndex3;
 	static u8 OBP0ColorForIndex2;
 	static u8 OBP0ColorForIndex1;
@@ -58,8 +59,8 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	static u8 OBP1ColorForIndex2;
 	static u8 OBP1ColorForIndex1;
 	static u8 OBP1ColorForIndex0 = ColorIndex::Transparent;
-	static u8& DMA = bus->ram[HWAddr::DMA];
-	static u8& STAT = bus->ram[HWAddr::STAT];
+	static u8 DMA;
+	static u8 STAT;
 	static u8 modeFlag;
 	static bool LYC_equals_LYFlag;
 	static bool Mode0StatInterruptSrc;
@@ -67,6 +68,18 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	static bool Mode2StatInterruptSrc;
 	static bool LYC_equals_LYStatInterruptSrc;
 
+	LCDC = bus->ram[HWAddr::LCDC];
+	SCY = bus->ram[HWAddr::SCY];	// viewport y position
+	SCX = bus->ram[HWAddr::SCX];	// viewport x position
+	LY = bus->ram[HWAddr::LY];	// LCD Y coordinate
+	LYC = bus->ram[HWAddr::LYC];	// LY compare
+	WY = bus->ram[HWAddr::WY];	// window Y position
+	WX = bus->ram[HWAddr::WX];	// window X position + 7
+	BGP = bus->ram[HWAddr::BGP];	// BG pallette data
+	OBP0 = bus->ram[HWAddr::OBP0];	// BG pallette data
+	OBP1 = bus->ram[HWAddr::OBP1];	// BG pallette data
+	DMA = bus->ram[HWAddr::DMA];
+	STAT = bus->ram[HWAddr::STAT];
 	LCDAndPPUEnable			= LCDC & (1 << 7);
 	WindowTileMapArea		= LCDC & (1 << 6);
 	WindowEnable			= LCDC & (1 << 5);
@@ -92,10 +105,6 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	Mode2StatInterruptSrc	= STAT & 0b00100000;
 	LYC_equals_LYStatInterruptSrc = STAT & 0b00100000;
 
-	if (!LCDAndPPUEnable)
-	{
-		return;
-	}
 
 	static int DMATransferCycles = 0;
 	if (DoDMATransfer && DMATransferCycles == 0)
@@ -173,24 +182,28 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	cycles = (cycles + 1) % 70224;
 	if (cycles == 0)
 	{
-		static int rowByteLength = 0;
-
-		static std::random_device rd;
-		static std::mt19937 gen(rd());
-		static std::uniform_int_distribution<> dist(0, 3);
-		for (size_t row = 0; row < DMGScreenWidth; row++)
+		if (!LCDAndPPUEnable)
 		{
-			for (size_t col = 0; col < DMGScreenHeight; col++)
-			{
-				screen[row + (col * DMGScreenWidth)] = GameBoyColors[dist(gen)];
-			}
-		}
+			static int rowByteLength = 0;
 
-		SDL_UpdateTexture(dmgScreen, NULL, screen, DMGScreenWidth * BytesPerPixel);
+			static std::random_device rd;
+			static std::mt19937 gen(rd());
+			static std::uniform_int_distribution<> dist(0, 3);
+			for (size_t row = 0; row < DMGScreenWidth; row++)
+			{
+				for (size_t col = 0; col < DMGScreenHeight; col++)
+				{
+					screen[row + (col * DMGScreenWidth)] = GameBoyColors[dist(gen)];
+				}
+			}
+
+			SDL_UpdateTexture(dmgScreen, NULL, screen, DMGScreenWidth * BytesPerPixel);
+		}
+		frameComplete = true;
 	}
 }
 
 bool PPU::FrameComplete()
 {
-	return cycles == 0;
+	return frameComplete;
 }
