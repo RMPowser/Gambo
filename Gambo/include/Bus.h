@@ -65,6 +65,17 @@ public:
 				ram[addr + 0x2000] = data;
 			}
 
+			// top 3 bits in IF are always read as 1
+			if (addr == HWAddr::IF)
+			{
+				ram[HWAddr::IF] |= 0b11100000;
+			}
+
+			lastWrite = addr;
+		}
+	}
+
+
 	void Disassemble(u16 startAddr, u16 endAddr)
 	{
 		u32 addr = startAddr;
