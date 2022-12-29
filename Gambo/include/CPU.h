@@ -138,8 +138,6 @@ public:
 	void PushPC();
 	u16 PopPC();
 
-	std::map<u16, std::string> Disassemble(u16 startAddr, u16 endAddr);
-
 private:
 	u8 cycles = 0;
 

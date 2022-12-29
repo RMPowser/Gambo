@@ -1,4 +1,4 @@
-﻿#include "Bus.h"
+#include "Bus.h"
 #include <fstream>
 #include <random>
 #include <format>
@@ -14,7 +14,6 @@ public:
 	SDL_Texture* dmgScreen = nullptr;
 	SDL_Texture* windowTexture = nullptr;
 	Bus gb;
-	std::map<uint16_t, std::string> mapAsm;
 	bool running = false;
 
 	Gambo()
@@ -37,7 +36,7 @@ public:
 		windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
 		SDL_assert_release(windowTexture);
 
-		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\Gambo\\Gambo\\test roms\\cpu_instrs.gb", std::ios::binary);
+		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\cpu_instrs\\individual\\01-special.gb", std::ios::binary);
 
 		// copies all data into buffer
 		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
@@ -49,7 +48,7 @@ public:
 			gb.ram[offset++] = byte;
 		}
 
-		mapAsm = gb.cpu.Disassemble(0x0000, 0xFFFF);
+		gb.Disassemble(0x0000, 0xFFFF);
 
 		gb.cpu.Reset();
 
@@ -75,7 +74,7 @@ public:
 		using frames = std::chrono::duration<double, std::ratio<1, 60>>;
 
 		auto nextFrame = clock::now() + frames{ 0 };
-
+		decltype(nextFrame) i;
 		while (true)
 		{
 			nextFrame += frames{ 1 };
@@ -124,6 +123,11 @@ public:
 				{
 					gb.cpu.Clock();
 					gb.ppu.Clock(dmgScreen);
+					//if (gb.cpu.PC == 0xC44D)
+					//{
+					//	running = false;
+					//	goto BREAK;
+					//}
 				} while (!gb.ppu.FrameComplete());
 			}
 			else if (step)
@@ -132,15 +136,18 @@ public:
 				{
 					gb.cpu.Clock();
 					gb.ppu.Clock(dmgScreen);
+					BREAK:
 				} while (!gb.cpu.InstructionComplete());
 				step = false;
 			}
+
+			gb.Disassemble(gb.cpu.PC - 20, gb.cpu.PC + 20);
 
 
 			Render();
 
 
-			decltype(nextFrame) i = clock::now();
+			i = clock::now();
 			while (i < nextFrame)
 			{
 				i = clock::now();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <format>
 #include "CPU.h"
 #include "PPU.h"
 #include "GamboDefine.h"
@@ -22,6 +23,9 @@ public:
 	// FF80-FFFE | High RAM(HRAM)				  | 
 	// FFFF-FFFF | Interrupt Enable register (IE) |
 	std::array<u8, 0x10000> ram;
+	std::map<uint16_t, std::string> mapAsm;
+	u16 lastWrite = 0;
+	u16 lastRead = 0;
 	CPU cpu;
 	PPU ppu;
 
@@ -34,10 +38,11 @@ public:
 		ram.fill(0x00);
 	};
 
-	u8 Read(uint16_t addr) const
+	u8 Read(uint16_t addr)
 	{
 		if (addr >= 0x0000 && addr <= 0xFFFF)
 		{
+			lastRead = addr;
 			return ram[addr];
 		}
 
@@ -59,6 +64,61 @@ public:
 			{
 				ram[addr + 0x2000] = data;
 			}
+
+	void Disassemble(u16 startAddr, u16 endAddr)
+	{
+		u32 addr = startAddr;
+		u8 value = 0x00, lo = 0x00, hi = 0x00;
+		u16 lineAddr = 0;
+
+		mapAsm.clear();
+
+		while (addr <= (u32)endAddr)
+		{
+			// skip vram
+			if (0x8800 <= addr && addr <= 0x9FFF)
+			{
+				addr++;
+				continue;
+			}
+
+			lineAddr = addr;
+
+			// prefix line with instruction addr
+			std::string s = "$" + hex(addr, 4) + ": ";
+
+			// read instruction and get readable name
+			u8 opcode = ram[addr++];
+			if (opcode == 0xCB)
+			{
+				// its a 16bit opcode so read another byte
+				opcode = ram[addr++];
+
+				s += cpu.instructions16bit[opcode].mnemonic;
+			}
+			else
+			{
+				auto& instruction = cpu.instructions8bit[opcode];
+				if (instruction.bytes == 2)
+				{
+					u8 data = ram[addr++];
+					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
+				}
+				else if (instruction.bytes == 3)
+				{
+					u16 lo = ram[addr++];
+					u16 hi = ram[addr++];
+					u16 data = (hi << 8) | lo;
+					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
+				}
+				else
+				{
+					s += cpu.instructions8bit[opcode].mnemonic;
+				}
+			}
+
+
+			mapAsm[lineAddr] = s;
 		}
 	}
 };

@@ -1,4 +1,3 @@
-#include <format>
 #include "CPU.h"
 #include "Bus.h"
 
@@ -258,65 +257,6 @@ u16 CPU::PopPC()
 
 	u16 result = (high << 8) | low;
 	return result;
-}
-
-std::map<u16, std::string> CPU::Disassemble(u16 startAddr, u16 endAddr)
-{
-	u32 addr = startAddr;
-	u8 value = 0x00, lo = 0x00, hi = 0x00;
-	std::map<u16, std::string> mapLines;
-	u16 lineAddr = 0;
-
-	auto hex = [](uint32_t n, uint8_t d)
-	{
-		std::string s(d, '0');
-		for (int i = d - 1; i >= 0; i--, n >>= 4)
-			s[i] = "0123456789ABCDEF"[n & 0xF];
-		return s;
-	};
-
-	while (addr <= (u32)endAddr)
-	{
-		lineAddr = addr;
-
-		// prefix line with instruction addr
-		std::string s = "$" + hex(addr, 4) + ": ";
-
-		// read instruction and get readable name
-		u8 opcode = bus->Read(addr++);
-		if (opcode == 0xCB)
-		{
-			// its a 16bit opcode so read another byte
-			opcode = Read(addr++);
-
-			s += instructions16bit[opcode].mnemonic;
-		}
-		else
-		{
-			auto& instruction = instructions8bit[opcode];
-			if (instruction.bytes == 2)
-			{
-				u8 data = Read(addr++);
-				s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
-			}
-			else if (instruction.bytes == 3)
-			{
-				u16 lo = Read(addr++);
-				u16 hi = Read(addr++);
-				u16 data = (hi << 8) | lo;
-				s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
-			}
-			else
-			{
-				s += instructions8bit[opcode].mnemonic;
-			}
-		}
-
-
-		mapLines[lineAddr] = s;
-	}
-
-	return mapLines;
 }
 
 #pragma region CPU Control Instructions
