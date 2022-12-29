@@ -122,12 +122,12 @@ public:
 				do
 				{
 					gb.cpu.Clock();
-					gb.ppu.Clock(dmgScreen);
 					//if (gb.cpu.PC == 0xC44D)
 					//{
 					//	running = false;
 					//	goto BREAK;
 					//}
+					gb.ppu.Clock(dmgScreen);
 				} while (!gb.ppu.FrameComplete());
 			}
 			else if (step)
@@ -135,8 +135,8 @@ public:
 				do
 				{
 					gb.cpu.Clock();
+			BREAK:
 					gb.ppu.Clock(dmgScreen);
-					BREAK:
 				} while (!gb.cpu.InstructionComplete());
 				step = false;
 			}
