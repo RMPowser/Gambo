@@ -187,11 +187,11 @@ enum InterruptFlags
 
 static SDL_Color GameBoyColors[5]
 {
-	{ 255, 255, 255, 255 },
+	{ 228, 228, 228, 228 },
 	{ 192, 192, 192, 255 },
 	{ 96, 96, 96, 255 },
 	{ 0, 0, 0, 255 },
-	{ 255, 255, 255, 0 }, // transparent for use in sprites
+	{ 0, 0, 0, 0 }, // transparent for use in sprites
 };
 
 static const auto BytesPerPixel = 4;
