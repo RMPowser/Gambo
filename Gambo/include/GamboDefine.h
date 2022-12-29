@@ -176,6 +176,15 @@ enum ColorIndex
 	Transparent // for use in sprites
 };
 
+enum InterruptFlags
+{
+	VBlank	= 1 << 0,
+	LCDStat	= 1 << 1,
+	Timer	= 1 << 2,
+	Serial	= 1 << 3,
+	Joypad	= 1 << 4,
+};
+
 static SDL_Color GameBoyColors[5]
 {
 	{ 255, 255, 255, 255 },
