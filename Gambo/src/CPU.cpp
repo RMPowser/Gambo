@@ -37,6 +37,34 @@ void CPU::Clock()
 {
 	if (cycles == 0)
 	{
+		static u8 IF;
+		IF = bus->ram[HWAddr::IF];
+
+		// handle interrupts in priority order
+		if (IF & InterruptFlags::VBlank)
+		{
+			HandleInterrupt(InterruptFlags::VBlank);
+		}
+		else if (IF & InterruptFlags::LCDStat)
+		{
+			HandleInterrupt(InterruptFlags::LCDStat);
+		}
+		else if (IF & InterruptFlags::Timer)
+		{
+			HandleInterrupt(InterruptFlags::Timer);
+		}
+		else if (IF & InterruptFlags::Serial)
+		{
+			HandleInterrupt(InterruptFlags::Serial);
+		}
+		else if (IF & InterruptFlags::Joypad)
+		{
+			HandleInterrupt(InterruptFlags::Joypad);
+		}
+
+		
+
+		// read and execute code normally
 		opcode = Read(PC++);
 		if (opcode == 0xCB)
 		{
@@ -62,6 +90,51 @@ void CPU::Clock()
 	cycles--;
 }
 
+void CPU::HandleInterrupt(InterruptFlags f)
+{
+	static u8 IF;
+	IF = bus->ram[HWAddr::IF];
+
+	// acknowledge the interrupt
+	IF &= ~(f);
+
+	// give control to the interrupt if IME is enabled
+	if (IME)
+	{
+		IME = false;
+
+		cycles = 50;
+
+		PushPC();
+
+		switch (f)
+		{
+			case VBlank:
+				PC = 0x0040;
+				break;
+
+			case LCDStat:
+				PC = 0x0048;
+				break;
+
+			case Timer:
+				PC = 0x0050;
+				break;
+
+			case Serial:
+				PC = 0x0058;
+				break;
+
+			case Joypad:
+				PC = 0x0060;
+				break;
+
+			default:
+				throw;
+		}
+	}
+}
+
 bool CPU::InstructionComplete()
 {
 	return cycles == 0;
@@ -83,6 +156,9 @@ void CPU::Reset()
 	L = 0x4D;
 	PC = 0x0100;
 	SP = 0xFFFE;
+	IME = false;
+	stopMode = false;
+	isHalted = false;
 
 	// this is what the hardware registers look like at PC = 0x0100
 	bus->ram[HWAddr::P1]	=	 0xCF;
@@ -1194,7 +1270,7 @@ u8 CPU::LD_aa16_A()
 
 u8 CPU::LD_A_aa8()
 {
-	A = Read(Read(PC++));
+	A = Read(Read(PC++) | 0xFF00);
 	return 0;
 }
 
@@ -1264,58 +1340,58 @@ u8 CPU::LD_SP_d16()
 
 u8 CPU::POP_BC()
 {
-	C = Pop();
 	B = Pop();
+	C = Pop();
 	return 0;
 }
 
 u8 CPU::PUSH_BC()
 {
-	Push(B);
 	Push(C);
+	Push(B);
 	return 0;
 }
 
 u8 CPU::POP_DE()
 {
-	E = Pop();
 	D = Pop();
+	E = Pop();
 	return 0;
 }
 
 u8 CPU::PUSH_DE()
 {
-	Push(D);
 	Push(E);
+	Push(D);
 	return 0;
 }
 
 u8 CPU::POP_HL()
 {
-	L = Pop();
 	H = Pop();
+	L = Pop();
 	return 0;
 }
 
 u8 CPU::PUSH_HL()
 {
-	Push(H);
 	Push(L);
+	Push(H);
 	return 0;
 }
 
 u8 CPU::POP_AF()
 {
+	A = Pop();
 	F = Pop();
 	F &= ~(0b00001111);
-	A = Pop();
 	return 0;
 }
 
 u8 CPU::PUSH_AF()
 {
-	Push(A);
 	Push(F);
+	Push(A);
 	return 0;
 }
 
@@ -1364,7 +1440,7 @@ u8 CPU::DEC_B()
 
 	SetFlag(fZ, B == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (B & 0xF) != 0);
+	SetFlag(fH, (B & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1388,7 +1464,7 @@ u8 CPU::DEC_C()
 
 	SetFlag(fZ, C == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (C & 0xF) != 0);
+	SetFlag(fH, (C & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1412,7 +1488,7 @@ u8 CPU::DEC_D()
 
 	SetFlag(fZ, D == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (D & 0xF) != 0);
+	SetFlag(fH, (D & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1436,7 +1512,7 @@ u8 CPU::DEC_E()
 
 	SetFlag(fZ, E == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (E & 0xF) != 0);
+	SetFlag(fH, (E & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1460,7 +1536,7 @@ u8 CPU::DEC_H()
 
 	SetFlag(fZ, H == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (H & 0xF) != 0);
+	SetFlag(fH, (H & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1484,7 +1560,7 @@ u8 CPU::DEC_L()
 
 	SetFlag(fZ, L == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (L & 0xF) != 0);
+	SetFlag(fH, (L & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1510,7 +1586,7 @@ u8 CPU::DEC_aHL()
 
 	SetFlag(fZ, data == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (data & 0xF) != 0);
+	SetFlag(fH, (data & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1533,283 +1609,324 @@ u8 CPU::DEC_A()
 	A--;
 
 	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0xF) != 0);
+	SetFlag(fN, 1);
+	SetFlag(fH, (A & 0xF) == 0xF);
 
 	return 0;
 }
 
 u8 CPU::ADD_A_B()
 {
-	static u16 result;
-	result = A + B;
-	A += B;
+	int sum = A + B;
+	int noCarrySum = A ^ B;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += B;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_C()
 {
-	static u16 result;
-	result = A + C;
-	A += C;
+	int sum = A + C;
+	int noCarrySum = A ^ C;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += C;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_D()
 {
-	static u16 result;
-	result = A + D;
-	A += D;
+	int sum = A + D;
+	int noCarrySum = A ^ D;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += D;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_E()
 {
-	static u16 result;
-	result = A + E;
-	A += E;
+	int sum = A + E;
+	int noCarrySum = A ^ E;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += E;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_H()
 {
-	static u16 result;
-	result = A + H;
-	A += H;
+	int sum = A + H;
+	int noCarrySum = A ^ H;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += H;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_L()
 {
-	static u16 result;
-	result = A + L;
-	A += L;
+	int sum = A + L;
+	int noCarrySum = A ^ L;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += L;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_aHL()
 {
-	static u16 result;
-	result = A + Read(HL);
-	A += Read(HL);
+	int data = Read(HL);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADD_A_A()
 {
-	static u16 result;
-	result = A + A;
-	A += A;
+	int sum = A + A;
+	int noCarrySum = A ^ A;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += A;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_B()
 {
-	static u16 result;
-	result = A + B + GetFlag(fC);
-	A += B + GetFlag(fC);
+	int data = B + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_C()
 {
-	static u16 result;
-	result = A + C + GetFlag(fC);
-	A += C + GetFlag(fC);
+	int data = C + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_D()
 {
-	static u16 result;
-	result = A + D + GetFlag(fC);
-	A += D + GetFlag(fC);
+	int data = D + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_E()
 {
-	static u16 result;
-	result = A + E + GetFlag(fC);
-	A += E + GetFlag(fC);
+	int data = E + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_H()
 {
-	static u16 result;
-	result = A + H + GetFlag(fC);
-	A += H + GetFlag(fC);
+	int data = H + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_L()
 {
-	static u16 result;
-	result = A + L + GetFlag(fC);
-	A += L + GetFlag(fC);
+	int data = L + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_aHL()
 {
-	static u16 result;
-	result = A + Read(HL) + GetFlag(fC);
-	A += Read(HL) + GetFlag(fC);
+	int data = Read(HL) + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_A()
 {
-	static u16 result;
-	result = A + A + GetFlag(fC);
-	A += A + GetFlag(fC);
+	int data = A + GetFlag(fC);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_B()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (B & 0xF));
 	SetFlag(fC, A < B);
 
 	A -= B;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_C()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (C & 0xF));
 	SetFlag(fC, A < C);
 
 	A -= C;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_D()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (D & 0xF));
 	SetFlag(fC, A < D);
 
 	A -= D;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_E()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (E & 0xF));
 	SetFlag(fC, A < E);
 
 	A -= E;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_H()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (H & 0xF));
 	SetFlag(fC, A < H);
 
 	A -= H;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_L()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (L & 0xF));
 	SetFlag(fC, A < L);
 
 	A -= L;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
@@ -1818,89 +1935,89 @@ u8 CPU::SUB_A_aHL()
 	static u8 data;
 	data = Read(HL);
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (data & 0xF));
 	SetFlag(fC, A < data);
 
 	A -= data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_A()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (A & 0xF));
 	SetFlag(fC, A < A);
 
 	A -= A;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_B()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (B & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < B + GetFlag(fC));
 
 	A -= B - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_C()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (C & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < C + GetFlag(fC));
 
 	A -= C - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_D()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (D & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < D + GetFlag(fC));
 
 	A -= D - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_E()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (E & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < E + GetFlag(fC));
 
 	A -= E - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_H()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (H & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < H + GetFlag(fC));
 
 	A -= H - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_L()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (L & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < L + GetFlag(fC));
 
 	A -= L - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
@@ -1909,23 +2026,23 @@ u8 CPU::SBC_A_aHL()
 	static u8 data;
 	data = Read(HL);
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (data & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < data + GetFlag(fC));
 
 	A -= data - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::SBC_A_A()
 {
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
 	SetFlag(fH, (A & 0xF) < (A & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < A + GetFlag(fC));
 
 	A -= A - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
@@ -2325,33 +2442,36 @@ u8 CPU::CP_A_A()
 
 u8 CPU::ADD_A_d8()
 {
-	static u16 result;
 	static u8 data;
 	data = Read(PC++);
-	result = A + data;
-	A += data;
 
-	SetFlag(fZ, A == 0);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
-	return 0;
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
 
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
 u8 CPU::ADC_A_d8()
 {
-	static u16 result;
-	static u8 data;
-	data = Read(PC++);
-	result = A + data;
-	A += data;
+	int data = Read(PC++) + GetFlag(fC);
 
-	SetFlag(fZ, A == 0);
+	int sum = A + data;
+	int noCarrySum = A ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
 	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0b00010000));
-	SetFlag(fC, (result & 0b0000000100000000));
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
+
+	A += data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
@@ -2360,12 +2480,12 @@ u8 CPU::SUB_A_d8()
 	static u8 data;
 	data = Read(PC++);
 
-	SetFlag(fZ, A == 0);
 	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (data & 0xF));
 	SetFlag(fC, A < data);
+	SetFlag(fH, (A & 0xF) < (data & 0xF));
 
 	A -= data;
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
@@ -2373,13 +2493,13 @@ u8 CPU::SBC_A_d8()
 {
 	static u8 data;
 	data = Read(PC++);
-
-	SetFlag(fZ, A == 0);
+	
 	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (data & 0xF) + GetFlag(fC));
 	SetFlag(fC, A < data + GetFlag(fC));
+	SetFlag(fH, (A & 0xF) < (data & 0xF) + GetFlag(fC));
 
 	A -= data - GetFlag(fC);
+	SetFlag(fZ, A == 0);
 	return 0;
 }
 
@@ -2443,10 +2563,14 @@ u8 CPU::INC_BC()
 
 u8 CPU::ADD_HL_BC()
 {
+	int sum = HL + BC;
+	int noCarrySum = HL ^ BC;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
 	SetFlag(fN, 0);
-	SetFlag(fH, ((HL & 0xFF) + (BC & 0xFF)) > 0xFF);
-	SetFlag(fC, ((int)HL + (int)BC) > 0xFFFF);
-	
+	SetFlag(fH, carryBits & 0x100);
+	SetFlag(fC, carryBits & 0x10000);
+
 	HL += BC;
 	return 0;
 }
@@ -2465,9 +2589,13 @@ u8 CPU::INC_DE()
 
 u8 CPU::ADD_HL_DE()
 {
+	int sum = HL + DE;
+	int noCarrySum = HL ^ DE;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
 	SetFlag(fN, 0);
-	SetFlag(fH, ((HL & 0xFF) + (DE & 0xFF)) > 0xFF);
-	SetFlag(fC, ((int)HL + (int)DE) > 0xFFFF);
+	SetFlag(fH, carryBits & 0x100);
+	SetFlag(fC, carryBits & 0x10000);
 
 	HL += DE;
 	return 0;
@@ -2487,9 +2615,13 @@ u8 CPU::INC_HL()
 
 u8 CPU::ADD_HL_HL()
 {
+	int sum = HL + HL;
+	int noCarrySum = HL ^ HL;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
 	SetFlag(fN, 0);
-	SetFlag(fH, ((HL & 0xFF) + (HL & 0xFF)) > 0xFF);
-	SetFlag(fC, ((int)HL + (int)HL) > 0xFFFF);
+	SetFlag(fH, carryBits & 0x1000);
+	SetFlag(fC, carryBits & 0x10000);
 
 	HL += HL;
 	return 0;
@@ -2509,9 +2641,13 @@ u8 CPU::INC_SP()
 
 u8 CPU::ADD_HL_SP()
 {
+	int sum = HL + SP;
+	int noCarrySum = HL ^ SP;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
 	SetFlag(fN, 0);
-	SetFlag(fH, ((HL & 0xFF) + (SP & 0xFF)) > 0xFF);
-	SetFlag(fC, ((int)HL + (int)SP) > 0xFFFF);
+	SetFlag(fH, carryBits & 0x100);
+	SetFlag(fC, carryBits & 0x10000);
 
 	HL += SP;
 	return 0;
@@ -2525,12 +2661,15 @@ u8 CPU::DEC_SP()
 
 u8 CPU::ADD_SP_s8()
 {
-	static u8 data;
-	data = Read(PC++);
+	int data = Read(PC++);
+	int sum = SP + data;
+	int noCarrySum = SP ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
+	SetFlag(fZ, 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, ((SP & 0xFF) + (data & 0xFF)) > 0xFF);
-	SetFlag(fC, ((int)SP + (int)data) > 0xFFFF);
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
 
 	SP += data;
 	return 0;
@@ -2983,7 +3122,7 @@ u8 CPU::RR_C()
 	static bool bit0;
 	bit0 = C & 0b00000001;
 
-	C = (C >> 1) | (u8)GetFlag(fC);
+	C = (C >> 1) | (u8)GetFlag(fC) << 7;
 
 	SetFlag(fZ, C == 0);
 	SetFlag(fN, 0);
@@ -2998,7 +3137,7 @@ u8 CPU::RR_D()
 	static bool bit0;
 	bit0 = D & 0b00000001;
 
-	D = (D >> 1) | (u8)GetFlag(fC);
+	D = (D >> 1) | (u8)GetFlag(fC) << 7;
 
 	SetFlag(fZ, D == 0);
 	SetFlag(fN, 0);
@@ -3013,7 +3152,7 @@ u8 CPU::RR_E()
 	static bool bit0;
 	bit0 = E & 0b00000001;
 
-	E = (E >> 1) | (u8)GetFlag(fC);
+	E = (E >> 1) | (u8)GetFlag(fC) << 7;
 
 	SetFlag(fZ, E == 0);
 	SetFlag(fN, 0);
@@ -3028,7 +3167,7 @@ u8 CPU::RR_H()
 	static bool bit0;
 	bit0 = H & 0b00000001;
 
-	H = (H >> 1) | (u8)GetFlag(fC);
+	H = (H >> 1) | (u8)GetFlag(fC) << 7;
 
 	SetFlag(fZ, H == 0);
 	SetFlag(fN, 0);
@@ -3043,7 +3182,7 @@ u8 CPU::RR_L()
 	static bool bit0;
 	bit0 = L & 0b00000001;
 
-	L = (L >> 1) | (u8)GetFlag(fC);
+	L = (L >> 1) | (u8)GetFlag(fC) << 7;
 
 	SetFlag(fZ, L == 0);
 	SetFlag(fN, 0);
@@ -3060,7 +3199,7 @@ u8 CPU::RR_aHL()
 	data = Read(HL);
 	bit0 = data & 0b00000001;
 
-	Write(HL, (data >> 1) | (u8)GetFlag(fC));
+	Write(HL, (data >> 1) | (u8)GetFlag(fC) << 7);
 
 	SetFlag(fZ, Read(HL) == 0);
 	SetFlag(fN, 0);
@@ -3075,7 +3214,7 @@ u8 CPU::RR_A()
 	static bool bit0;
 	bit0 = A & 0b00000001;
 
-	A = (A >> 1) | (u8)GetFlag(fC);
+	A = (A >> 1) | (u8)GetFlag(fC) << 7;
 
 	SetFlag(fZ, A == 0);
 	SetFlag(fN, 0);
