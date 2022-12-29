@@ -168,20 +168,18 @@ private:
 		SDL_LockTexture(windowTexture, NULL, (void**)&target, &rowByteLength);
 		{
 			memset(target, 32, targetWidth * targetHeight * 4);
-			// Draw Ram Page 0x00
-			//DrawRam(2, 2, 0x0000, 16, 16);
-			//DrawRam(2, 182, 0x0100, 16, 16);
 			DrawCpu(target, targetWidth, targetHeight, 448, 2);
-			DrawCode(target, targetWidth, targetHeight, 448, 112, 22);
+			DrawCode(target, targetWidth, targetHeight, 448, 82, 10);
+			DrawStackPointer(target, targetWidth, targetHeight, 448, 202, 10);
+			DrawRamWrites(target, targetWidth, targetHeight, 548, 202, 10);
 
 			DrawString(target, targetWidth, targetHeight, 10, 332, "SPACE = Step Instruction    R = RESET    P = PLAY");
-			//DrawString(target, targetWidth, targetHeight, 10, 510, std::format("FPS: {}", "???"));
 		}
 		SDL_UnlockTexture(windowTexture);
 
 
 		SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
-		SDL_RenderClear(renderer);
+		//SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, windowTexture, NULL, NULL);
 		static SDL_Rect destRect = { 0, 0, DMGScreenWidth * PixelScale * 2, DMGScreenHeight * PixelScale * 2 };
 		SDL_RenderCopy(renderer, dmgScreen, NULL, &destRect);
@@ -237,52 +235,114 @@ private:
 	{
 		DrawString(target, targetWidth, targetHeight, x, y, "FLAGS:");
 		DrawString(target, targetWidth, targetHeight, x + 56, y, "Z", gb.cpu.F & CPU::fZ ? GREEN : RED);
-		DrawString(target, targetWidth, targetHeight, x + 72, y, "N", gb.cpu.F & CPU::fN ? GREEN : RED);
-		DrawString(target, targetWidth, targetHeight, x + 88, y, "H", gb.cpu.F & CPU::fH ? GREEN : RED);
-		DrawString(target, targetWidth, targetHeight, x + 104, y, "C", gb.cpu.F & CPU::fC ? GREEN : RED);
-		DrawString(target, targetWidth, targetHeight, x, y + 10, "PC: $" + hex(gb.cpu.PC, 4));
-		DrawString(target, targetWidth, targetHeight, x, y + 20, "AF: $" + hex(gb.cpu.AF, 4));
-		DrawString(target, targetWidth, targetHeight, x, y + 30, "BC: $" + hex(gb.cpu.BC, 4));
-		DrawString(target, targetWidth, targetHeight, x, y + 40, "DE: $" + hex(gb.cpu.DE, 4));
-		DrawString(target, targetWidth, targetHeight, x, y + 50, "HL: $" + hex(gb.cpu.HL, 4));
-		DrawString(target, targetWidth, targetHeight, x, y + 60, "SP: $" + hex(gb.cpu.SP, 4));
+		DrawString(target, targetWidth, targetHeight, x + 64, y, "N", gb.cpu.F & CPU::fN ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x + 72, y, "H", gb.cpu.F & CPU::fH ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x + 80, y, "C", gb.cpu.F & CPU::fC ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x + 100, y, "IME", gb.cpu.IME ? GREEN : RED);
+		DrawString(target, targetWidth, targetHeight, x, y + 10, "AF: $" + hex(gb.cpu.AF, 4));
+		DrawString(target, targetWidth, targetHeight, x, y + 20, "BC: $" + hex(gb.cpu.BC, 4));
+		DrawString(target, targetWidth, targetHeight, x, y + 30, "DE: $" + hex(gb.cpu.DE, 4));
+		DrawString(target, targetWidth, targetHeight, x, y + 40, "HL: $" + hex(gb.cpu.HL, 4));
+		DrawString(target, targetWidth, targetHeight, x, y + 50, "SP: $" + hex(gb.cpu.SP, 4), GREEN);
+		DrawString(target, targetWidth, targetHeight, x, y + 60, "PC: $" + hex(gb.cpu.PC, 4), CYAN);
+		DrawString(target, targetWidth, targetHeight, x + 100, y + 10, "LCDC: $" + hex(gb.ram[HWAddr::LCDC], 2));
+		DrawString(target, targetWidth, targetHeight, x + 100, y + 20, "STAT: $" + hex(gb.ram[HWAddr::STAT], 2));
+		DrawString(target, targetWidth, targetHeight, x + 100, y + 30, "LY:   $" + hex(gb.ram[HWAddr::LY], 2));
+		DrawString(target, targetWidth, targetHeight, x + 100, y + 50, "IE:   $" + hex(gb.ram[HWAddr::IE], 2));
+		DrawString(target, targetWidth, targetHeight, x + 100, y + 60, "IF:   $" + hex(gb.ram[HWAddr::IF], 2));
 	}
 
 	void DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
 	{
-		auto it_a = mapAsm.find(gb.cpu.PC);
-		SDL_assert(it_a != mapAsm.end());
-		SDL_assert(it_a != mapAsm.end());
+		auto it_a = gb.mapAsm.find(gb.cpu.PC);
+		SDL_assert(it_a != gb.mapAsm.end());
 
 		int nLineY = (nLines >> 1) * 10 + y;
-		if (it_a != mapAsm.end())
+		if (it_a != gb.mapAsm.end())
 		{
 			DrawString(target, targetWidth, targetHeight, x, nLineY, (*it_a).second, CYAN);
 			while (nLineY < (nLines * 10) + y)
 			{
 				nLineY += 10;
-				if (++it_a != mapAsm.end())
+				if (++it_a != gb.mapAsm.end())
 				{
 					DrawString(target, targetWidth, targetHeight, x, nLineY, (*it_a).second);
 				}
 			}
 		}
 
-		it_a = mapAsm.find(gb.cpu.PC);
+		it_a = gb.mapAsm.find(gb.cpu.PC);
 		nLineY = (nLines >> 1) * 10 + y;
-		if (it_a != mapAsm.end())
+		if (it_a != gb.mapAsm.end())
 		{
 			while (nLineY > y)
 			{
 				nLineY -= 10;
-				if (--it_a != mapAsm.end())
+				if (--it_a != gb.mapAsm.end())
 				{
 					DrawString(target, targetWidth, targetHeight, x, nLineY, (*it_a).second);
 				}
 			}
 		}
 	}
+
+	void DrawStackPointer(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
+	{
+		u16 addr = gb.cpu.SP;
+		int nLineY = (nLines >> 1) * 10 + y;
+		auto data0 = hex(addr, 4);
+		auto data1 = hex(gb.ram[addr], 2);
+		auto data2 = hex(gb.ram[u16(addr + 1)], 2);
+		auto s = std::format("${}: {}{}", data0, data1, data2);
+		DrawString(target, targetWidth, targetHeight, x, nLineY, s, GREEN);
+		while (nLineY < (nLines * 10) + y)
+		{
+			nLineY += 10;
+			addr += 2;
+			data0 = hex(addr, 4);
+			data1 = hex(gb.ram[addr], 2);
+			data2 = hex(gb.ram[u16(addr + 1)], 2);
+			s = std::format("${}: {}{}", data0, data1, data2);
+			DrawString(target, targetWidth, targetHeight, x, nLineY, s);
+		}
+
+		addr = gb.cpu.SP;
+		nLineY = (nLines >> 1) * 10 + y;
+		while (nLineY > y)
+		{
+			nLineY -= 10;
+			addr -= 2;
+			data0 = hex(addr, 4);
+			data1 = hex(gb.ram[addr], 2);
+			data2 = hex(gb.ram[u16(addr + 1)], 2);
+			s = std::format("${}: {}{}", data0, data1, data2);
+			DrawString(target, targetWidth, targetHeight, x, nLineY, s);
+		}
+	}
+
+	void DrawRamWrites(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
+	{
+		u16 addr = gb.lastWrite;
+		int nLineY = (nLines >> 1) * 10 + y;
+		DrawString(target, targetWidth, targetHeight, x, nLineY, std::format("${}: {}", hex(addr, 4), hex(gb.ram[addr], 2)), RED);
+		while (nLineY < (nLines * 10) + y)
+		{
+			nLineY += 10;
+			addr++;
+			DrawString(target, targetWidth, targetHeight, x, nLineY, std::format("${}: {}", hex(addr, 4), hex(gb.ram[addr], 2)));
+		}
+
+		addr = gb.lastWrite;
+		nLineY = (nLines >> 1) * 10 + y;
+		while (nLineY > y)
+		{
+			nLineY -= 10;
+			addr--;
+			DrawString(target, targetWidth, targetHeight, x, nLineY, std::format("${}: {}", hex(addr, 4), hex(gb.ram[addr], 2)));
+		}
+	}
 };
+
 
 int main(int argc, char* argv[])
 {
