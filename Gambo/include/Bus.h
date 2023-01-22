@@ -70,6 +70,12 @@ public:
 			{
 				ram[HWAddr::IF] |= 0b11100000;
 			}
+			
+			// writing anything to the DIV register resets it to 0
+			if (addr == HWAddr::DIV)
+			{
+				ram[addr] = 0;
+			}
 
 			lastWrite = addr;
 		}

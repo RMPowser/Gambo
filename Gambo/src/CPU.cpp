@@ -87,6 +87,8 @@ void CPU::Clock()
 	}
 
 	cycles--;
+
+	UpdateTimers();
 }
 
 void CPU::HandleInterrupt(InterruptFlags f)
@@ -129,6 +131,78 @@ void CPU::HandleInterrupt(InterruptFlags f)
 
 			default:
 				throw;
+		}
+	}
+}
+
+void CPU::UpdateTimers()
+{
+	static int DIVCounter = 0;
+
+	// DIV register always counts up every 256 clock cycles
+	if (DIVCounter == 256)
+	{
+		DIVCounter = 0;
+		bus->ram[HWAddr::DIV]++;
+	}
+	else
+	{
+		DIVCounter++;
+	}
+
+
+
+	// TIMA iterates at a specified frequency and only if it's enabled.
+	static int TIMACounter = 0;
+
+	static u8& TAC = bus->ram[HWAddr::TAC];
+	static bool TIMAEnabled;
+	TIMAEnabled = TAC & 0b100;
+	if (TIMAEnabled)
+	{
+		static u8 TIMAFreqSelect;
+		TIMAFreqSelect = TAC & 0b011;
+
+		static int TIMAFreq;
+		switch (TIMAFreqSelect)
+		{
+			case 0b00:
+				TIMAFreq = 1024;
+				break;
+
+			case 0b01:
+				TIMAFreq = 16;
+				break;
+
+			case 0b10:
+				TIMAFreq = 64;
+				break;
+
+			case 0b11:
+				TIMAFreq = 256;
+				break;
+		}
+
+		// iterate TIMA at specified frequency
+		if (TIMACounter == TIMAFreq)
+		{
+			TIMACounter = 0;
+			static u8& TIMA = bus->ram[HWAddr::TIMA];
+			if (TIMA == 0xFF)
+			{
+				// TIMA resets to TMA register value
+				TIMA = bus->ram[HWAddr::TMA];
+				// request interrupt
+				bus->ram[HWAddr::IF] |= InterruptFlags::Timer;
+			}
+			else
+			{
+				TIMA++;
+			}
+		}
+		else
+		{
+			TIMACounter++;
 		}
 	}
 }
