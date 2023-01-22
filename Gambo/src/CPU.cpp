@@ -36,33 +36,6 @@ void CPU::Clock()
 {
 	if (cycles == 0)
 	{
-		static u8 IF;
-		IF = bus->ram[HWAddr::IF];
-
-		// handle interrupts in priority order
-		if (IF & InterruptFlags::VBlank)
-		{
-			HandleInterrupt(InterruptFlags::VBlank);
-		}
-		else if (IF & InterruptFlags::LCDStat)
-		{
-			HandleInterrupt(InterruptFlags::LCDStat);
-		}
-		else if (IF & InterruptFlags::Timer)
-		{
-			HandleInterrupt(InterruptFlags::Timer);
-		}
-		else if (IF & InterruptFlags::Serial)
-		{
-			HandleInterrupt(InterruptFlags::Serial);
-		}
-		else if (IF & InterruptFlags::Joypad)
-		{
-			HandleInterrupt(InterruptFlags::Joypad);
-		}
-
-		
-
 		// read and execute code normally
 		opcode = Read(PC++);
 		if (opcode == 0xCB)
@@ -84,6 +57,33 @@ void CPU::Clock()
 			// execute the instruction and see if we require additional clock cycles
 			cycles += (this->*instructions8bit[opcode].Execute)();
 		}
+
+
+
+		static u8& IF = bus->ram[HWAddr::IF];
+		static u8& IE = bus->ram[HWAddr::IE];
+
+		// handle interrupts in priority order
+		if (IF & InterruptFlags::VBlank && IE & InterruptFlags::VBlank)
+		{
+			HandleInterrupt(InterruptFlags::VBlank);
+		}
+		else if (IF & InterruptFlags::LCDStat && IE & InterruptFlags::LCDStat)
+		{
+			HandleInterrupt(InterruptFlags::LCDStat);
+		}
+		else if (IF & InterruptFlags::Timer && IE & InterruptFlags::Timer)
+		{
+			HandleInterrupt(InterruptFlags::Timer);
+		}
+		else if (IF & InterruptFlags::Serial && IE & InterruptFlags::Serial)
+		{
+			HandleInterrupt(InterruptFlags::Serial);
+		}
+		else if (IF & InterruptFlags::Joypad && IE & InterruptFlags::Joypad)
+		{
+			HandleInterrupt(InterruptFlags::Joypad);
+		}
 	}
 
 	cycles--;
@@ -91,16 +91,15 @@ void CPU::Clock()
 
 void CPU::HandleInterrupt(InterruptFlags f)
 {
-	static u8 IF;
-	IF = bus->ram[HWAddr::IF];
-
-	// acknowledge the interrupt
-	IF &= ~(f);
+	static u8& IF = bus->ram[HWAddr::IF];
 
 	// give control to the interrupt if IME is enabled
 	if (IME)
 	{
 		IME = false;
+
+		// acknowledge the interrupt
+		IF &= ~(f);
 
 		cycles = 50;
 
