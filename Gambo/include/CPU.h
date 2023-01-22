@@ -133,10 +133,8 @@ public:
 	void SetFlag(Flags f, bool v);
 	bool GetFlag(Flags f);
 
-	void Push(u8 data);
-	u8 Pop();
-	void PushPC();
-	u16 PopPC();
+	void Push(const std::same_as<u16> auto data);
+	void Pop(std::same_as<u16> auto& data);
 
 private:
 	u8 cycles = 0;

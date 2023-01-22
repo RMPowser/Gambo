@@ -103,7 +103,7 @@ void CPU::HandleInterrupt(InterruptFlags f)
 
 		cycles = 50;
 
-		PushPC();
+		Push(PC);
 
 		switch (f)
 		{
@@ -231,31 +231,26 @@ bool CPU::GetFlag(Flags f)
 		: false;
 }
 
-void CPU::Push(u8 data)
+void CPU::Push(const std::same_as<u16> auto data)
 {
-	Write(--SP, data);
+	static u8 high;
+	static u8 low;
+
+	high = data >> 8;
+	low = data & 0xFF;
+
+	Write(--SP, high);
+	Write(--SP, low);
 }
 
-u8 CPU::Pop()
-{
-	return Read(SP++);
-}
-
-void CPU::PushPC()
-{
-	Push(PC & 0xFF);
-	Push(PC >> 8);
-}
-
-u16 CPU::PopPC()
+void CPU::Pop(std::same_as<u16> auto& reg)
 {
 	static u16 high;
 	static u16 low;
-	high = Pop();
-	low = Pop();
+	low = Read(SP++);
+	high = Read(SP++);
 
-	u16 result = (high << 8) | low;
-	return result;
+	reg = (high << 8) | low;
 }
 
 #pragma region CPU Control Instructions
@@ -420,7 +415,7 @@ u8 CPU::RET_NZ()
 {
 	if (!GetFlag(fZ))
 	{
-		PC = PopPC();
+		Pop(PC);
 		return 12;
 	}
 	else
@@ -463,7 +458,7 @@ u8 CPU::CALL_NZ_a16()
 	u16 addr = high << 8 | low;
 	if (!GetFlag(fZ))
 	{
-		PushPC();
+		Push(PC);
 		PC = addr;
 		return 12;
 	}
@@ -475,7 +470,7 @@ u8 CPU::CALL_NZ_a16()
 
 u8 CPU::RST_0()
 {
-	PushPC();
+	Push(PC);
 
 	PC = 0x0000;
 	return 0;
@@ -485,7 +480,7 @@ u8 CPU::RET_Z()
 {
 	if (GetFlag(fZ))
 	{
-		PC = PopPC();
+		Pop(PC);
 		return 12;
 	}
 	else
@@ -496,7 +491,7 @@ u8 CPU::RET_Z()
 
 u8 CPU::RET()
 {
-	PC = PopPC();
+	Pop(PC);
 	return 0;
 }
 
@@ -525,7 +520,7 @@ u8 CPU::CALL_Z_a16()
 	u16 addr = high << 8 | low;
 	if (GetFlag(fZ))
 	{
-		PushPC();
+		Push(PC);
 		PC = addr;
 		return 12;
 	}
@@ -541,7 +536,7 @@ u8 CPU::CALL_a16()
 	u16 high = Read(PC++);
 
 	u16 addr = high << 8 | low;
-	PushPC();
+	Push(PC);
 	PC = addr;
 
 	return 0;
@@ -549,7 +544,7 @@ u8 CPU::CALL_a16()
 
 u8 CPU::RST_1()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0008;
 	return 0;
 }
@@ -558,7 +553,7 @@ u8 CPU::RET_NC()
 {
 	if (!GetFlag(fC))
 	{
-		PC = PopPC();
+		Pop(PC);
 		return 12;
 	}
 	else
@@ -592,7 +587,7 @@ u8 CPU::CALL_NC_a16()
 	u16 addr = high << 8 | low;
 	if (!GetFlag(fC))
 	{
-		PushPC();
+		Push(PC);
 		PC = addr;
 		return 12;
 	}
@@ -604,7 +599,7 @@ u8 CPU::CALL_NC_a16()
 
 u8 CPU::RST_2()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0010;
 	return 0;
 }
@@ -613,7 +608,7 @@ u8 CPU::RET_C()
 {
 	if (GetFlag(fC))
 	{
-		PC = PopPC();
+		Pop(PC);
 		return 12;
 	}
 	else
@@ -658,7 +653,7 @@ u8 CPU::CALL_C_a16()
 	u16 addr = high << 8 | low;
 	if (GetFlag(fZ))
 	{
-		PushPC();
+		Push(PC);
 		PC = addr;
 		return 12;
 	}
@@ -670,14 +665,14 @@ u8 CPU::CALL_C_a16()
 
 u8 CPU::RST_3()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0018;
 	return 0;
 }
 
 u8 CPU::RST_4()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0020;
 	return 0;
 }
@@ -690,21 +685,21 @@ u8 CPU::JP_HL()
 
 u8 CPU::RST_5()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0028;
 	return 0;
 }
 
 u8 CPU::RST_6()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0030;
 	return 0;
 }
 
 u8 CPU::RST_7()
 {
-	PushPC();
+	Push(PC);
 	PC = 0x0038;
 	return 0;
 }
@@ -1279,58 +1274,50 @@ u8 CPU::LD_SP_d16()
 
 u8 CPU::POP_BC()
 {
-	B = Pop();
-	C = Pop();
+	Pop(BC);
 	return 0;
 }
 
 u8 CPU::PUSH_BC()
 {
-	Push(C);
-	Push(B);
+	Push(BC);
 	return 0;
 }
 
 u8 CPU::POP_DE()
 {
-	D = Pop();
-	E = Pop();
+	Pop(DE);
 	return 0;
 }
 
 u8 CPU::PUSH_DE()
 {
-	Push(E);
-	Push(D);
+	Push(DE);
 	return 0;
 }
 
 u8 CPU::POP_HL()
 {
-	H = Pop();
-	L = Pop();
+	Pop(HL);
 	return 0;
 }
 
 u8 CPU::PUSH_HL()
 {
-	Push(L);
-	Push(H);
+	Push(HL);
 	return 0;
 }
 
 u8 CPU::POP_AF()
 {
-	A = Pop();
-	F = Pop();
+	Pop(AF);
 	F &= ~(0b00001111);
 	return 0;
 }
 
 u8 CPU::PUSH_AF()
 {
-	Push(F);
-	Push(A);
+	Push(AF);
 	return 0;
 }
 
