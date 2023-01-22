@@ -1342,14 +1342,17 @@ u8 CPU::LD_HL_SPinc_s8()
 	static int result16;
 
 	data = Read(PC++);
-	result8 = (SP & 0xF) + (data & 0xF);
-	result16 = SP + data;
-	HL = SP + data;
+
+	int sum = SP + data;
+	int noCarrySum = SP ^ data;
+	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+
+	HL = sum;
 
 	SetFlag(fZ, 0);
 	SetFlag(fN, 0);
-	SetFlag(fH, result8 > 0xFF);
-	SetFlag(fC, result16 > 0xFFFF);
+	SetFlag(fH, carryBits & 0x10);
+	SetFlag(fC, carryBits & 0x100);
 
 	return 0;
 }
