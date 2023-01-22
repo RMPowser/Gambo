@@ -292,17 +292,15 @@ private:
 		int nLineY = (nLines >> 1) * 10 + y;
 		auto data0 = hex(addr, 4);
 		auto data1 = hex(gb.ram[addr], 2);
-		auto data2 = hex(gb.ram[u16(addr + 1)], 2);
-		auto s = std::format("${}: {}{}", data0, data1, data2);
+		auto s = std::format("${}: {}", data0, data1);
 		DrawString(target, targetWidth, targetHeight, x, nLineY, s, GREEN);
 		while (nLineY < (nLines * 10) + y)
 		{
 			nLineY += 10;
-			addr += 2;
+			addr += 1;
 			data0 = hex(addr, 4);
 			data1 = hex(gb.ram[addr], 2);
-			data2 = hex(gb.ram[u16(addr + 1)], 2);
-			s = std::format("${}: {}{}", data0, data1, data2);
+			s = std::format("${}: {}", data0, data1);
 			DrawString(target, targetWidth, targetHeight, x, nLineY, s);
 		}
 
@@ -311,11 +309,10 @@ private:
 		while (nLineY > y)
 		{
 			nLineY -= 10;
-			addr -= 2;
+			addr -= 1;
 			data0 = hex(addr, 4);
 			data1 = hex(gb.ram[addr], 2);
-			data2 = hex(gb.ram[u16(addr + 1)], 2);
-			s = std::format("${}: {}{}", data0, data1, data2);
+			s = std::format("${}: {}", data0, data1);
 			DrawString(target, targetWidth, targetHeight, x, nLineY, s);
 		}
 	}
