@@ -1301,7 +1301,7 @@ u8 CPU::LD_A_aa8()
 
 u8 CPU::LD_A_aC()
 {
-	A = Read(C);
+	A = Read(u16(0xFF00 + C));
 	return 0;
 }
 
