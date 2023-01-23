@@ -2679,7 +2679,7 @@ u8 CPU::DEC_SP()
 
 u8 CPU::ADD_SP_s8()
 {
-	int data = Read(PC++);
+	s8 data = Read(PC++);
 	int sum = SP + data;
 	int noCarrySum = SP ^ data;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
