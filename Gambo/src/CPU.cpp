@@ -36,53 +36,63 @@ void CPU::Clock()
 {
 	if (cycles == 0)
 	{
-		// read and execute code normally
-		opcode = Read(PC++);
-		if (opcode == 0xCB)
+		cycles = instructions8bit[0].cycles; 
+
+		if (isHalted && InterruptPending())
 		{
-			// its a 16bit opcode
+			isHalted = false;
+		}
+		
+		if (!isHalted)
+		{
+			// read and execute code normally
 			opcode = Read(PC++);
+			if (opcode == 0xCB)
+			{
+				// its a 16bit opcode
+				opcode = Read(PC++);
 
-			// lookup the initial number of clock cycles this instruction takes
-			cycles = instructions16bit[opcode].cycles;
+				// lookup the initial number of clock cycles this instruction takes
+				cycles = instructions16bit[opcode].cycles;
 
-			// execute the instruction and see if we require additional clock cycles
-			cycles += (this->*instructions16bit[opcode].Execute)();
-		}
-		else
-		{
-			// lookup the initial number of cycles this instruction takes
-			cycles = instructions8bit[opcode].cycles;
+				// execute the instruction and see if we require additional clock cycles
+				cycles += (this->*instructions16bit[opcode].Execute)();
+			}
+			else
+			{
+				// lookup the initial number of cycles this instruction takes
+				cycles = instructions8bit[opcode].cycles;
 
-			// execute the instruction and see if we require additional clock cycles
-			cycles += (this->*instructions8bit[opcode].Execute)();
-		}
+				// execute the instruction and see if we require additional clock cycles
+				cycles += (this->*instructions8bit[opcode].Execute)();
+			}
 
 
 
-		static u8& IF = bus->ram[HWAddr::IF];
-		static u8& IE = bus->ram[HWAddr::IE];
+			static u8& IF = bus->ram[HWAddr::IF];
+			static u8& IE = bus->ram[HWAddr::IE];
 
-		// handle interrupts in priority order
-		if (IF & InterruptFlags::VBlank && IE & InterruptFlags::VBlank)
-		{
-			HandleInterrupt(InterruptFlags::VBlank);
-		}
-		else if (IF & InterruptFlags::LCDStat && IE & InterruptFlags::LCDStat)
-		{
-			HandleInterrupt(InterruptFlags::LCDStat);
-		}
-		else if (IF & InterruptFlags::Timer && IE & InterruptFlags::Timer)
-		{
-			HandleInterrupt(InterruptFlags::Timer);
-		}
-		else if (IF & InterruptFlags::Serial && IE & InterruptFlags::Serial)
-		{
-			HandleInterrupt(InterruptFlags::Serial);
-		}
-		else if (IF & InterruptFlags::Joypad && IE & InterruptFlags::Joypad)
-		{
-			HandleInterrupt(InterruptFlags::Joypad);
+			// handle interrupts in priority order
+			if (IF & InterruptFlags::VBlank && IE & InterruptFlags::VBlank)
+			{
+				HandleInterrupt(InterruptFlags::VBlank);
+			}
+			else if (IF & InterruptFlags::LCDStat && IE & InterruptFlags::LCDStat)
+			{
+				HandleInterrupt(InterruptFlags::LCDStat);
+			}
+			else if (IF & InterruptFlags::Timer && IE & InterruptFlags::Timer)
+			{
+				HandleInterrupt(InterruptFlags::Timer);
+			}
+			else if (IF & InterruptFlags::Serial && IE & InterruptFlags::Serial)
+			{
+				HandleInterrupt(InterruptFlags::Serial);
+			}
+			else if (IF & InterruptFlags::Joypad && IE & InterruptFlags::Joypad)
+			{
+				HandleInterrupt(InterruptFlags::Joypad);
+			}
 		}
 	}
 
@@ -205,6 +215,11 @@ void CPU::UpdateTimers()
 			TIMACounter++;
 		}
 	}
+}
+
+bool CPU::InterruptPending()
+{
+	return (bus->ram[HWAddr::IE] & bus->ram[HWAddr::IF]) != 0;
 }
 
 bool CPU::InstructionComplete()

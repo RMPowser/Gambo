@@ -139,6 +139,7 @@ public:
 private:
 	u8 cycles = 0;
 	void UpdateTimers();
+	bool InterruptPending();
 
 #pragma region CPU Control Instructions
 	u8 XXX(); // catch all non existing instructions8bit
