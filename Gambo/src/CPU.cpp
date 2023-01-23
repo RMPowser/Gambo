@@ -874,7 +874,9 @@ u8 CPU::LD_aHLdec_A()
 
 u8 CPU::LD_aHL_d8()
 {
-	Write(HL, A);
+	static u8 data;
+	data = Read(PC++);
+	Write(HL, data);
 	return 0;
 }
 
