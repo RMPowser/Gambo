@@ -2480,17 +2480,16 @@ u8 CPU::ADD_A_d8()
 
 u8 CPU::ADC_A_d8()
 {
-	int data = Read(PC++) + GetFlag(fC);
+	int carry = GetFlag(fC);
+	int data = Read(PC++);
 
-	int sum = A + data;
-	int noCarrySum = A ^ data;
-	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
+	int sum = A + data + carry;
 
 	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(fH, ((A & 0xF) + (data & 0xF) + carry) > 0xF);
+	SetFlag(fC, sum > 0xFF);
 
-	A += data;
+	A = (u8)sum;
 	SetFlag(fZ, A == 0);
 	return 0;
 }
@@ -2511,14 +2510,16 @@ u8 CPU::SUB_A_d8()
 
 u8 CPU::SBC_A_d8()
 {
-	static u8 data;
-	data = Read(PC++);
-	
-	SetFlag(fN, 1);
-	SetFlag(fC, A < data + GetFlag(fC));
-	SetFlag(fH, (A & 0xF) < (data & 0xF) + GetFlag(fC));
+	int carry = GetFlag(fC);
+	int data = Read(PC++);
 
-	A -= data - GetFlag(fC);
+	int sum = A - data - carry;
+
+	SetFlag(fN, 1);
+	SetFlag(fH, ((A & 0xF) - (data & 0xF) - carry) < 0);
+	SetFlag(fC, sum < 0);
+
+	A = (u8)sum;
 	SetFlag(fZ, A == 0);
 	return 0;
 }
