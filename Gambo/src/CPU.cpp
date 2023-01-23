@@ -2664,7 +2664,7 @@ u8 CPU::ADD_HL_SP()
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
 	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x100);
+	SetFlag(fH, carryBits & 0x1000);
 	SetFlag(fC, carryBits & 0x10000);
 
 	HL += SP;
