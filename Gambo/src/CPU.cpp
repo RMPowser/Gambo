@@ -1327,7 +1327,7 @@ u8 CPU::LD_a16_SP()
 	u16 low = Read(PC++);
 	u16 high = Read(PC++);
 	u16 addr = (high << 8) | low;
-	u8 spLow = u8(SP | 0xFF);
+	u8 spLow = u8(SP & 0xFF);
 	u8 spHigh = u8(SP >> 8);
 	Write(addr, spLow);
 	Write(addr + 1, spHigh);
