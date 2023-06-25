@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <vector>
 #include <string>
-#include <profileapi.h>
 
 typedef uint64_t u64;
 typedef  int64_t s64;
