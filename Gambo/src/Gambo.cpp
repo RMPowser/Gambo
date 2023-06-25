@@ -343,7 +343,7 @@ private:
 
 int main(int argc, char* argv[])
 {
-	std::unique_ptr<Gambo> emu = std::make_unique<Gambo>();
+	auto emu = std::make_unique<Gambo>();
 	emu->Run();
 
 	return 0;
