@@ -259,7 +259,7 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 						static bool colorBit1;
 						colorBit0 = data0 & (1 << colorBitIndex);
 						colorBit1 = data1 & (1 << colorBitIndex);
-						colorIndex = (colorBit1 << 1) | colorBit0;
+						colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
 
 						// now we have the color id, get the actual color from BG palette 0xFF47
 						static u8 color;
