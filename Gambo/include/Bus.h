@@ -92,8 +92,11 @@ public:
 
 		while (addr <= (u32)endAddr)
 		{
-			// skip vram
-			if (0x8800 <= addr && addr <= 0x9FFF)
+			
+			if ((0x4000 <= addr && addr <= 0xBFFF) || // skip vram
+				(0x0104 <= addr && addr <= 0x014F) || // skip cartridge header
+				(0xFE00 <= addr && addr <= 0xFE7F) || // skip OAM and IO
+				(addr == 0xD800)) // skip this address in particular because if i dont, it breaks disassembly
 			{
 				addr++;
 				continue;
