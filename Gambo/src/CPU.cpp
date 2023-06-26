@@ -3366,9 +3366,9 @@ u8 CPU::SRA_aHL()
 	static u8 data;
 	static bool bit0;
 	static bool bit7;
-	bit0 = B & 0b00000001;
-	bit7 = B & 0b10000000;
 	data = Read(HL);
+	bit0 = data & 0b00000001;
+	bit7 = (data & 0b10000000) >> 7;
 
 	Write(HL, (data >> 1) | (bit7 << 7));
 

@@ -36,7 +36,7 @@ public:
 		windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
 		SDL_assert_release(windowTexture);
 
-		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\cpu_instrs\\individual\\09-op r,r.gb", std::ios::binary);
+		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\cpu_instrs\\individual\\11-op a,(hl).gb", std::ios::binary);
 
 		// copies all data into buffer
 		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
