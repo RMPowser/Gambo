@@ -119,24 +119,32 @@ public:
 			else
 			{
 				auto& instruction = cpu.instructions8bit[opcode];
-				if (instruction.bytes == 2)
+				switch (instruction.bytes)
 				{
-					u8 data = ram[addr++];
-					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
-				}
-				else if (instruction.bytes == 3)
-				{
-					u16 lo = ram[addr++];
-					u16 hi = ram[addr++];
-					u16 data = (hi << 8) | lo;
-					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
-				}
-				else
-				{
-					s += cpu.instructions8bit[opcode].mnemonic;
+					case 0:
+					case 1:
+					{
+						s += cpu.instructions8bit[opcode].mnemonic;
+						break;
+					}
+					case 2:
+					{
+						u8 data = ram[addr++];
+						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
+						break;
+					}
+					case 3:
+					{
+						u16 lo = ram[addr++];
+						u16 hi = ram[addr++];
+						u16 data = (hi << 8) | lo;
+						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
+						break;
+					}
+					default:
+						throw("opcode has more than 3 bytes");
 				}
 			}
-
 
 			mapAsm[lineAddr] = s;
 		}
