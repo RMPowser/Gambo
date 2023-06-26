@@ -36,7 +36,7 @@ public:
 		windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
 		SDL_assert_release(windowTexture);
 
-		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\cpu_instrs\\individual\\02-interrupts.gb", std::ios::binary);
+		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\cpu_instrs\\individual\\09-op r,r.gb", std::ios::binary);
 
 		// copies all data into buffer
 		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
@@ -122,7 +122,8 @@ public:
 				do
 				{
 					gb.cpu.Clock();
-					//if (gb.cpu.PC == 0xC44D)
+					// 0xC869
+					//if (gb.cpu.PC == 0xC01C)
 					//{
 					//	running = false;
 					//	goto BREAK;
@@ -135,13 +136,13 @@ public:
 				do
 				{
 					gb.cpu.Clock();
-			BREAK:
+				BREAK:
 					gb.ppu.Clock(dmgScreen);
 				} while (!gb.cpu.InstructionComplete());
 				step = false;
 			}
 
-			gb.Disassemble(gb.cpu.PC - 20, gb.cpu.PC + 20);
+			//gb.Disassemble(0x0000, 0xFFFF);
 
 
 			Render();
@@ -339,7 +340,6 @@ private:
 		}
 	}
 };
-
 
 int main(int argc, char* argv[])
 {
