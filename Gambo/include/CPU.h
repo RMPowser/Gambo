@@ -143,6 +143,7 @@ private:
 
 	void ADC(const u8 data);
 	void SBC(const u8 data);
+	void BIT(u8& reg, int bit);
 
 #pragma region CPU Control Instructions
 	u8 XXX(); // catch all non existing instructions8bit

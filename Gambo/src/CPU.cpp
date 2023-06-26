@@ -250,6 +250,13 @@ void CPU::SBC(const u8 data)
 	SetFlag(fZ, A == 0);
 }
 
+void CPU::BIT(u8& reg, int bit)
+{
+	SetFlag(fZ, ((reg >> bit) & 0x01) == 0);
+	SetFlag(fH, 1);
+	SetFlag(fN, 0);
+}
+
 bool CPU::InstructionComplete()
 {
 	return cycles == 0;
@@ -3653,576 +3660,465 @@ u8 CPU::SRL_A()
 
 u8 CPU::BIT_0_B()
 {
-	SetFlag(fZ, B & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+
+	BIT(B, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_C()
 {
-	SetFlag(fZ, C & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_D()
 {
-	SetFlag(fZ, D & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_E()
 {
-	SetFlag(fZ, E & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_H()
 {
-	SetFlag(fZ, H & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_L()
 {
-	SetFlag(fZ, L & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_0_A()
 {
-	SetFlag(fZ, A & (1 << 0));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 0);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_B()
 {
-	SetFlag(fZ, B & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_C()
 {
-	SetFlag(fZ, C & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_D()
 {
-	SetFlag(fZ, D & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_E()
 {
-	SetFlag(fZ, E & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_H()
 {
-	SetFlag(fZ, H & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_L()
 {
-	SetFlag(fZ, L & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_1_A()
 {
-	SetFlag(fZ, A & (1 << 1));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 1);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_B()
 {
-	SetFlag(fZ, B & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_C()
 {
-	SetFlag(fZ, C & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_D()
 {
-	SetFlag(fZ, D & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_E()
 {
-	SetFlag(fZ, E & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_H()
 {
-	SetFlag(fZ, H & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_L()
 {
-	SetFlag(fZ, L & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_2_A()
 {
-	SetFlag(fZ, A & (1 << 2));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 2);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_B()
 {
-	SetFlag(fZ, B & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_C()
 {
-	SetFlag(fZ, C & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_D()
 {
-	SetFlag(fZ, D & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_E()
 {
-	SetFlag(fZ, E & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_H()
 {
-	SetFlag(fZ, H & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_L()
 {
-	SetFlag(fZ, L & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_3_A()
 {
-	SetFlag(fZ, A & (1 << 3));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 3);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_B()
 {
-	SetFlag(fZ, B & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_C()
 {
-	SetFlag(fZ, C & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_D()
 {
-	SetFlag(fZ, D & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_E()
 {
-	SetFlag(fZ, E & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_H()
 {
-	SetFlag(fZ, H & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_L()
 {
-	SetFlag(fZ, L & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_4_A()
 {
-	SetFlag(fZ, A & (1 << 4));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 4);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_B()
 {
-	SetFlag(fZ, B & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_C()
 {
-	SetFlag(fZ, C & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_D()
 {
-	SetFlag(fZ, D & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_E()
 {
-	SetFlag(fZ, E & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_H()
 {
-	SetFlag(fZ, H & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_L()
 {
-	SetFlag(fZ, L & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_5_A()
 {
-	SetFlag(fZ, A & (1 << 5));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 5);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_B()
 {
-	SetFlag(fZ, B & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_C()
 {
-	SetFlag(fZ, C & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_D()
 {
-	SetFlag(fZ, D & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_E()
 {
-	SetFlag(fZ, E & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_H()
 {
-	SetFlag(fZ, H & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_L()
 {
-	SetFlag(fZ, L & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_6_A()
 {
-	SetFlag(fZ, A & (1 << 6));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 6);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_B()
 {
-	SetFlag(fZ, B & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(B, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_C()
 {
-	SetFlag(fZ, C & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(C, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_D()
 {
-	SetFlag(fZ, D & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(D, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_E()
 {
-	SetFlag(fZ, E & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(E, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_H()
 {
-	SetFlag(fZ, H & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(H, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_L()
 {
-	SetFlag(fZ, L & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(L, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_aHL()
 {
-	SetFlag(fZ, Read(HL) & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	static u8 data = 0;
+	data = Read(HL);
+	BIT(data, 7);
 
 	return 0;
 }
 
 u8 CPU::BIT_7_A()
 {
-	SetFlag(fZ, A & (1 << 7));
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
+	BIT(A, 7);
 
 	return 0;
 }
@@ -4427,31 +4323,31 @@ u8 CPU::RES_4_B()
 
 u8 CPU::RES_4_C()
 {
-	C &= ~(1 << 3);
+	C &= ~(1 << 4);
 	return 0;
 }
 
 u8 CPU::RES_4_D()
 {
-	D &= ~(1 << 3);
+	D &= ~(1 << 4);
 	return 0;
 }
 
 u8 CPU::RES_4_E()
 {
-	E &= ~(1 << 3);
+	E &= ~(1 << 4);
 	return 0;
 }
 
 u8 CPU::RES_4_H()
 {
-	H &= ~(1 << 3);
+	H &= ~(1 << 4);
 	return 0;
 }
 
 u8 CPU::RES_4_L()
 {
-	L &= ~(1 << 3);
+	L &= ~(1 << 4);
 	return 0;
 }
 
