@@ -129,14 +129,14 @@ public:
 					}
 					case 2:
 					{
-						u8 data = ram[addr++];
+						u8 data = Read(addr++);
 						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
 						break;
 					}
 					case 3:
 					{
-						u16 lo = ram[addr++];
-						u16 hi = ram[addr++];
+						u16 lo = Read(addr++);
+						u16 hi = Read(addr++);
 						u16 data = (hi << 8) | lo;
 						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
 						break;
