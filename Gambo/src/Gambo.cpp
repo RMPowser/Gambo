@@ -5,6 +5,13 @@
 #include <chrono>
 #include <iostream>
 
+template <class Clock, class Duration>
+void sleep_until(std::chrono::time_point<Clock, Duration> tp)
+{
+	using namespace std::chrono;
+	
+}
+
 
 class Gambo
 {
@@ -36,7 +43,7 @@ public:
 		windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
 		SDL_assert_release(windowTexture);
 
-		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\cpu_instrs\\individual\\11.gb", std::ios::binary);
+		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\instr_timing\\instr_timing.gb", std::ios::binary);
 
 		// copies all data into buffer
 		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
@@ -70,15 +77,12 @@ public:
 
 	void Run()
 	{
-		using clock = std::chrono::high_resolution_clock;
-		using frames = std::chrono::duration<double, std::ratio<1, 60>>;
-
-		auto nextFrame = clock::now() + frames{ 0 };
-		decltype(nextFrame) i;
+		using namespace std::chrono;
+		using clock = high_resolution_clock;
+		using framerate = duration<int, std::ratio<1, 60>>;
+		auto timePoint = clock::now() + framerate{1};
 		while (true)
 		{
-			nextFrame += frames{ 1 };
-
 			static bool step = false;
 
 			SDL_Event e;
@@ -116,20 +120,22 @@ public:
 				}
 			}
 
-
+			static bool disassemble;
+			disassemble = false;
 			if (running)
 			{
 				do
 				{
 					gb.cpu.Clock();
-					// 0xC869
-					//if (gb.cpu.PC == 0xC01C)
+					//if (gb.cpu.PC == 0xC448)
 					//{
 					//	running = false;
 					//	goto BREAK;
 					//}
 					gb.ppu.Clock(dmgScreen);
 				} while (!gb.ppu.FrameComplete());
+
+				disassemble = true;
 			}
 			else if (step)
 			{
@@ -140,19 +146,23 @@ public:
 					gb.ppu.Clock(dmgScreen);
 				} while (!gb.cpu.InstructionComplete());
 				step = false;
+				disassemble = true;
 			}
 
-			//gb.Disassemble(0x0000, 0xFFFF);
-
+#if !defined(NDEBUG)
+			if (disassemble)
+			{
+				gb.Disassemble(0x0000, 0xFFFF);
+			}
+#endif
 
 			Render();
 
-
-			i = clock::now();
-			while (i < nextFrame)
+			std::this_thread::sleep_until(timePoint - 5ms);
+			while (clock::now() <= timePoint) 
 			{
-				i = clock::now();
 			}
+			timePoint += framerate{1};
 		}
 	}
 
