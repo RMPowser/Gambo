@@ -468,69 +468,63 @@ u8 CPU::EI()
 #pragma region Jump Instructions
 u8 CPU::JR_s8()
 {
-	static s8 data;
-	data = Read(PC++);
-	PC += data;
+	PC = (s8)Read(PC) + PC + 1;
 	
 	return 0;
 }
 
 u8 CPU::JR_NZ_s8()
 {
-	static s8 data;
-	data = Read(PC++);
 	if (!GetFlag(fZ))
 	{
-		PC += data;
+		PC = (s8)Read(PC) + PC + 1;
 		return 4;
 	}
 	else
 	{
+		PC++;
 		return 0;
 	}
 }
 
 u8 CPU::JR_Z_s8()
 {
-	static s8 data;
-	data = Read(PC++);
 	if (GetFlag(fZ))
 	{
-		PC += data;
+		PC = (s8)Read(PC) + PC + 1;
 		return 4;
 	}
 	else
 	{
+		PC++;
 		return 0;
 	}
 }
 
 u8 CPU::JR_NC_s8()
 {
-	static s8 data;
-	data = Read(PC++);
 	if (!GetFlag(fC))
 	{
-		PC += data;
+		PC = (s8)Read(PC) + PC + 1;
 		return 4;
 	}
 	else
 	{
+		PC++;
 		return 0;
 	}
 }
 
 u8 CPU::JR_C_s8()
 {
-	static s8 data;
-	data = Read(PC++);
 	if (GetFlag(fC))
 	{
-		PC += data;
+		PC = (s8)Read(PC) + PC + 1;
 		return 4;
 	}
 	else
 	{
+		PC++;
 		return 0;
 	}
 }
@@ -550,10 +544,13 @@ u8 CPU::RET_NZ()
 
 u8 CPU::JP_NZ_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = (high << 8) | low;
+	addr = (high << 8) | low;
 	if (!GetFlag(fZ))
 	{
 		PC = addr;
@@ -567,19 +564,24 @@ u8 CPU::JP_NZ_a16()
 
 u8 CPU::JP_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	PC = high << 8 | low;
+	PC = (high << 8) | low;
 	return 0;
 }
 
 u8 CPU::CALL_NZ_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = high << 8 | low;
+	addr = (high << 8) | low;
 	if (!GetFlag(fZ))
 	{
 		Push(PC);
@@ -621,10 +623,13 @@ u8 CPU::RET()
 
 u8 CPU::JP_Z_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = (high << 8) | low;
+	addr = (high << 8) | low;
 	if (GetFlag(fZ))
 	{
 		PC = addr;
@@ -638,10 +643,13 @@ u8 CPU::JP_Z_a16()
 
 u8 CPU::CALL_Z_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = high << 8 | low;
+	addr = (high << 8) | low;
 	if (GetFlag(fZ))
 	{
 		Push(PC);
@@ -656,10 +664,13 @@ u8 CPU::CALL_Z_a16()
 
 u8 CPU::CALL_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = high << 8 | low;
+	addr = (high << 8) | low;
 	Push(PC);
 	PC = addr;
 
@@ -688,10 +699,13 @@ u8 CPU::RET_NC()
 
 u8 CPU::JP_NC_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = (high << 8) | low;
+	addr = (high << 8) | low;
 	if (!GetFlag(fC))
 	{
 		PC = addr;
@@ -705,10 +719,13 @@ u8 CPU::JP_NC_a16()
 
 u8 CPU::CALL_NC_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = high << 8 | low;
+	addr = (high << 8) | low;
 	if (!GetFlag(fC))
 	{
 		Push(PC);
@@ -743,10 +760,7 @@ u8 CPU::RET_C()
 
 u8 CPU::RETI()
 {
-	u16 low = Read(SP--);
-	u16 high = Read(SP--);
-
-	PC = high << 8 | low;
+	Pop(PC);
 	IME = true; 
 
 	return 0;
@@ -754,10 +768,13 @@ u8 CPU::RETI()
 
 u8 CPU::JP_C_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = (high << 8) | low;
+	addr = (high << 8) | low;
 	if (GetFlag(fC))
 	{
 		PC = addr;
@@ -771,11 +788,14 @@ u8 CPU::JP_C_a16()
 
 u8 CPU::CALL_C_a16()
 {
-	u16 low = Read(PC++);
-	u16 high = Read(PC++);
+	static u16 low = 0;
+	static u16 high = 0;
+	static u16 addr = 0;
+	low = Read(PC++);
+	high = Read(PC++);
 
-	u16 addr = high << 8 | low;
-	if (GetFlag(fZ))
+	addr = (high << 8) | low;
+	if (GetFlag(fC))
 	{
 		Push(PC);
 		PC = addr;
