@@ -36,8 +36,6 @@ void CPU::Clock()
 {
 	if (cycles == 0)
 	{
-		cycles = instructions8bit[0].cycles; 
-
 		if (isHalted && InterruptPending())
 		{
 			isHalted = false;
@@ -147,18 +145,15 @@ void CPU::HandleInterrupt(InterruptFlags f)
 
 void CPU::UpdateTimers()
 {
-	static int DIVCounter = 0;
-
 	// DIV register always counts up every 256 clock cycles
-	if (DIVCounter == 256)
-	{
-		DIVCounter = 0;
-		bus->ram[HWAddr::DIV]++;
-	}
-	else
-	{
-		DIVCounter++;
-	}
+	static int DIVCounter = 0;
+	static u8& DIV = bus->ram[HWAddr::DIV];
+
+	DIVCounter++;
+	DIVCounter %= 256;
+
+	if (DIVCounter == 0)
+		DIV++;
 
 
 
@@ -194,25 +189,19 @@ void CPU::UpdateTimers()
 		}
 
 		// iterate TIMA at specified frequency
-		if (TIMACounter == TIMAFreq)
+		TIMACounter++;
+		TIMACounter %= TIMAFreq;
+		if (TIMACounter == 0)
 		{
-			TIMACounter = 0;
 			static u8& TIMA = bus->ram[HWAddr::TIMA];
-			if (TIMA == 0xFF)
+			TIMA++;
+			if (TIMA == 0x00)
 			{
 				// TIMA resets to TMA register value
 				TIMA = bus->ram[HWAddr::TMA];
 				// request interrupt
 				bus->ram[HWAddr::IF] |= InterruptFlags::Timer;
 			}
-			else
-			{
-				TIMA++;
-			}
-		}
-		else
-		{
-			TIMACounter++;
 		}
 	}
 }
