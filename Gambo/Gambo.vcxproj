@@ -11,12 +11,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="include\Gambo.h" />
+    <ClCompile Include="src\Frontend.cpp" />
+    <ClCompile Include="include\GamboCore.h" />
+    <ClCompile Include="include\Frontend.h" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\PPU.cpp" />
     <ClCompile Include="src\CPU.cpp" />
     <ClCompile Include="include\CPU.h" />
-    <ClCompile Include="src\Gambo.cpp" />
+    <ClCompile Include="src\GamboCore.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\GamboDefine.h" />

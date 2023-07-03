@@ -1,11 +1,12 @@
-#include "Gambo.h"
+#include "GamboCore.h"
+#include "Frontend.h"
 #include <fstream>
 #include <random>
 #include <format>
 #include <chrono>
 #include <iostream>
 
-Gambo::Gambo()
+GamboCore::GamboCore(Frontend* fe)
 {
 	SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 
@@ -43,7 +44,7 @@ Gambo::Gambo()
 	gb.cpu.Reset();
 }
 
-Gambo::~Gambo()
+GamboCore::~GamboCore()
 {
 	if (window != nullptr)
 	{
@@ -53,7 +54,7 @@ Gambo::~Gambo()
 	SDL_Quit();
 }
 
-void Gambo::Run()
+void GamboCore::Run()
 {
 	using namespace std::chrono;
 	using clock = high_resolution_clock;
@@ -144,7 +145,7 @@ void Gambo::Run()
 	}
 }
 
-void Gambo::Render()
+void GamboCore::Render()
 {
 	static SDL_Color* target = nullptr;
 	static int rowByteLength = 0;
@@ -174,7 +175,7 @@ void Gambo::Render()
 	SDL_RenderPresent(renderer);
 }
 
-void Gambo::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, SDL_Color col, u32 scale)
+void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, SDL_Color col, u32 scale)
 {
 	static u64 targetSize;
 	static u32 trueScale;
@@ -219,7 +220,7 @@ void Gambo::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32
 	}
 }
 
-void Gambo::DrawCpu(SDL_Color* target, int targetWidth, int targetHeight, int x, int y)
+void GamboCore::DrawCpu(SDL_Color* target, int targetWidth, int targetHeight, int x, int y)
 {
 	DrawString(target, targetWidth, targetHeight, x, y, "FLAGS:");
 	DrawString(target, targetWidth, targetHeight, x + 56, y, "Z", gb.cpu.F & CPU::fZ ? GREEN : RED);
@@ -240,7 +241,7 @@ void Gambo::DrawCpu(SDL_Color* target, int targetWidth, int targetHeight, int x,
 	DrawString(target, targetWidth, targetHeight, x + 100, y + 60, "IF:   $" + hex(gb.ram[HWAddr::IF], 2));
 }
 
-void Gambo::DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
+void GamboCore::DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
 {
 	auto it_a = gb.mapAsm.find(gb.cpu.PC);
 	SDL_assert(it_a != gb.mapAsm.end());
@@ -274,7 +275,7 @@ void Gambo::DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x
 	}
 }
 
-void Gambo::DrawStackPointer(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
+void GamboCore::DrawStackPointer(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
 {
 	u16 addr = gb.cpu.SP;
 	int nLineY = (nLines >> 1) * 10 + y;
@@ -305,7 +306,7 @@ void Gambo::DrawStackPointer(SDL_Color* target, int targetWidth, int targetHeigh
 	}
 }
 
-void Gambo::DrawRamWrites(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
+void GamboCore::DrawRamWrites(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
 {
 	u16 addr = gb.lastWrite;
 	int nLineY = (nLines >> 1) * 10 + y;
