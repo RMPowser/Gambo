@@ -1,4 +1,3 @@
-#include "SDL2/SDL.h"
 #include "PPU.h"
 #include "Bus.h"
 #include <random>
