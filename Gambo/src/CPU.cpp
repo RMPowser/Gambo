@@ -36,6 +36,8 @@ void CPU::Clock()
 {
 	if (cycles == 0)
 	{
+		cycles = instructions8bit[0].cycles;
+
 		if (isHalted && InterruptPending())
 		{
 			isHalted = false;
@@ -265,14 +267,14 @@ void CPU::Reset()
 	E = 0xD8;
 	H = 0x01;
 	L = 0x4D;
-	PC = 0x0100;
+	PC = 0x0000;
 	SP = 0xFFFE;
 	IME = false;
 	stopMode = false;
 	isHalted = false;
-
+	
 	// this is what the hardware registers look like at PC = 0x0100
-	bus->ram[HWAddr::P1]	=	 0xCF;
+	bus->ram[HWAddr::P1]	=	 0x0F;
 	bus->ram[HWAddr::SB]	=	 0x00;
 	bus->ram[HWAddr::SC]	=	 0x7E;
 	bus->ram[HWAddr::DIV]	=	 0xAB;
