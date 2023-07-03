@@ -6,7 +6,8 @@
 #include <chrono>
 #include <iostream>
 
-GamboCore::GamboCore(Frontend* fe)
+GamboCore::GamboCore(const std::shared_ptr<Frontend> fe)
+	: frontend(fe)
 {
 	SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 

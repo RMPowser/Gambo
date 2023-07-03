@@ -6,7 +6,7 @@ class Frontend;
 class GamboCore
 {
 public:
-	GamboCore(Frontend* fe);
+	GamboCore(const std::shared_ptr<Frontend> fe);
 	~GamboCore();
 
 	void Run();
@@ -22,7 +22,7 @@ public:
 	bool running = false;
 
 private:
-	Frontend* frontend;
+	std::shared_ptr<Frontend> frontend;
 	void Render();
 
 	void DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, SDL_Color col = WHITE, u32 scale = 1);

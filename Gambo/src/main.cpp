@@ -3,9 +3,8 @@
 
 int main(int argc, char* argv[])
 {
-	Frontend frontend;
-	GamboCore emu(&frontend);
-	emu.Run();
+	auto gamboCore = std::make_unique<GamboCore>(std::make_shared<Frontend>());
+	gamboCore->Run();
 
 	return 0;
 }
