@@ -51,6 +51,12 @@ public:
 
 	void Write(u16 addr, u8 data)
 	{
+		// TODO: remove this after implementing input
+		if (addr == HWAddr::P1)
+		{
+			return;
+		}
+
 		if (addr >= 0x0000 && addr <= 0xFFFF)
 		{
 			ram[addr] = data;

@@ -43,8 +43,9 @@ public:
 		windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
 		SDL_assert_release(windowTexture);
 
-		std::ifstream input("C:\\Users\\Ryan\\source\\repos\\gb-test-roms\\instr_timing\\instr_timing.gb", std::ios::binary);
+		std::ifstream input("E:\\ROMS\\GB\\Tetris.gb", std::ios::binary);
 
+		gb.ram.fill(0xFF);
 		// copies all data into buffer
 		std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
 		uint16_t offset = 0x0000;
