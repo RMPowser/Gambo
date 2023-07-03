@@ -81,8 +81,8 @@ namespace HWAddr
 }
 
 static constexpr auto WindowTitle = "Gambo";
-static constexpr auto DMGScreenWidth = 160;
-static constexpr auto DMGScreenHeight = 144;
+inline constexpr auto DMGScreenWidth = 160;
+inline constexpr auto DMGScreenHeight = 144;
 static auto PixelScale = 2;
 static constexpr auto TabSizeInSpaces = 4;
 

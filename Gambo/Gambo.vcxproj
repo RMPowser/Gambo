@@ -11,6 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="include\Gambo.h" />
+    <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\PPU.cpp" />
     <ClCompile Include="src\CPU.cpp" />
     <ClCompile Include="include\CPU.h" />
