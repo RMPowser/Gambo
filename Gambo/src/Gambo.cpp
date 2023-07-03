@@ -41,8 +41,6 @@ Gambo::Gambo()
 	gb.Disassemble(0x0000, 0xFFFF);
 
 	gb.cpu.Reset();
-
-	Render();
 }
 
 Gambo::~Gambo()
