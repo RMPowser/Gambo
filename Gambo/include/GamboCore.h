@@ -1,3 +1,4 @@
+#pragma once
 #include "GamboDefine.h"
 #include "Bus.h"
 

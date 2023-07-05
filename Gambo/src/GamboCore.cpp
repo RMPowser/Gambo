@@ -59,7 +59,7 @@ void GamboCore::Run()
 {
 	using namespace std::chrono;
 	using clock = high_resolution_clock;
-	using framerate = duration<int, std::ratio<1, 60>>;
+	using framerate = duration<int, std::ratio<1, DesiredFPS>>;
 	auto timePoint = clock::now() + framerate{1};
 	while (true)
 	{

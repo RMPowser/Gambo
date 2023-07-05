@@ -11,6 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="include\FileDialogs.h" />
+    <ClCompile Include="src\FileDialogs_Windows.cpp" />
     <ClCompile Include="include\imgui\backends\imgui_impl_dx12.cpp" />
     <ClCompile Include="include\imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="include\imgui\imgui.cpp" />
@@ -18,6 +20,7 @@
     <ClCompile Include="include\imgui\imgui_draw.cpp" />
     <ClCompile Include="include\imgui\imgui_tables.cpp" />
     <ClCompile Include="include\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\ClearColor.cpp" />
     <ClCompile Include="src\Frontend.cpp" />
     <ClCompile Include="include\GamboCore.h" />
     <ClCompile Include="include\Frontend.h" />
@@ -26,8 +29,10 @@
     <ClCompile Include="src\CPU.cpp" />
     <ClCompile Include="include\CPU.h" />
     <ClCompile Include="src\GamboCore.cpp" />
+    <ClCompile Include="include\imgui\backends\Win32_DX12_Helpers.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\ClearColor.h" />
     <ClInclude Include="include\GamboDefine.h" />
     <ClInclude Include="include\Bus.h" />
     <ClInclude Include="include\imgui\backends\imgui_impl_dx12.h" />
@@ -39,6 +44,7 @@
     <ClInclude Include="include\imgui\imstb_textedit.h" />
     <ClInclude Include="include\imgui\imstb_truetype.h" />
     <ClInclude Include="include\PPU.h" />
+    <ClInclude Include="include\imgui\backends\Win32_DX12_Helpers.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -96,7 +102,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SDL2_DIR)\lib\x64;$(ProjectDir)lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(SDL2_DIR)\lib\x64\SDL2.dll $(TargetDir) /y</Command>
@@ -121,7 +127,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SDL2_DIR)\lib\x64;$(ProjectDir)lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(SDL2_DIR)\lib\x64\SDL2.dll $(TargetDir) /y</Command>
