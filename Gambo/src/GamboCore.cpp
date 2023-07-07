@@ -6,26 +6,11 @@
 #include <chrono>
 #include <iostream>
 
-GamboCore::GamboCore(const std::shared_ptr<Frontend> fe)
+GamboCore::GamboCore(Frontend* fe)
 	: frontend(fe)
 {
-	SDL_assert_release(SDL_Init(SDL_INIT_EVERYTHING) == 0);
-
-	window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640 * PixelScale, 350 * PixelScale, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
-	SDL_assert_release(window);
-
-	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
-
-	renderer = SDL_GetRenderer(window);
-	SDL_assert_release(renderer);
-
-	dmgScreen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DMGScreenWidth, DMGScreenHeight);
-	SDL_assert_release(dmgScreen);
-
-	int windowWidth, windowHeight;
-	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-	windowTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, windowWidth, windowHeight);
-	SDL_assert_release(windowTexture);
+	screen = SDL_CreateTexture(frontend->GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DMGScreenWidth, DMGScreenHeight);
+	SDL_assert_release(screen);
 
 	std::ifstream input("E:\\ROMS\\GB\\Tetris.gb", std::ios::binary);
 
@@ -47,12 +32,6 @@ GamboCore::GamboCore(const std::shared_ptr<Frontend> fe)
 
 GamboCore::~GamboCore()
 {
-	if (window != nullptr)
-	{
-		SDL_DestroyWindow(window);
-	}
-
-	SDL_Quit();
 }
 
 void GamboCore::Run()
@@ -61,44 +40,45 @@ void GamboCore::Run()
 	using clock = high_resolution_clock;
 	using framerate = duration<int, std::ratio<1, DesiredFPS>>;
 	auto timePoint = clock::now() + framerate{1};
-	while (true)
+
+	while (!done)
 	{
 		static bool step = false;
 
-		SDL_Event e;
-		while (SDL_PollEvent(&e))
-		{
-			switch (e.type)
-			{
-				case SDL_KEYDOWN:
-					if (e.key.keysym.sym == SDLK_p)
-					{
-						running = !running;
-					}
-					else if (e.key.keysym.sym == SDLK_r)
-					{
-						gb.cpu.Reset();
-					}
-					else if (e.key.keysym.sym == SDLK_SPACE)
-					{
-						step = true;
-					}
-					break;
-
-				case SDL_WINDOWEVENT:
-					switch (e.window.event)
-					{
-						case SDL_WINDOWEVENT_CLOSE:
-							return;
-						default:
-							break;
-					}
-					break;
-
-				default:
-					break;
-			}
-		}
+		//SDL_Event e;
+		//while (SDL_PollEvent(&e))
+		//{
+		//	switch (e.type)
+		//	{
+		//		case SDL_KEYDOWN:
+		//			if (e.key.keysym.sym == SDLK_p)
+		//			{
+		//				running = !running;
+		//			}
+		//			else if (e.key.keysym.sym == SDLK_r)
+		//			{
+		//				gb.cpu.Reset();
+		//			}
+		//			else if (e.key.keysym.sym == SDLK_SPACE)
+		//			{
+		//				step = true;
+		//			}
+		//			break;
+		//
+		//		case SDL_WINDOWEVENT:
+		//			switch (e.window.event)
+		//			{
+		//				case SDL_WINDOWEVENT_CLOSE:
+		//					return;
+		//				default:
+		//					break;
+		//			}
+		//			break;
+		//
+		//		default:
+		//			break;
+		//	}
+		//}
 
 		static bool disassemble;
 		disassemble = false;
@@ -112,7 +92,7 @@ void GamboCore::Run()
 				//	running = false;
 				//	goto BREAK;
 				//}
-				gb.ppu.Clock(dmgScreen);
+				gb.ppu.Clock(screen);
 			} while (!gb.ppu.FrameComplete());
 
 			disassemble = true;
@@ -123,7 +103,7 @@ void GamboCore::Run()
 			{
 				gb.cpu.Clock();
 			BREAK:
-				gb.ppu.Clock(dmgScreen);
+				gb.ppu.Clock(screen);
 			} while (!gb.cpu.InstructionComplete());
 			step = false;
 			disassemble = true;
@@ -136,8 +116,6 @@ void GamboCore::Run()
 		}
 #endif
 
-		Render();
-
 		std::this_thread::sleep_until(timePoint - 5ms);
 		while (clock::now() <= timePoint)
 		{
@@ -146,34 +124,38 @@ void GamboCore::Run()
 	}
 }
 
-void GamboCore::Render()
+SDL_Texture* GamboCore::GetScreen()
 {
-	static SDL_Color* target = nullptr;
-	static int rowByteLength = 0;
+	//static SDL_Color* target = nullptr;
+	//static int rowByteLength = 0;
 
-	int targetWidth;
-	int targetHeight;
-	SDL_QueryTexture(windowTexture, NULL, NULL, &targetWidth, &targetHeight);
+	//int targetWidth;
+	//int targetHeight;
+	//SDL_QueryTexture(windowTexture, NULL, NULL, &targetWidth, &targetHeight);
+	//
+	//SDL_LockTexture(windowTexture, NULL, (void**)&target, &rowByteLength);
+	//{
+	//	memset(target, 32, targetWidth * targetHeight * 4);
+	//	DrawCpu(target, targetWidth, targetHeight, 448, 2);
+	//	DrawCode(target, targetWidth, targetHeight, 448, 82, 10);
+	//	DrawStackPointer(target, targetWidth, targetHeight, 448, 202, 10);
+	//	DrawRamWrites(target, targetWidth, targetHeight, 548, 202, 10);
+	//
+	//	DrawString(target, targetWidth, targetHeight, 10, 332, "SPACE = Step Instruction    R = RESET    P = PLAY");
+	//}
+	//SDL_UnlockTexture(windowTexture);
 
-	SDL_LockTexture(windowTexture, NULL, (void**)&target, &rowByteLength);
-	{
-		memset(target, 32, targetWidth * targetHeight * 4);
-		DrawCpu(target, targetWidth, targetHeight, 448, 2);
-		DrawCode(target, targetWidth, targetHeight, 448, 82, 10);
-		DrawStackPointer(target, targetWidth, targetHeight, 448, 202, 10);
-		DrawRamWrites(target, targetWidth, targetHeight, 548, 202, 10);
+	return screen;
+}
 
-		DrawString(target, targetWidth, targetHeight, 10, 332, "SPACE = Step Instruction    R = RESET    P = PLAY");
-	}
-	SDL_UnlockTexture(windowTexture);
+float GamboCore::GetScreenWidth()
+{
+	return screenWidth * screenScale;
+}
 
-
-	SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
-	//SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, windowTexture, NULL, NULL);
-	static SDL_Rect destRect = { 0, 0, DMGScreenWidth * PixelScale * 2, DMGScreenHeight * PixelScale * 2 };
-	SDL_RenderCopy(renderer, dmgScreen, NULL, &destRect);
-	SDL_RenderPresent(renderer);
+float GamboCore::GetScreenHeight()
+{
+	return screenHeight * screenScale;
 }
 
 void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, SDL_Color col, u32 scale)

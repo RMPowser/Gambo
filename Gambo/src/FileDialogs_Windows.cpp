@@ -1,5 +1,6 @@
 #include "FileDialogs.h"
-#include "Win32_DX12_Helpers.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <commdlg.h>
 
 
@@ -13,7 +14,7 @@ namespace FileDialogs
 		// Initialize OPENFILENAME
 		ZeroMemory(&ofn, sizeof(ofn));
 		ofn.lStructSize = sizeof(ofn);
-		ofn.hwndOwner = GetNativeWindow();
+		ofn.hwndOwner = 0;
 		ofn.lpstrFile = szFile;
 		ofn.nMaxFile = sizeof(szFile);
 		ofn.lpstrFilter = filters;
