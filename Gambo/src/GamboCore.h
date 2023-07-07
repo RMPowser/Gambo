@@ -3,8 +3,6 @@
 #include "Bus.h"
 #include <atomic>
 
-class Frontend;
-
 struct GamboState
 {
 	struct _flags
