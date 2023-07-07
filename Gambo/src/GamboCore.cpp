@@ -151,7 +151,6 @@ GamboState GamboCore::GetState() const
 
 void GamboCore::RemoveCartridge()
 {
-	running = false;
 	gb.ram.fill(0xFF);
 }
 
@@ -173,8 +172,6 @@ void GamboCore::InsertCartridge(std::wstring filePath)
 	//gb.Disassemble(0x0000, 0xFFFF);
 
 	gb.cpu.Reset();
-
-	running = true;
 }
 
 void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col, u32 scale)

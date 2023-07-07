@@ -23,4 +23,5 @@ private:
 	SDL_Renderer* renderer = nullptr;
 
 	bool done = false;
+	bool maintainAspectRatio = true;
 };

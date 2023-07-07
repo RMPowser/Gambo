@@ -1,11 +1,10 @@
 #include "Frontend.h"
-#include "imgui.h"
-#include "imgui_internal.h"
+#include "GamboDefine.h"
 #include "ClearColor.h"
 #include "FileDialogs.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
-#include "GamboDefine.h"
+#include <sstream>
 #include <exception>
 
 Frontend::Frontend()
@@ -16,7 +15,7 @@ Frontend::Frontend()
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	io.IniFilename = NULL;
 
@@ -33,8 +32,8 @@ Frontend::Frontend()
 	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) == 0);
 
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
-	float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (222);
-	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (40);
+	float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (DebugWindowWidth);
+	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2);
 	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)windowW, (int)windowH, window_flags);
 	SDL_assert_release(window);
 
@@ -131,39 +130,11 @@ void Frontend::UpdateUI()
 {
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
-
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;
-	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos);
-	ImGui::SetNextWindowSize(viewport->Size);
-	ImGui::SetNextWindowViewport(viewport->ID);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-		ImGui::PopStyleVar();
-		ImGui::PopStyleVar(2);
-		
-		ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
-		ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
-		ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace); // Add empty node
-		ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
-
-		ImGuiID dock_main_id = dockspace_id; // This variable will track the document node, however we are not using it here as we aren't docking anything into it.
-		ImGuiID dock_id_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.7f, NULL, &dock_main_id);
-		ImGuiID dock_id_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, NULL, &dock_main_id);
-
-		ImGui::DockBuilderDockWindow(GamboWindowTitle, dock_id_left);
-		ImGui::DockBuilderDockWindow(DebugInfoWindowTitle, dock_main_id);
-		ImGui::DockBuilderFinish(dockspace_id);
-
-		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), 0);
-	ImGui::End();
+	auto viewport = ImGui::GetMainViewport();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+	ImGui::SetNextWindowSize({ viewport->Size.x - DebugWindowWidth, viewport->Size.y });
+	ImGui::SetNextWindowPos({ 0, 0 });
 	ImGui::Begin(GamboWindowTitle, 0, 
 		ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
@@ -183,40 +154,83 @@ void Frontend::UpdateUI()
 			{
 				if (ImGui::MenuItem("Open..."))
 				{
-					gambo->RemoveCartridge();
-					gambo->InsertCartridge(FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0"));
+					bool previousState = gambo->running;
+					gambo->running = false;
+
+					std::wstring filePath = FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
+					if (filePath != L"")
+					{
+						gambo->RemoveCartridge();
+						gambo->InsertCartridge(filePath);
+						gambo->running = true;
+					}
+					else
+					{
+						gambo->running = previousState;
+					}
 				}
 				ImGui::EndMenu();
-
 			}
 
-			static std::string buttonName = "Play";
+			std::string buttonName = !gambo->running ? "Play" : "Pause";
 			if (ImGui::MenuItem(buttonName.c_str()))
 			{
-				if (buttonName == "Play")
-				{
-					buttonName = "Pause";
-				}
-				else
-				{
-					buttonName = "Play";
-				}
-
 				gambo->running = !gambo->running;
+			}
+
+			if (ImGui::BeginMenu("Options"))
+			{
+				ImGui::MenuItem("Maintain Aspect Ratio", nullptr, &maintainAspectRatio);
+
+				if (ImGui::BeginMenu("Window Scale"))
+				{
+					std::array<bool, PixelScaleMax> scale;
+					scale.fill(false);
+					scale[PixelScale - 1] = true;
+
+					std::stringstream ss;
+					for (int i = 0; i < scale.size(); i++)
+					{
+						ss.str("");
+						ss.clear();
+						ss << i + 1 << "x";
+						if (ImGui::MenuItem(ss.str().c_str(), nullptr, &scale[i]))
+						{
+							PixelScale = i + 1;
+							float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (DebugWindowWidth);
+							float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2);
+							SDL_SetWindowSize(window, (int)windowW, (int)windowH);
+						}
+					}
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();
 		}
 
+		// maintain aspect ratio during scaling
+		ImVec2 gamboSize = { viewport->Size.x - DebugWindowWidth - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - (ImGui::GetFontSize() + style.FramePadding.y * 2) };
+		if (maintainAspectRatio)
+		{
+			float aspect = gamboSize.x / gamboSize.y;
+			if (aspect > GamboAspectRatio)
+				gamboSize.x = gamboSize.y * GamboAspectRatio;
+			else if (aspect < GamboAspectRatio)
+				gamboSize.y = gamboSize.x * (1 / GamboAspectRatio);
+		}
+		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboSize) * 0.5f);
 		SDL_UpdateTexture(gamboScreen, NULL, gambo->GetScreen(), GamboScreenWidth * BytesPerPixel);
-		ImGui::Image(gamboScreen, ImVec2{ gambo->GetScreenWidth(), gambo->GetScreenHeight() });
+		ImGui::Image(gamboScreen, gamboSize);
 	}
 	ImGui::End();
 	ImGui::PopStyleVar(1);
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
-	ImGui::SetNextWindowSize({ 222, 222 });
+	ImGui::SetNextWindowSize({ DebugWindowWidth, viewport->Size.y });
+	ImGui::SetNextWindowPos({ viewport->Size.x - DebugWindowWidth, 0 });
 	ImGui::Begin(DebugInfoWindowTitle, 0,
-		ImGuiWindowFlags_AlwaysAutoResize |
+		//ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoTitleBar |
@@ -253,7 +267,7 @@ void Frontend::UpdateUI()
 
 
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	//ImGui::ShowDemoWindow();
+	ImGui::ShowDemoWindow();
 	ImGui::PopStyleVar(1);
 }
 

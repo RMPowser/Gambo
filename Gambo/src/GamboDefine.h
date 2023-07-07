@@ -3,7 +3,9 @@
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <cstdint>
 #include <vector>
@@ -88,11 +90,14 @@ namespace HWAddr
 static constexpr auto MainWindowTitle = "Gambo";
 inline constexpr auto GamboWindowTitle = "Gambo Window";
 inline constexpr auto DebugInfoWindowTitle = "Debug Info";
+inline constexpr auto DebugWindowWidth = 200;
 inline constexpr auto GamboScreenWidth = 160;
 inline constexpr auto GamboScreenHeight = 144;
 inline constexpr auto GamboScreenSize = GamboScreenWidth * GamboScreenHeight;
+inline constexpr auto GamboAspectRatio = (float)GamboScreenWidth / (float)GamboScreenHeight;
 inline constexpr auto BytesPerPixel = 4;
 static auto PixelScale = 5;
+inline constexpr auto PixelScaleMax = 8;
 static constexpr auto TabSizeInSpaces = 4;
 
 #define SAFE_DELETE(ptr) if (ptr) { delete ptr; ptr = nullptr; }
@@ -152,10 +157,10 @@ enum InterruptFlags
 
 static SDL_Color GameBoyColors[5]
 {
-	{ 228, 228, 228, 255 },
-	{ 192, 192, 192, 255 },
-	{ 96, 96, 96, 255 },
-	{ 0, 0, 0, 255 },
+	{ 200, 200, 15, 255 },
+	{ 139, 172, 15, 255 },
+	{ 48, 98, 48, 255 },
+	{ 15, 56, 15, 255 },
 	{ 0, 0, 0, 0 }, // transparent for use in sprites
 };
 
