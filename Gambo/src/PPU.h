@@ -23,11 +23,11 @@ public:
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	void Clock(SDL_Texture* dmgScreen);
+	void Clock();
 	bool FrameComplete();
+	SDL_Color* screen = new SDL_Color[GamboScreenSize];
 
 private:
-	 SDL_Color* screen = new SDL_Color[DMGScreenWidth * DMGScreenHeight];
 	int cycles = 0;
 	bool frameComplete = false;
 };

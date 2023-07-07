@@ -1,9 +1,9 @@
-#include "Gambo.h"
+#include "Frontend.h"
+#include "GamboCore.h"
 
 int main(int argc, char* argv[])
 {
-	auto emu = std::make_unique<Gambo>();
-	emu->Run();
-
+	auto frontend = std::make_unique<Frontend>();
+	frontend->Run();
 	return 0;
 }

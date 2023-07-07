@@ -6,6 +6,7 @@
 PPU::PPU(Bus* b)
 	:bus(b)
 {
+	std::fill(&(screen[0]), &(screen[GamboScreenSize]), SDL_Color{ 0, 0, 0, 255 });
 }
 
 PPU::~PPU()
@@ -23,7 +24,7 @@ void PPU::Write(u16 addr, u8 data)
 	bus->Write(addr, data);
 }
 
-void PPU::Clock(SDL_Texture* dmgScreen)
+void PPU::Clock()
 {
 	frameComplete = false;
 	static int currScanlineCycles = 0;
@@ -215,7 +216,7 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 					pixelRowOffset = LY % 8 * 2; // each row takes up two bytes of memory
 
 					// time to start drawing the scanline
-					for (int pixel = 0; pixel < DMGScreenWidth; pixel++)
+					for (int pixel = 0; pixel < GamboScreenWidth; pixel++)
 					{
 						static u8 xPos;
 
@@ -285,7 +286,7 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 								break;
 						}
 
-						screen[(LY * DMGScreenWidth) + pixel] = GameBoyColors[color];
+						screen[(LY * GamboScreenWidth) + pixel] = GameBoyColors[color];
 					}
 				}
 				break;
@@ -331,7 +332,6 @@ void PPU::Clock(SDL_Texture* dmgScreen)
 	cycles = (cycles + 1) % 70224;
 	if (cycles == 0)
 	{
-		SDL_UpdateTexture(dmgScreen, NULL, screen, DMGScreenWidth* BytesPerPixel);
 		frameComplete = true;
 	}
 }
