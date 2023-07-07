@@ -1,5 +1,6 @@
 #include "Frontend.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "ClearColor.h"
 #include "FileDialogs.h"
 #include "imgui_impl_sdl2.h"
@@ -26,13 +27,20 @@ Frontend::Frontend()
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+	io.IniFilename = NULL;
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
 	//ImGui::StyleColorsLight();
+
+	auto& style = ImGui::GetStyle();
+	style.WindowBorderSize = 0;
+	style.WindowPadding = { 10, 10 };
+	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -114,6 +122,8 @@ void Frontend::BeginFrame()
 		}
 	}
 
+	HandleKeyboardShortcuts();
+
 	// Start the Dear ImGui frame
 	ImGui_ImplSDLRenderer2_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
@@ -123,12 +133,24 @@ void Frontend::BeginFrame()
 void Frontend::UpdateUI()
 {
 	auto& io = ImGui::GetIO();
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	ImGui::ShowDemoWindow();
 
-	// main menu bar
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+	ImGui::SetNextWindowPos({ 0, 0 });
+	ImGui::SetNextWindowSize(ImGui::GetMainViewport()->Size);
+	ImGui::Begin("MainWindow", 0, 
+		//ImGuiWindowFlags_AlwaysAutoResize |
+		//ImGuiWindowFlags_NoBackground |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_NoCollapse |
+		//ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_MenuBar |
+		ImGuiWindowFlags_NoBringToFrontOnFocus
+	);
 	{
-		if (ImGui::BeginMainMenuBar())
+		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
 			{
@@ -138,35 +160,53 @@ void Frontend::UpdateUI()
 				}
 				ImGui::EndMenu();
 			}
-			ImGui::EndMainMenuBar();
+			ImGui::EndMenuBar();
 		}
-	}
 
-	{
-		ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoSplit;
-		ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), flags);
-	}
 
-	// gambo rendering window
-	{
-		ImGuiWindowFlags flags =
-			ImGuiWindowFlags_AlwaysAutoResize |
-			ImGuiWindowFlags_NoBackground |
-			ImGuiWindowFlags_NoResize |
-			ImGuiWindowFlags_NoTitleBar |
-			ImGuiWindowFlags_NoDecoration |
-			ImGuiWindowFlags_NoCollapse |
-			ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoSavedSettings;
-
-		ImGui::Begin("Gambo", 0, flags);
-		ImGui::SetWindowPos({ 0, 0 }, 0);
-		
 		ImGui::Image(gambo->GetScreen(), ImVec2{ gambo->GetScreenWidth(), gambo->GetScreenHeight() });
-
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-		ImGui::End();
 	}
+	ImGui::End();
+	ImGui::PopStyleVar(1);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
+	ImGui::Begin("Debug Info", 0,
+		ImGuiWindowFlags_AlwaysAutoResize |
+		//ImGuiWindowFlags_NoBackground |
+		//ImGuiWindowFlags_NoResize |
+		//ImGuiWindowFlags_NoTitleBar |
+		//ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_NoCollapse |
+		//ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoSavedSettings
+		//ImGuiWindowFlags_MenuBar |
+		//ImGuiWindowFlags_NoBringToFrontOnFocus
+	);
+	{
+		auto state = gambo->GetState();
+		ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+		ImGui::TextColored(WHITE, "FLAGS: ");
+			ImGui::SameLine(); ImGui::TextColored(state.flags.Z ? GREEN : RED, "Z");
+			ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.N ? GREEN : RED, "N");
+			ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.H ? GREEN : RED, "H");
+			ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.C ? GREEN : RED, "C");
+		ImGui::Text("");
+		ImGui::TextColored(WHITE, "AF: 0x%.2X%.2X", state.registers.A, state.registers.F);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LCDC: 0x%.2X", state.LCDC);
+		ImGui::TextColored(WHITE, "BC: 0x%.2X%.2X", state.registers.B, state.registers.C);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "STAT: 0x%.2X", state.STAT);
+		ImGui::TextColored(WHITE, "DE: 0x%.2X%.2X", state.registers.D, state.registers.E);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LY: 0x%.2X", state.LY);
+		ImGui::TextColored(WHITE, "HL: 0x%.2X%.2X", state.registers.H, state.registers.L);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IE: 0x%.2X", state.IE);
+		ImGui::TextColored(WHITE, "SP: 0x%.4X", state.SP);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IF: 0x%.2X", state.IF);
+		ImGui::TextColored(WHITE, "PC: 0x%.4X", state.PC);
+	}
+	ImGui::End();
+	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+	ImGui::ShowDemoWindow();
+	ImGui::PopStyleVar(1);
 }
 
 void Frontend::EndFrame()
@@ -184,5 +224,24 @@ void Frontend::EndFrame()
 	if (done)
 	{
 		gambo->done = true;
+	}
+}
+
+void Frontend::HandleKeyboardShortcuts()
+{
+	// for some reason, doing shortcuts this way makes it trigger twice.
+	// the bool is there to make sure it only triggers the first time.
+	static bool ctrl_o = false;
+	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
+	{
+		if (ctrl_o)
+		{
+			ctrl_o = false;
+		}
+		else
+		{
+			FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
+			ctrl_o = true;
+		}
 	}
 }

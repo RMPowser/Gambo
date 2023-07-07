@@ -124,41 +124,51 @@ void GamboCore::Run()
 	}
 }
 
-SDL_Texture* GamboCore::GetScreen()
+SDL_Texture* GamboCore::GetScreen() const
 {
-	//static SDL_Color* target = nullptr;
-	//static int rowByteLength = 0;
-
-	//int targetWidth;
-	//int targetHeight;
-	//SDL_QueryTexture(windowTexture, NULL, NULL, &targetWidth, &targetHeight);
-	//
-	//SDL_LockTexture(windowTexture, NULL, (void**)&target, &rowByteLength);
-	//{
-	//	memset(target, 32, targetWidth * targetHeight * 4);
-	//	DrawCpu(target, targetWidth, targetHeight, 448, 2);
-	//	DrawCode(target, targetWidth, targetHeight, 448, 82, 10);
-	//	DrawStackPointer(target, targetWidth, targetHeight, 448, 202, 10);
-	//	DrawRamWrites(target, targetWidth, targetHeight, 548, 202, 10);
-	//
-	//	DrawString(target, targetWidth, targetHeight, 10, 332, "SPACE = Step Instruction    R = RESET    P = PLAY");
-	//}
-	//SDL_UnlockTexture(windowTexture);
-
 	return screen;
 }
 
-float GamboCore::GetScreenWidth()
+float GamboCore::GetScreenWidth() const
 {
 	return screenWidth * screenScale;
 }
 
-float GamboCore::GetScreenHeight()
+float GamboCore::GetScreenHeight() const
 {
 	return screenHeight * screenScale;
 }
 
-void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, SDL_Color col, u32 scale)
+GamboState GamboCore::GetState() const
+{
+	GamboState g;
+	g.flags.Z = gb.cpu.F & CPU::fZ;
+	g.flags.N = gb.cpu.F & CPU::fN;
+	g.flags.H = gb.cpu.F & CPU::fH;
+	g.flags.C = gb.cpu.F & CPU::fC;
+	g.flags.IME = gb.cpu.IME;
+
+	g.registers.A = gb.cpu.A;
+	g.registers.F = gb.cpu.F;
+	g.registers.B = gb.cpu.B;
+	g.registers.C = gb.cpu.C;
+	g.registers.D = gb.cpu.D;
+	g.registers.E = gb.cpu.E;
+	g.registers.H = gb.cpu.H;
+	g.registers.L = gb.cpu.L;
+	
+	g.PC = gb.cpu.PC;
+	g.SP = gb.cpu.SP;
+
+	g.LCDC = gb.ram[HWAddr::LCDC];
+	g.STAT = gb.ram[HWAddr::STAT];
+	g.LY = gb.ram[HWAddr::LY];
+	g.IE = gb.ram[HWAddr::IE];
+	g.IF = gb.ram[HWAddr::IF];
+	return g;
+}
+
+void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col, u32 scale)
 {
 	static u64 targetSize;
 	static u32 trueScale;
@@ -194,7 +204,7 @@ void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight,
 								u64 index = ((x * PixelScale) + screenX + (i * trueScale) + is) + (((y * PixelScale) + screenY + (j * trueScale) + js) * targetWidth);
 								if (index < targetSize)
 								{
-									target[index] = col;
+									//target[index] = col;
 								}
 							}
 

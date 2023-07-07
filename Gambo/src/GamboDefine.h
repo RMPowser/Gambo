@@ -3,6 +3,8 @@
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
 
+#include "imgui.h"
+
 #include <cstdint>
 #include <vector>
 #include <string>
@@ -151,15 +153,31 @@ static const std::vector<bool> fontSheet =
 };
 #undef X
 
-static const SDL_Color
-GREY(192, 192, 192), DARK_GREY(128, 128, 128), VERY_DARK_GREY(64, 64, 64),
-RED(255, 0, 0), DARK_RED(128, 0, 0), VERY_DARK_RED(64, 0, 0),
-YELLOW(255, 255, 0), DARK_YELLOW(128, 128, 0), VERY_DARK_YELLOW(64, 64, 0),
-GREEN(0, 255, 0), DARK_GREEN(0, 128, 0), VERY_DARK_GREEN(0, 64, 0),
-CYAN(0, 255, 255), DARK_CYAN(0, 128, 128), VERY_DARK_CYAN(0, 64, 64),
-BLUE(0, 0, 255), DARK_BLUE(0, 0, 128), VERY_DARK_BLUE(0, 0, 64),
-MAGENTA(255, 0, 255), DARK_MAGENTA(128, 0, 128), VERY_DARK_MAGENTA(64, 0, 64),
-WHITE(255, 255, 255), BLACK(0, 0, 0), BLANK(0, 0, 0, 0);
+static const ImVec4
+	GREY				{ 0.75, 0.75, 0.75, 1 },
+	DARK_GREY			{ 0.5, 0.5, 0.5, 1 },
+	VERY_DARK_GREY		{ 0.25, 0.25, 0.25, 1 },
+	RED					{ 1, 0, 0, 1 },
+	DARK_RED			{ 0.5, 0, 0, 1 },
+	VERY_DARK_RED		{ 0.25, 0, 0, 1 },
+	YELLOW				{ 1, 1, 0, 1 },
+	DARK_YELLOW			{ 0.5, 0.5, 0, 1 },
+	VERY_DARK_YELLOW	{ 0.25, 0.25, 0, 1 },
+	GREEN				{ 0, 1, 0, 1 },
+	DARK_GREEN			{ 0, 0.5, 0, 1 },
+	VERY_DARK_GREEN		{ 0, 0.25, 0, 1 },
+	CYAN				{ 0, 1, 1, 1 },
+	DARK_CYAN			{ 0, 0.5, 0.5, 1 },
+	VERY_DARK_CYAN		{ 0, 0.25, 0.25, 1 },
+	BLUE				{ 0, 0, 1, 1 },
+	DARK_BLUE			{ 0, 0, 0.5, 1 },
+	VERY_DARK_BLUE		{ 0, 0, 0.25, 1 },
+	MAGENTA				{ 1, 0, 1, 1 },
+	DARK_MAGENTA		{ 0.5, 0, 0.5, 1 },
+	VERY_DARK_MAGENTA	{ 0.25, 0, 0.25, 1 },
+	WHITE				{ 1, 1, 1, 1 },
+	BLACK				{ 0, 0, 0, 1 },
+	BLANK				{ 0, 0, 0, 0 };
 
 static inline std::string hex(uint32_t n, uint8_t d)
 {

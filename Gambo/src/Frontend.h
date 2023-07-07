@@ -19,6 +19,7 @@ private:
 	void BeginFrame();
 	void UpdateUI();
 	void EndFrame();
+	void HandleKeyboardShortcuts();
 
 	std::unique_ptr<GamboCore> gambo;
 	SDL_Window* window = nullptr;
