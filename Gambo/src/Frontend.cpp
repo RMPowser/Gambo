@@ -33,13 +33,13 @@ Frontend::Frontend()
 
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
 	float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (DebugWindowWidth);
-	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2);
+	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2) + 13;
 	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)windowW, (int)windowH, window_flags);
 	SDL_assert_release(window);
 
 	windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1) + (DebugWindowWidth);
 	windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + (ImGui::GetFontSize() + (style.FramePadding.y * 2) + 13);
-	SDL_SetWindowMinimumSize(window, windowW, windowH);
+	SDL_SetWindowMinimumSize(window, (int)windowW, (int)windowH);
 
 	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
 
@@ -206,6 +206,7 @@ void Frontend::UpdateUI()
 							PixelScale = i + 1;
 							float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (DebugWindowWidth);
 							float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2);
+							SDL_RestoreWindow(window);
 							SDL_SetWindowSize(window, (int)windowW, (int)windowH);
 						}
 					}
