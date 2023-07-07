@@ -267,7 +267,7 @@ void CPU::Reset()
 	E = 0xD8;
 	H = 0x01;
 	L = 0x4D;
-	PC = 0x0000;
+	PC = 0x0100;
 	SP = 0xFFFE;
 	IME = false;
 	stopMode = false;
