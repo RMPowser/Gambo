@@ -76,7 +76,7 @@ void GamboCore::Run()
 				gb.ppu.Clock();
 			} while (!gb.ppu.FrameComplete());
 
-			disassemble = true;
+			disassemble = false;
 		}
 		else if (step)
 		{
@@ -97,7 +97,7 @@ void GamboCore::Run()
 		}
 #endif
 
-		std::this_thread::sleep_until(timePoint - 5ms);
+		std::this_thread::sleep_until(timePoint - 1ms);
 		while (clock::now() <= timePoint)
 		{
 		}
