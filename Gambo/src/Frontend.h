@@ -10,10 +10,6 @@ public:
 	~Frontend();
 	
 	void Run();
-	
-	SDL_Window* GetWindow();
-	SDL_Renderer* GetRenderer();
-
 
 private:
 	void BeginFrame();
@@ -22,6 +18,7 @@ private:
 	void HandleKeyboardShortcuts();
 
 	std::unique_ptr<GamboCore> gambo;
+	SDL_Texture* gamboScreen = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 

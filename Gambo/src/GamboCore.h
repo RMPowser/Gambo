@@ -30,31 +30,31 @@ struct GamboState
 class GamboCore
 {
 public:
-	GamboCore(Frontend* fe);
+	GamboCore();
 	~GamboCore();
 
 	void Run();
 
-	SDL_Texture* GetScreen() const;
+	void* GetScreen() const;
 	float GetScreenWidth() const;
 	float GetScreenHeight() const;
 	GamboState GetState() const;
 
+	void RemoveCartridge();
+	void InsertCartridge(std::wstring filePath);
+
 	std::atomic<bool> done = false;
+	std::atomic<bool> running = false;
 
 private:
 	Bus gb;
 
 	void DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col = WHITE, u32 scale = 1);
-	void DrawCpu(SDL_Color* target, int targetWidth, int targetHeight, int x, int y);
 	void DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);
 	void DrawStackPointer(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);
 	void DrawRamWrites(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);
 	
-	Frontend* frontend;
-	std::atomic<SDL_Texture*> screen = nullptr;
-	float screenWidth = DMGScreenWidth;
-	float screenHeight = DMGScreenHeight;
+	float screenWidth = GamboScreenWidth;
+	float screenHeight = GamboScreenHeight;
 	int screenScale = PixelScale; 
-	bool running = false;
 };

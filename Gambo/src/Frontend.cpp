@@ -10,26 +10,13 @@
 
 Frontend::Frontend()
 {
-	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) == 0);
-
-	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
-	window = SDL_CreateWindow(WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640 * PixelScale, 350 * PixelScale, window_flags);
-	SDL_assert_release(window);
-
-	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
-
-	renderer = SDL_GetRenderer(window);
-	SDL_assert_release(renderer);
-
-	clear_color = { 0.45f, 0.55f, 0.60f, 1.00f };
-
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 	io.IniFilename = NULL;
 
@@ -41,6 +28,26 @@ Frontend::Frontend()
 	style.WindowBorderSize = 0;
 	style.WindowPadding = { 10, 10 };
 	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
+
+
+	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) == 0);
+
+	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
+	float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (222);
+	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (40);
+	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)windowW, (int)windowH, window_flags);
+	SDL_assert_release(window);
+
+	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
+
+	renderer = SDL_GetRenderer(window);
+	SDL_assert_release(renderer);
+
+	gamboScreen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, GamboScreenWidth, GamboScreenHeight);
+	SDL_assert_release(gamboScreen);
+
+	clear_color = { 0.45f, 0.55f, 0.60f, 1.00f };
+
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -62,7 +69,7 @@ Frontend::Frontend()
 	//ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
 	//IM_ASSERT(font != nullptr);
 
-	gambo = std::make_unique<GamboCore>(this);
+	gambo = std::make_unique<GamboCore>();
 }
 
 Frontend::~Frontend()
@@ -88,16 +95,6 @@ void Frontend::Run()
 	}
 
 	gamboThread.join();
-}
-
-SDL_Window* Frontend::GetWindow()
-{
-	return window;
-}
-
-SDL_Renderer* Frontend::GetRenderer()
-{
-	return renderer;
 }
 
 void Frontend::BeginFrame()
@@ -133,18 +130,48 @@ void Frontend::BeginFrame()
 void Frontend::UpdateUI()
 {
 	auto& io = ImGui::GetIO();
+	auto& style = ImGui::GetStyle();
+
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->Pos);
+	ImGui::SetNextWindowSize(viewport->Size);
+	ImGui::SetNextWindowViewport(viewport->ID);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+		ImGui::PopStyleVar();
+		ImGui::PopStyleVar(2);
+		
+		ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
+		ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
+		ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace); // Add empty node
+		ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+		ImGuiID dock_main_id = dockspace_id; // This variable will track the document node, however we are not using it here as we aren't docking anything into it.
+		ImGuiID dock_id_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.7f, NULL, &dock_main_id);
+		ImGuiID dock_id_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, NULL, &dock_main_id);
+
+		ImGui::DockBuilderDockWindow(GamboWindowTitle, dock_id_left);
+		ImGui::DockBuilderDockWindow(DebugInfoWindowTitle, dock_main_id);
+		ImGui::DockBuilderFinish(dockspace_id);
+
+		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), 0);
+	ImGui::End();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-	ImGui::SetNextWindowPos({ 0, 0 });
-	ImGui::SetNextWindowSize(ImGui::GetMainViewport()->Size);
-	ImGui::Begin("MainWindow", 0, 
-		//ImGuiWindowFlags_AlwaysAutoResize |
+	ImGui::Begin(GamboWindowTitle, 0, 
+		ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoTitleBar |
 		ImGuiWindowFlags_NoDecoration |
 		ImGuiWindowFlags_NoCollapse |
-		//ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoSavedSettings |
 		ImGuiWindowFlags_MenuBar |
 		ImGuiWindowFlags_NoBringToFrontOnFocus
@@ -154,33 +181,51 @@ void Frontend::UpdateUI()
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("Open...", "CTRL+O"))
+				if (ImGui::MenuItem("Open..."))
 				{
-					FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
+					gambo->RemoveCartridge();
+					gambo->InsertCartridge(FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0"));
 				}
 				ImGui::EndMenu();
+
+			}
+
+			static std::string buttonName = "Play";
+			if (ImGui::MenuItem(buttonName.c_str()))
+			{
+				if (buttonName == "Play")
+				{
+					buttonName = "Pause";
+				}
+				else
+				{
+					buttonName = "Play";
+				}
+
+				gambo->running = !gambo->running;
 			}
 			ImGui::EndMenuBar();
 		}
 
-
-		ImGui::Image(gambo->GetScreen(), ImVec2{ gambo->GetScreenWidth(), gambo->GetScreenHeight() });
+		SDL_UpdateTexture(gamboScreen, NULL, gambo->GetScreen(), GamboScreenWidth * BytesPerPixel);
+		ImGui::Image(gamboScreen, ImVec2{ gambo->GetScreenWidth(), gambo->GetScreenHeight() });
 	}
 	ImGui::End();
 	ImGui::PopStyleVar(1);
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
-	ImGui::Begin("Debug Info", 0,
+	ImGui::SetNextWindowSize({ 222, 222 });
+	ImGui::Begin(DebugInfoWindowTitle, 0,
 		ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
-		//ImGuiWindowFlags_NoResize |
-		//ImGuiWindowFlags_NoTitleBar |
-		//ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoDecoration |
 		ImGuiWindowFlags_NoCollapse |
-		//ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoSavedSettings
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoSavedSettings |
 		//ImGuiWindowFlags_MenuBar |
-		//ImGuiWindowFlags_NoBringToFrontOnFocus
+		ImGuiWindowFlags_NoBringToFrontOnFocus
 	);
 	{
 		auto state = gambo->GetState();
@@ -196,16 +241,19 @@ void Frontend::UpdateUI()
 		ImGui::TextColored(WHITE, "BC: 0x%.2X%.2X", state.registers.B, state.registers.C);
 			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "STAT: 0x%.2X", state.STAT);
 		ImGui::TextColored(WHITE, "DE: 0x%.2X%.2X", state.registers.D, state.registers.E);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LY: 0x%.2X", state.LY);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LY:   0x%.2X", state.LY);
 		ImGui::TextColored(WHITE, "HL: 0x%.2X%.2X", state.registers.H, state.registers.L);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IE: 0x%.2X", state.IE);
-		ImGui::TextColored(WHITE, "SP: 0x%.4X", state.SP);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IF: 0x%.2X", state.IF);
-		ImGui::TextColored(WHITE, "PC: 0x%.4X", state.PC);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IE:   0x%.2X", state.IE);
+		ImGui::TextColored(GREEN, "SP: 0x%.4X", state.SP);
+			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IF:   0x%.2X", state.IF);
+		ImGui::TextColored(CYAN, "PC: 0x%.4X", state.PC);
 	}
 	ImGui::End();
+
+
+
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	ImGui::ShowDemoWindow();
+	//ImGui::ShowDemoWindow();
 	ImGui::PopStyleVar(1);
 }
 
@@ -231,17 +279,31 @@ void Frontend::HandleKeyboardShortcuts()
 {
 	// for some reason, doing shortcuts this way makes it trigger twice.
 	// the bool is there to make sure it only triggers the first time.
-	static bool ctrl_o = false;
-	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
-	{
-		if (ctrl_o)
-		{
-			ctrl_o = false;
-		}
-		else
-		{
-			FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
-			ctrl_o = true;
-		}
-	}
+	//static bool ctrl_o = false;
+	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
+	//{
+	//	if (ctrl_o)
+	//	{
+	//		ctrl_o = false;
+	//	}
+	//	else
+	//	{
+	//		FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
+	//		ctrl_o = true;
+	//	}
+	//}
+	//
+	//static bool ctrl_p = false;
+	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_P))
+	//{
+	//	if (ctrl_p)
+	//	{
+	//		ctrl_p = false;
+	//	}
+	//	else
+	//	{
+	//		gambo->running = !gambo->running;
+	//		ctrl_p = true;
+	//	}
+	//}
 }

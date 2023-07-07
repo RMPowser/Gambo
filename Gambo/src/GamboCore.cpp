@@ -6,28 +6,9 @@
 #include <chrono>
 #include <iostream>
 
-GamboCore::GamboCore(Frontend* fe)
-	: frontend(fe)
+GamboCore::GamboCore()
 {
-	screen = SDL_CreateTexture(frontend->GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, DMGScreenWidth, DMGScreenHeight);
-	SDL_assert_release(screen);
-
-	std::ifstream input("E:\\ROMS\\GB\\Tetris.gb", std::ios::binary);
-
-	gb.ram.fill(0xFF);
-	// copies all data into buffer
-	std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
-	uint16_t offset = 0x0000;
-
-	// copy the buffer into ram
-	for (auto& byte : buffer)
-	{
-		gb.ram[offset++] = byte;
-	}
-
-	gb.Disassemble(0x0000, 0xFFFF);
-
-	gb.cpu.Reset();
+	RemoveCartridge();
 }
 
 GamboCore::~GamboCore()
@@ -92,7 +73,7 @@ void GamboCore::Run()
 				//	running = false;
 				//	goto BREAK;
 				//}
-				gb.ppu.Clock(screen);
+				gb.ppu.Clock();
 			} while (!gb.ppu.FrameComplete());
 
 			disassemble = true;
@@ -103,7 +84,7 @@ void GamboCore::Run()
 			{
 				gb.cpu.Clock();
 			BREAK:
-				gb.ppu.Clock(screen);
+				gb.ppu.Clock();
 			} while (!gb.cpu.InstructionComplete());
 			step = false;
 			disassemble = true;
@@ -124,9 +105,9 @@ void GamboCore::Run()
 	}
 }
 
-SDL_Texture* GamboCore::GetScreen() const
+void* GamboCore::GetScreen() const
 {
-	return screen;
+	return gb.ppu.screen;
 }
 
 float GamboCore::GetScreenWidth() const
@@ -168,6 +149,34 @@ GamboState GamboCore::GetState() const
 	return g;
 }
 
+void GamboCore::RemoveCartridge()
+{
+	running = false;
+	gb.ram.fill(0xFF);
+}
+
+void GamboCore::InsertCartridge(std::wstring filePath)
+{
+	std::ifstream input(filePath, std::ios::binary);
+
+	gb.ram.fill(0xFF);
+	// copies all data into buffer
+	std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
+	uint16_t offset = 0x0000;
+
+	// copy the buffer into ram
+	for (auto& byte : buffer)
+	{
+		gb.ram[offset++] = byte;
+	}
+
+	//gb.Disassemble(0x0000, 0xFFFF);
+
+	gb.cpu.Reset();
+
+	running = true;
+}
+
 void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col, u32 scale)
 {
 	static u64 targetSize;
@@ -197,7 +206,7 @@ void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight,
 
 			for (u32 i = 0; i < 8; i++)
 				for (u32 j = 0; j < 8; j++)
-					if (fontSheet[(i + offsetX * 8) + ((j + offsetY * 8) * 128)])
+					//if (fontSheet[(i + offsetX * 8) + ((j + offsetY * 8) * 128)])
 						for (u32 is = 0; is < trueScale; is++)
 							for (u32 js = 0; js < trueScale; js++)
 							{
@@ -211,27 +220,6 @@ void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight,
 			screenX += 8 * trueScale;
 		}
 	}
-}
-
-void GamboCore::DrawCpu(SDL_Color* target, int targetWidth, int targetHeight, int x, int y)
-{
-	DrawString(target, targetWidth, targetHeight, x, y, "FLAGS:");
-	DrawString(target, targetWidth, targetHeight, x + 56, y, "Z", gb.cpu.F & CPU::fZ ? GREEN : RED);
-	DrawString(target, targetWidth, targetHeight, x + 64, y, "N", gb.cpu.F & CPU::fN ? GREEN : RED);
-	DrawString(target, targetWidth, targetHeight, x + 72, y, "H", gb.cpu.F & CPU::fH ? GREEN : RED);
-	DrawString(target, targetWidth, targetHeight, x + 80, y, "C", gb.cpu.F & CPU::fC ? GREEN : RED);
-	DrawString(target, targetWidth, targetHeight, x + 100, y, "IME", gb.cpu.IME ? GREEN : RED);
-	DrawString(target, targetWidth, targetHeight, x, y + 10, "AF: $" + hex(gb.cpu.AF, 4));
-	DrawString(target, targetWidth, targetHeight, x, y + 20, "BC: $" + hex(gb.cpu.BC, 4));
-	DrawString(target, targetWidth, targetHeight, x, y + 30, "DE: $" + hex(gb.cpu.DE, 4));
-	DrawString(target, targetWidth, targetHeight, x, y + 40, "HL: $" + hex(gb.cpu.HL, 4));
-	DrawString(target, targetWidth, targetHeight, x, y + 50, "SP: $" + hex(gb.cpu.SP, 4), GREEN);
-	DrawString(target, targetWidth, targetHeight, x, y + 60, "PC: $" + hex(gb.cpu.PC, 4), CYAN);
-	DrawString(target, targetWidth, targetHeight, x + 100, y + 10, "LCDC: $" + hex(gb.ram[HWAddr::LCDC], 2));
-	DrawString(target, targetWidth, targetHeight, x + 100, y + 20, "STAT: $" + hex(gb.ram[HWAddr::STAT], 2));
-	DrawString(target, targetWidth, targetHeight, x + 100, y + 30, "LY:   $" + hex(gb.ram[HWAddr::LY], 2));
-	DrawString(target, targetWidth, targetHeight, x + 100, y + 50, "IE:   $" + hex(gb.ram[HWAddr::IE], 2));
-	DrawString(target, targetWidth, targetHeight, x + 100, y + 60, "IF:   $" + hex(gb.ram[HWAddr::IF], 2));
 }
 
 void GamboCore::DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines)
