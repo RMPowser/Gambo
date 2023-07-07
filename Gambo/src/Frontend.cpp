@@ -37,6 +37,10 @@ Frontend::Frontend()
 	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)windowW, (int)windowH, window_flags);
 	SDL_assert_release(window);
 
+	windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1) + (DebugWindowWidth);
+	windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + (ImGui::GetFontSize() + (style.FramePadding.y * 2) + 13);
+	SDL_SetWindowMinimumSize(window, windowW, windowH);
+
 	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
 
 	renderer = SDL_GetRenderer(window);
@@ -180,7 +184,10 @@ void Frontend::UpdateUI()
 
 			if (ImGui::BeginMenu("Options"))
 			{
+				ImGui::MenuItem("IntegerScale", nullptr, &integerScale);
+				maintainAspectRatio = integerScale ? true : maintainAspectRatio;
 				ImGui::MenuItem("Maintain Aspect Ratio", nullptr, &maintainAspectRatio);
+				integerScale = maintainAspectRatio ? integerScale : false;
 
 				if (ImGui::BeginMenu("Window Scale"))
 				{
@@ -211,6 +218,13 @@ void Frontend::UpdateUI()
 
 		// maintain aspect ratio during scaling
 		ImVec2 gamboSize = { viewport->Size.x - DebugWindowWidth - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - (ImGui::GetFontSize() + style.FramePadding.y * 2) };
+
+		if (integerScale)
+		{
+			gamboSize.x -= int(gamboSize.x) % GamboScreenWidth;
+			gamboSize.y -= int(gamboSize.y) % GamboScreenHeight;
+		}
+
 		if (maintainAspectRatio)
 		{
 			float aspect = gamboSize.x / gamboSize.y;
@@ -219,6 +233,10 @@ void Frontend::UpdateUI()
 			else if (aspect < GamboAspectRatio)
 				gamboSize.y = gamboSize.x * (1 / GamboAspectRatio);
 		}
+		
+		PixelScale = std::max((int)gamboSize.x / GamboScreenWidth, 1);
+		PixelScale = std::min(PixelScale, PixelScaleMax);
+
 		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboSize) * 0.5f);
 		SDL_UpdateTexture(gamboScreen, NULL, gambo->GetScreen(), GamboScreenWidth * BytesPerPixel);
 		ImGui::Image(gamboScreen, gamboSize);
@@ -267,7 +285,7 @@ void Frontend::UpdateUI()
 
 
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	ImGui::ShowDemoWindow();
+	//ImGui::ShowDemoWindow();
 	ImGui::PopStyleVar(1);
 }
 

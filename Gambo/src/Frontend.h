@@ -23,5 +23,6 @@ private:
 	SDL_Renderer* renderer = nullptr;
 
 	bool done = false;
+	bool integerScale = true;
 	bool maintainAspectRatio = true;
 };
