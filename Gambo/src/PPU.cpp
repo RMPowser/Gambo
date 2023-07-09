@@ -49,8 +49,8 @@ void PPU::Clock()
 	static u8 BGColorForIndex2;
 	static u8 BGColorForIndex1;
 	static u8 BGColorForIndex0;
-	static u8& OBP0 = bus->ram[HWAddr::OBP0];	// BG pallette data
-	static u8& OBP1 = bus->ram[HWAddr::OBP1];	// BG pallette data
+	static u8& OBP0 = bus->ram[HWAddr::OBP0];	// OBJ pallette data
+	static u8& OBP1 = bus->ram[HWAddr::OBP1];	// OBJ pallette data
 	static u8 OBP0ColorForIndex3;
 	static u8 OBP0ColorForIndex2;
 	static u8 OBP0ColorForIndex1;

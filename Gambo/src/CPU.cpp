@@ -4,6 +4,7 @@
 CPU::CPU(Bus* b)
 	: bus(b)
 {
+	Reset();
 }
 
 CPU::~CPU()
@@ -255,80 +256,105 @@ bool CPU::InstructionComplete()
 
 void CPU::Reset()
 {
-	// this puts the cpu into back into a state as if it had just finished a legit boot sequence
-	A = 0x01;
-	SetFlag(fZ, 1);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 1);
-	B = 0x00;
-	C = 0x13;
-	D = 0x00;
-	E = 0xD8;
-	H = 0x01;
-	L = 0x4D;
-	PC = 0x0100;
-	SP = 0xFFFE;
-	IME = false;
-	stopMode = false;
-	isHalted = false;
-	
-	// this is what the hardware registers look like at PC = 0x0100
-	bus->ram[HWAddr::P1]	=	 0x0F;
-	bus->ram[HWAddr::SB]	=	 0x00;
-	bus->ram[HWAddr::SC]	=	 0x7E;
-	bus->ram[HWAddr::DIV]	=	 0xAB;
-	bus->ram[HWAddr::TIMA]	=	 0x00;
-	bus->ram[HWAddr::TMA]	=	 0x00;
-	bus->ram[HWAddr::TAC]	=	 0xF8;
-	bus->ram[HWAddr::IF]	=	 0xE1;
-	bus->ram[HWAddr::NR10]	=	 0x80;
-	bus->ram[HWAddr::NR11]	=	 0xBF;
-	bus->ram[HWAddr::NR12]	=	 0xF3;
-	bus->ram[HWAddr::NR13]	=	 0xFF;
-	bus->ram[HWAddr::NR14]	=	 0xBF;
-	bus->ram[HWAddr::NR21]	=	 0x3F;
-	bus->ram[HWAddr::NR22]	=	 0x00;
-	bus->ram[HWAddr::NR23]	=	 0xFF;
-	bus->ram[HWAddr::NR24]	=	 0xBF;
-	bus->ram[HWAddr::NR30]	=	 0x7F;
-	bus->ram[HWAddr::NR31]	=	 0xFF;
-	bus->ram[HWAddr::NR32]	=	 0x9F;
-	bus->ram[HWAddr::NR33]	=	 0xFF;
-	bus->ram[HWAddr::NR34]	=	 0xBF;
-	bus->ram[HWAddr::NR41]	=	 0xFF;
-	bus->ram[HWAddr::NR42]	=	 0x00;
-	bus->ram[HWAddr::NR43]	=	 0x00;
-	bus->ram[HWAddr::NR44]	=	 0xBF;
-	bus->ram[HWAddr::NR50]	=	 0x77;
-	bus->ram[HWAddr::NR51]	=	 0xF3;
-	bus->ram[HWAddr::NR52]	=	 0xF1;
-	bus->ram[HWAddr::LCDC]	=	 0x91;
-	bus->ram[HWAddr::STAT]	=	 0x85;
-	bus->ram[HWAddr::SCY]	=	 0x00;
-	bus->ram[HWAddr::SCX]	=	 0x00;
-	bus->ram[HWAddr::LY]	=	 0x00;
-	bus->ram[HWAddr::LYC]	=	 0x00;
-	bus->ram[HWAddr::DMA]	=	 0xFF;
-	bus->ram[HWAddr::BGP]	=	 0xFC;
-	bus->ram[HWAddr::OBP0]	=	 0x00;
-	bus->ram[HWAddr::OBP1]	=	 0x00;
-	bus->ram[HWAddr::WY]	=	 0x00;
-	bus->ram[HWAddr::WX]	=	 0x00;
-	bus->ram[HWAddr::KEY1]	=	 0xFF;
-	bus->ram[HWAddr::VBK]	=	 0xFF;
-	bus->ram[HWAddr::HDMA1]	=	 0xFF;
-	bus->ram[HWAddr::HDMA2]	=	 0xFF;
-	bus->ram[HWAddr::HDMA3]	=	 0xFF;
-	bus->ram[HWAddr::HDMA4]	=	 0xFF;
-	bus->ram[HWAddr::HDMA5]	=	 0xFF;
-	bus->ram[HWAddr::RP]	=	 0xFF;
-	bus->ram[HWAddr::BCPS]	=	 0xFF;
-	bus->ram[HWAddr::BCPD]	=	 0xFF;
-	bus->ram[HWAddr::OCPS]	=	 0xFF;
-	bus->ram[HWAddr::OCPD]	=	 0xFF;
-	bus->ram[HWAddr::SVBK]	=	 0xFF;
-	bus->ram[HWAddr::IE]	=	 0x00;
+	if (!useBootRom)
+	{
+		// this puts the cpu into back into a state as if it had just finished a legit boot sequence
+		A = 0x01;
+		SetFlag(fZ, 1);
+		SetFlag(fN, 0);
+		SetFlag(fH, 1);
+		SetFlag(fC, 1);
+		B = 0x00;
+		C = 0x13;
+		D = 0x00;
+		E = 0xD8;
+		H = 0x01;
+		L = 0x4D;
+		PC = 0x0100;
+		SP = 0xFFFE;
+		IME = false;
+		stopMode = false;
+		isHalted = false;
+
+		// this is what the hardware registers look like at PC = 0x0100
+		bus->ram[HWAddr::P1] = 0x0F;
+		bus->ram[HWAddr::SB] = 0x00;
+		bus->ram[HWAddr::SC] = 0x7E;
+		bus->ram[HWAddr::DIV] = 0xAB;
+		bus->ram[HWAddr::TIMA] = 0x00;
+		bus->ram[HWAddr::TMA] = 0x00;
+		bus->ram[HWAddr::TAC] = 0xF8;
+		bus->ram[HWAddr::IF] = 0xE1;
+		bus->ram[HWAddr::NR10] = 0x80;
+		bus->ram[HWAddr::NR11] = 0xBF;
+		bus->ram[HWAddr::NR12] = 0xF3;
+		bus->ram[HWAddr::NR13] = 0xFF;
+		bus->ram[HWAddr::NR14] = 0xBF;
+		bus->ram[HWAddr::NR21] = 0x3F;
+		bus->ram[HWAddr::NR22] = 0x00;
+		bus->ram[HWAddr::NR23] = 0xFF;
+		bus->ram[HWAddr::NR24] = 0xBF;
+		bus->ram[HWAddr::NR30] = 0x7F;
+		bus->ram[HWAddr::NR31] = 0xFF;
+		bus->ram[HWAddr::NR32] = 0x9F;
+		bus->ram[HWAddr::NR33] = 0xFF;
+		bus->ram[HWAddr::NR34] = 0xBF;
+		bus->ram[HWAddr::NR41] = 0xFF;
+		bus->ram[HWAddr::NR42] = 0x00;
+		bus->ram[HWAddr::NR43] = 0x00;
+		bus->ram[HWAddr::NR44] = 0xBF;
+		bus->ram[HWAddr::NR50] = 0x77;
+		bus->ram[HWAddr::NR51] = 0xF3;
+		bus->ram[HWAddr::NR52] = 0xF1;
+		bus->ram[HWAddr::LCDC] = 0x91;
+		bus->ram[HWAddr::STAT] = 0x85;
+		bus->ram[HWAddr::SCY] = 0x00;
+		bus->ram[HWAddr::SCX] = 0x00;
+		bus->ram[HWAddr::LY] = 0x00;
+		bus->ram[HWAddr::LYC] = 0x00;
+		bus->ram[HWAddr::DMA] = 0xFF;
+		bus->ram[HWAddr::BGP] = 0xFC;
+		bus->ram[HWAddr::OBP0] = 0x00;
+		bus->ram[HWAddr::OBP1] = 0x00;
+		bus->ram[HWAddr::WY] = 0x00;
+		bus->ram[HWAddr::WX] = 0x00;
+		bus->ram[HWAddr::KEY1] = 0xFF;
+		bus->ram[HWAddr::VBK] = 0xFF;
+		bus->ram[HWAddr::BOOT] = 0xFF;
+		bus->ram[HWAddr::HDMA1] = 0xFF;
+		bus->ram[HWAddr::HDMA2] = 0xFF;
+		bus->ram[HWAddr::HDMA3] = 0xFF;
+		bus->ram[HWAddr::HDMA4] = 0xFF;
+		bus->ram[HWAddr::HDMA5] = 0xFF;
+		bus->ram[HWAddr::RP] = 0xFF;
+		bus->ram[HWAddr::BCPS] = 0xFF;
+		bus->ram[HWAddr::BCPD] = 0xFF;
+		bus->ram[HWAddr::OCPS] = 0xFF;
+		bus->ram[HWAddr::OCPD] = 0xFF;
+		bus->ram[HWAddr::SVBK] = 0xFF;
+		bus->ram[HWAddr::IE] = 0x00;
+	}
+	else
+	{
+		A = 0x00;
+		SetFlag(fZ, 0);
+		SetFlag(fN, 0);
+		SetFlag(fH, 0);
+		SetFlag(fC, 0);
+		B = 0x00;
+		C = 0x00;
+		D = 0x00;
+		E = 0x00;
+		H = 0x00;
+		L = 0x00;
+		PC = 0x0000;
+		SP = 0xFFFE;
+		IME = false;
+		stopMode = false;
+		isHalted = false;
+		bus->ram[HWAddr::BOOT] = 0xFE;
+		bus->ram[HWAddr::P1] = 0x0F;
+	}
 }
 
 void CPU::SetFlag(Flags f, bool v)

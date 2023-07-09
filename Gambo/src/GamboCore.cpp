@@ -8,7 +8,6 @@
 
 GamboCore::GamboCore()
 {
-	RemoveCartridge();
 }
 
 GamboCore::~GamboCore()
@@ -151,27 +150,39 @@ GamboState GamboCore::GetState() const
 
 void GamboCore::RemoveCartridge()
 {
-	gb.ram.fill(0xFF);
+	SAFE_DELETE(cartridge);
 }
 
 void GamboCore::InsertCartridge(std::wstring filePath)
 {
-	std::ifstream input(filePath, std::ios::binary);
+	running = false;
+
+	RemoveCartridge();
+
+	cartridge = new Cartridge(filePath);
 
 	gb.ram.fill(0xFF);
-	// copies all data into buffer
-	std::vector<uint8_t> buffer(std::istreambuf_iterator<char>(input), {});
-	uint16_t offset = 0x0000;
 
-	// copy the buffer into ram
-	for (auto& byte : buffer)
+	// copy the initial cartridge data into ram
+	size_t size = std::min(gb.ram.size(), cartridge->data.size());
+	for (size_t i = 0; i < size; i++)
 	{
-		gb.ram[offset++] = byte;
+		gb.ram[i] = cartridge->data[i];
 	}
 
-	//gb.Disassemble(0x0000, 0xFFFF);
-
 	gb.cpu.Reset();
+
+	running = true;
+}
+
+void GamboCore::SetUseBootRom(bool b)
+{
+	gb.cpu.useBootRom = b;
+}
+
+bool GamboCore::GetUseBootRom()
+{
+	return gb.cpu.useBootRom;
 }
 
 void GamboCore::DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col, u32 scale)

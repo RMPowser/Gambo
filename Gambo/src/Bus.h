@@ -34,12 +34,15 @@ public:
 		: cpu(this)
 		, ppu(this)
 	{
-		// zero out ram to prevent any shenanigans
-		ram.fill(0x00);
 	};
 
 	u8 Read(uint16_t addr)
 	{
+		if (!(ram[HWAddr::BOOT] & 1) && addr >= 0x0000 && addr <= 0x00FF)
+		{
+			return cpu.bootRom[addr];
+		}
+
 		if (addr >= 0x0000 && addr <= 0xFFFF)
 		{
 			lastRead = addr;

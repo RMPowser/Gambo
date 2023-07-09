@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <array>
+#include <atomic>
 
 typedef uint64_t u64;
 typedef  int64_t s64;
@@ -73,6 +75,7 @@ namespace HWAddr
 	static constexpr unsigned short WX    = 0xFF4B;
 	static constexpr unsigned short KEY1  = 0xFF4D;
 	static constexpr unsigned short VBK   = 0xFF4F;
+	static constexpr unsigned short BOOT  = 0xFF50;
 	static constexpr unsigned short HDMA1 = 0xFF51;
 	static constexpr unsigned short HDMA2 = 0xFF52;
 	static constexpr unsigned short HDMA3 = 0xFF53;

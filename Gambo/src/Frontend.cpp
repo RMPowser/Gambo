@@ -1,5 +1,6 @@
 #include "Frontend.h"
 #include "GamboDefine.h"
+#include "Cartridge.h"
 #include "ClearColor.h"
 #include "FileDialogs.h"
 #include "imgui_impl_sdl2.h"
@@ -158,19 +159,10 @@ void Frontend::UpdateUI()
 			{
 				if (ImGui::MenuItem("Open..."))
 				{
-					bool previousState = gambo->running;
-					gambo->running = false;
-
-					std::wstring filePath = FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
+					std::wstring filePath = FileDialogs::OpenFile(L"Game Boy Rom\0*.gb");
 					if (filePath != L"")
 					{
-						gambo->RemoveCartridge();
 						gambo->InsertCartridge(filePath);
-						gambo->running = true;
-					}
-					else
-					{
-						gambo->running = previousState;
 					}
 				}
 				ImGui::EndMenu();
@@ -184,6 +176,10 @@ void Frontend::UpdateUI()
 
 			if (ImGui::BeginMenu("Options"))
 			{
+				static bool useBootRom = gambo->GetUseBootRom();
+				if (ImGui::MenuItem("Use Boot Rom", nullptr, &useBootRom))
+					gambo->SetUseBootRom(useBootRom);
+
 				ImGui::MenuItem("IntegerScale", nullptr, &integerScale);
 				maintainAspectRatio = integerScale ? true : maintainAspectRatio;
 				ImGui::MenuItem("Maintain Aspect Ratio", nullptr, &maintainAspectRatio);
