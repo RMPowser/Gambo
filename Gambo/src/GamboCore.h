@@ -24,6 +24,8 @@ struct GamboState
 	u8 LY;
 	u8 IE;
 	u8 IF;
+
+	std::map<uint16_t, std::string> mapAsm;
 };
 
 class GamboCore

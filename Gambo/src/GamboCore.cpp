@@ -21,7 +21,7 @@ void GamboCore::Run()
 	using framerate = duration<int, std::ratio<1, DesiredFPS>>;
 	auto timePoint = clock::now() + framerate{1};
 
-	while (!done)
+	//while (!done)
 	{
 		static bool step = false;
 
@@ -60,8 +60,6 @@ void GamboCore::Run()
 		//	}
 		//}
 
-		static bool disassemble;
-		disassemble = false;
 		if (running)
 		{
 			do
@@ -75,7 +73,6 @@ void GamboCore::Run()
 				gb.ppu.Clock();
 			} while (!gb.ppu.FrameComplete());
 
-			disassemble = false;
 		}
 		else if (step)
 		{
@@ -86,15 +83,10 @@ void GamboCore::Run()
 				gb.ppu.Clock();
 			} while (!gb.cpu.InstructionComplete());
 			step = false;
-			disassemble = true;
 		}
 
-#if !defined(NDEBUG)
-		if (disassemble)
-		{
-			gb.Disassemble(0x0000, 0xFFFF);
-		}
-#endif
+
+		gb.Disassemble(gb.cpu.PC, 10);
 
 		std::this_thread::sleep_until(timePoint - 1ms);
 		while (clock::now() <= timePoint)
@@ -145,6 +137,8 @@ GamboState GamboCore::GetState() const
 	g.LY = gb.ram[HWAddr::LY];
 	g.IE = gb.ram[HWAddr::IE];
 	g.IF = gb.ram[HWAddr::IF];
+
+	g.mapAsm = gb.mapAsm;
 	return g;
 }
 

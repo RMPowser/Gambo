@@ -7,6 +7,7 @@
 #include "imgui_impl_sdlrenderer2.h"
 #include <sstream>
 #include <exception>
+#include <filesystem>
 
 Frontend::Frontend()
 {
@@ -37,7 +38,7 @@ Frontend::Frontend()
 	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2) + 13;
 	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)windowW, (int)windowH, window_flags);
 	SDL_assert_release(window);
-
+	
 	windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1) + (DebugWindowWidth);
 	windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + (ImGui::GetFontSize() + (style.FramePadding.y * 2) + 13);
 	SDL_SetWindowMinimumSize(window, (int)windowW, (int)windowH);
@@ -88,17 +89,18 @@ Frontend::~Frontend()
 
 void Frontend::Run()
 {
-	std::thread gamboThread([&]() { gambo->Run(); });
+	//std::thread gamboThread([&]() { gambo->Run(); });
 	
 
 	while (!done)
 	{
+		gambo->Run();
 		BeginFrame();
 		UpdateUI();
 		EndFrame();
 	}
 
-	gamboThread.join();
+	//gamboThread.join();
 }
 
 void Frontend::BeginFrame()
@@ -112,6 +114,24 @@ void Frontend::BeginFrame()
 	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSDL2_ProcessEvent(&event);
+		if (event.type == SDL_DROPFILE)
+		{
+			std::filesystem::path filePath(event.drop.file);
+			SDL_free(event.drop.file);
+
+			if (filePath.extension() == ".gb")
+			{
+				if (filePath != L"")
+				{
+					gambo->InsertCartridge(filePath);
+				}
+			}
+			else
+			{
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "file type not accepted", "The only file type Gambo accepts is \".gb\".", window);
+			}
+		}
+		
 		if (event.type == SDL_QUIT)
 		{
 			done = true;
@@ -133,6 +153,64 @@ void Frontend::BeginFrame()
 
 void Frontend::UpdateUI()
 {
+	DrawGamboWindow();
+	DrawDebugInfoWindow();
+	//ImGui::ShowDemoWindow();
+}
+
+void Frontend::EndFrame()
+{
+	auto& io = ImGui::GetIO();
+
+	// Rendering
+	ImGui::Render();
+	SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+	SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+	SDL_RenderClear(renderer);
+	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+	SDL_RenderPresent(renderer);
+
+	if (done)
+	{
+		gambo->done = true;
+	}
+}
+
+void Frontend::HandleKeyboardShortcuts()
+{
+	// for some reason, doing shortcuts this way makes it trigger twice.
+	// the bool is there to make sure it only triggers the first time.
+	//static bool ctrl_o = false;
+	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
+	//{
+	//	if (ctrl_o)
+	//	{
+	//		ctrl_o = false;
+	//	}
+	//	else
+	//	{
+	//		FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
+	//		ctrl_o = true;
+	//	}
+	//}
+	//
+	//static bool ctrl_p = false;
+	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_P))
+	//{
+	//	if (ctrl_p)
+	//	{
+	//		ctrl_p = false;
+	//	}
+	//	else
+	//	{
+	//		gambo->running = !gambo->running;
+	//		ctrl_p = true;
+	//	}
+	//}
+}
+
+void Frontend::DrawGamboWindow()
+{
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 	auto viewport = ImGui::GetMainViewport();
@@ -140,7 +218,7 @@ void Frontend::UpdateUI()
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 	ImGui::SetNextWindowSize({ viewport->Size.x - DebugWindowWidth, viewport->Size.y });
 	ImGui::SetNextWindowPos({ 0, 0 });
-	ImGui::Begin(GamboWindowTitle, 0, 
+	ImGui::Begin(GamboWindowTitle, 0,
 		ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
 		ImGuiWindowFlags_NoResize |
@@ -169,9 +247,13 @@ void Frontend::UpdateUI()
 			}
 
 			std::string buttonName = !gambo->running ? "Play" : "Pause";
-			if (ImGui::MenuItem(buttonName.c_str()))
+			if (ImGui::BeginMenu("Gambo"))
 			{
-				gambo->running = !gambo->running;
+				if (ImGui::MenuItem(buttonName.c_str()))
+				{
+					gambo->running = !gambo->running;
+				}
+				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("Options"))
@@ -230,7 +312,7 @@ void Frontend::UpdateUI()
 			else if (aspect < GamboAspectRatio)
 				gamboSize.y = gamboSize.x * (1 / GamboAspectRatio);
 		}
-		
+
 		PixelScale = std::max((int)gamboSize.x / GamboScreenWidth, 1);
 		PixelScale = std::min(PixelScale, PixelScaleMax);
 
@@ -240,6 +322,13 @@ void Frontend::UpdateUI()
 	}
 	ImGui::End();
 	ImGui::PopStyleVar(1);
+}
+
+void Frontend::DrawDebugInfoWindow()
+{
+	auto& io = ImGui::GetIO();
+	auto& style = ImGui::GetStyle();
+	auto viewport = ImGui::GetMainViewport();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 	ImGui::SetNextWindowSize({ DebugWindowWidth, viewport->Size.y });
@@ -260,79 +349,31 @@ void Frontend::UpdateUI()
 		auto state = gambo->GetState();
 		ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 		ImGui::TextColored(WHITE, "FLAGS: ");
-			ImGui::SameLine(); ImGui::TextColored(state.flags.Z ? GREEN : RED, "Z");
-			ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.N ? GREEN : RED, "N");
-			ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.H ? GREEN : RED, "H");
-			ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.C ? GREEN : RED, "C");
+		ImGui::SameLine(); ImGui::TextColored(state.flags.Z ? GREEN : RED, "Z");
+		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.N ? GREEN : RED, "N");
+		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.H ? GREEN : RED, "H");
+		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.C ? GREEN : RED, "C");
 		ImGui::Text("");
 		ImGui::TextColored(WHITE, "AF: 0x%.2X%.2X", state.registers.A, state.registers.F);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LCDC: 0x%.2X", state.LCDC);
+		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LCDC: 0x%.2X", state.LCDC);
 		ImGui::TextColored(WHITE, "BC: 0x%.2X%.2X", state.registers.B, state.registers.C);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "STAT: 0x%.2X", state.STAT);
+		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "STAT: 0x%.2X", state.STAT);
 		ImGui::TextColored(WHITE, "DE: 0x%.2X%.2X", state.registers.D, state.registers.E);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LY:   0x%.2X", state.LY);
+		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LY:   0x%.2X", state.LY);
 		ImGui::TextColored(WHITE, "HL: 0x%.2X%.2X", state.registers.H, state.registers.L);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IE:   0x%.2X", state.IE);
+		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IE:   0x%.2X", state.IE);
 		ImGui::TextColored(GREEN, "SP: 0x%.4X", state.SP);
-			ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IF:   0x%.2X", state.IF);
+		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IF:   0x%.2X", state.IF);
 		ImGui::TextColored(CYAN, "PC: 0x%.4X", state.PC);
+
+		ImGui::Text("");
+		bool first = true;
+		for (auto& line : state.mapAsm)
+		{
+			ImGui::TextColored(first == true ? CYAN : WHITE, line.second.c_str());
+			first = false;
+		}
 	}
 	ImGui::End();
-
-
-
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	//ImGui::ShowDemoWindow();
 	ImGui::PopStyleVar(1);
-}
-
-void Frontend::EndFrame()
-{
-	auto& io = ImGui::GetIO();
-
-	// Rendering
-	ImGui::Render();
-	SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-	SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
-	SDL_RenderClear(renderer);
-	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-	SDL_RenderPresent(renderer);
-
-	if (done)
-	{
-		gambo->done = true;
-	}
-}
-
-void Frontend::HandleKeyboardShortcuts()
-{
-	// for some reason, doing shortcuts this way makes it trigger twice.
-	// the bool is there to make sure it only triggers the first time.
-	//static bool ctrl_o = false;
-	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
-	//{
-	//	if (ctrl_o)
-	//	{
-	//		ctrl_o = false;
-	//	}
-	//	else
-	//	{
-	//		FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
-	//		ctrl_o = true;
-	//	}
-	//}
-	//
-	//static bool ctrl_p = false;
-	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_P))
-	//{
-	//	if (ctrl_p)
-	//	{
-	//		ctrl_p = false;
-	//	}
-	//	else
-	//	{
-	//		gambo->running = !gambo->running;
-	//		ctrl_p = true;
-	//	}
-	//}
 }

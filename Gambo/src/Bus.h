@@ -91,7 +91,7 @@ public:
 	}
 
 
-	void Disassemble(u16 startAddr, u16 endAddr)
+	void Disassemble(u16 startAddr, int numInstr)
 	{
 		u32 addr = startAddr;
 		u8 value = 0x00, lo = 0x00, hi = 0x00;
@@ -99,17 +99,17 @@ public:
 
 		mapAsm.clear();
 
-		while (addr <= (u32)endAddr)
+		while (mapAsm.size() < numInstr)
 		{
 			
-			if ((0x4000 <= addr && addr <= 0xBFFF) || // skip vram
-				(0x0104 <= addr && addr <= 0x014F) || // skip cartridge header
-				(0xFE00 <= addr && addr <= 0xFE7F) || // skip OAM and IO
-				(addr == 0xD800)) // skip this address in particular because if i dont, it breaks disassembly
-			{
-				addr++;
-				continue;
-			}
+			//if ((0x4000 <= addr && addr <= 0xBFFF) || // skip vram
+			//	(0x0104 <= addr && addr <= 0x014F) || // skip cartridge header
+			//	(0xFE00 <= addr && addr <= 0xFE7F) || // skip OAM and IO
+			//	(addr == 0xD800)) // skip this address in particular because if i dont, it breaks disassembly
+			//{
+			//	addr++;
+			//	continue;
+			//}
 
 			lineAddr = addr;
 

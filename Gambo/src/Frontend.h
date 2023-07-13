@@ -25,4 +25,8 @@ private:
 	bool done = false;
 	bool integerScale = true;
 	bool maintainAspectRatio = true;
+
+	// helpers
+	void DrawGamboWindow();
+	void DrawDebugInfoWindow();
 };
