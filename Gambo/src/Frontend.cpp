@@ -121,14 +121,11 @@ void Frontend::BeginFrame()
 
 			if (filePath.extension() == ".gb")
 			{
-				if (filePath != L"")
-				{
-					gambo->InsertCartridge(filePath);
-				}
+				gambo->InsertCartridge(filePath);
 			}
 			else
 			{
-				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "file type not accepted", "The only file type Gambo accepts is \".gb\".", window);
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "File type not accepted!", "The only file type Gambo accepts is \".gb\".", window);
 			}
 		}
 		
