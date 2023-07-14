@@ -286,7 +286,7 @@ void PPU::Clock()
 								break;
 						}
 
-						screen[(LY * GamboScreenWidth) + pixel] = GameBoyColors[color];
+						screen[(LY * GamboScreenWidth) + pixel] = blankOnFirstFrame ? GameBoyColors[White] : GameBoyColors[color];
 					}
 				}
 				break;
@@ -320,19 +320,22 @@ void PPU::Clock()
 				STAT &= ~0x0000100;
 			}
 		}
+
+		cycles = (cycles + 1) % 70224;
 	}
 	else
 	{
 		// disable all of this since the lcd is disabled
+		blankOnFirstFrame = true;
+		currScanlineCycles = 0;
 		LY = 0;
-		LYC = 0;
 		STAT &= ~0b01111111; 
 	}
-
-	cycles = (cycles + 1) % 70224;
+	
 	if (cycles == 0)
 	{
 		frameComplete = true;
+		blankOnFirstFrame = false;
 	}
 }
 

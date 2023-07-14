@@ -30,4 +30,5 @@ public:
 private:
 	int cycles = 0;
 	bool frameComplete = false;
+	bool blankOnFirstFrame = false;
 };
