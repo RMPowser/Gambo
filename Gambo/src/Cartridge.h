@@ -7,11 +7,14 @@ public:
 	Cartridge(std::wstring filePath);
 	~Cartridge();
 
-	std::vector<u8> data;
+	Cartridge() = delete;
+	
+	const std::vector<u8>& GetData();
 
 private:
 	void DeserializeHeader();
 
+	std::vector<u8> data;
 	struct CartridgeHeader
 	{
 		std::array<u8, 16>		title;				// 0x0134-0x0143
@@ -28,6 +31,5 @@ private:
 		u8						header_checksum;	// 0x014D
 		std::array<u8, 2>		global_checksum;	// 0x014E-0x014F
 	} header;
-	
 };
 

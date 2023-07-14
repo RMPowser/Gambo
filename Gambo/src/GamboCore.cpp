@@ -158,10 +158,10 @@ void GamboCore::InsertCartridge(std::wstring filePath)
 	gb.ram.fill(0xFF);
 
 	// copy the initial cartridge data into ram
-	size_t size = std::min(gb.ram.size(), cartridge->data.size());
+	size_t size = std::min(gb.ram.size(), cartridge->GetData().size());
 	for (size_t i = 0; i < size; i++)
 	{
-		gb.ram[i] = cartridge->data[i];
+		gb.ram[i] = cartridge->GetData()[i];
 	}
 
 	gb.cpu.Reset();

@@ -24,6 +24,11 @@ Cartridge::~Cartridge()
 {
 }
 
+const std::vector<u8>& Cartridge::GetData()
+{
+	return data;
+}
+
 void Cartridge::DeserializeHeader()
 {
 	for (size_t i = 0; i < header.title.size(); i++)
