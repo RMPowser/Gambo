@@ -6,7 +6,7 @@
 PPU::PPU(Bus* b)
 	:bus(b)
 {
-	std::fill(&(screen[0]), &(screen[GamboScreenSize]), SDL_Color{ 0, 0, 0, 255 });
+	Reset();
 }
 
 PPU::~PPU()
@@ -26,6 +26,7 @@ void PPU::Write(u16 addr, u8 data)
 
 void PPU::Clock()
 {
+	static int callCount = 0;
 	frameComplete = false;
 	static int currScanlineCycles = 0;
 
@@ -322,20 +323,27 @@ void PPU::Clock()
 		}
 
 		cycles = (cycles + 1) % 70224;
+
+		if (cycles == 0)
+		{
+			frameComplete = true;
+			blankOnFirstFrame = false;
+		}
 	}
 	else
 	{
 		// disable all of this since the lcd is disabled
 		blankOnFirstFrame = true;
+		cycles = 0;
 		currScanlineCycles = 0;
 		LY = 0;
 		STAT &= ~0b01111111; 
 	}
-	
-	if (cycles == 0)
+
+	callCount = (callCount + 1) % 70224;
+	if (callCount == 0)
 	{
 		frameComplete = true;
-		blankOnFirstFrame = false;
 	}
 }
 
@@ -344,6 +352,7 @@ void PPU::Reset()
 	cycles = 0;
 	frameComplete = false;
 	blankOnFirstFrame = false;
+	std::fill(&(screen[0]), &(screen[GamboScreenSize]), SDL_Color{ 0, 0, 0, 255 });
 }
 
 bool PPU::FrameComplete()

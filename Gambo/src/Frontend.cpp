@@ -2,12 +2,10 @@
 #include "GamboDefine.h"
 #include "Cartridge.h"
 #include "ClearColor.h"
-#include "FileDialogs.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include <sstream>
 #include <exception>
-#include <filesystem>
 
 Frontend::Frontend()
 {
@@ -114,19 +112,11 @@ void Frontend::BeginFrame()
 	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSDL2_ProcessEvent(&event);
+
 		if (event.type == SDL_DROPFILE)
 		{
-			std::filesystem::path filePath(event.drop.file);
+			OpenGameFromFile(event.drop.file);
 			SDL_free(event.drop.file);
-
-			if (filePath.extension() == ".gb")
-			{
-				gambo->InsertCartridge(filePath);
-			}
-			else
-			{
-				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "File type not accepted!", "The only file type Gambo accepts is \".gb\".", window);
-			}
 		}
 		
 		if (event.type == SDL_QUIT)
@@ -175,35 +165,35 @@ void Frontend::EndFrame()
 
 void Frontend::HandleKeyboardShortcuts()
 {
-	// for some reason, doing shortcuts this way makes it trigger twice.
-	// the bool is there to make sure it only triggers the first time.
-	//static bool ctrl_o = false;
-	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
-	//{
-	//	if (ctrl_o)
-	//	{
-	//		ctrl_o = false;
-	//	}
-	//	else
-	//	{
-	//		FileDialogs::OpenFile(L"All\0*.*\0Game Boy Rom\0*.gb\0Binary\0*.bin\0");
-	//		ctrl_o = true;
-	//	}
-	//}
-	//
-	//static bool ctrl_p = false;
-	//if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_P))
-	//{
-	//	if (ctrl_p)
-	//	{
-	//		ctrl_p = false;
-	//	}
-	//	else
-	//	{
-	//		gambo->running = !gambo->running;
-	//		ctrl_p = true;
-	//	}
-	//}
+	auto& io = ImGui::GetIO();
+	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_O))
+	{
+		OpenGameFromFile();
+		io.AddKeyEvent(ImGuiKey_O, false); // if i dont do this, the filedialog opens twice
+	}
+	
+	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_P))
+	{
+		SetGamboRunning();
+	}
+
+	if (ImGui::IsKeyPressed(ImGuiKey_F7))
+	{
+		SetGamboStep();
+	}
+}
+
+void Frontend::OpenGameFromFile(std::filesystem::path filePath)
+{
+	if (filePath.extension() == ".gb")
+	{
+		gambo = std::make_unique<GamboCore>();
+		gambo->InsertCartridge(filePath);
+	}
+	else if (filePath != "")
+	{
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "File type not accepted!", "The only file type Gambo accepts is \".gb\".", window);
+	}
 }
 
 void Frontend::DrawGamboWindow()
@@ -232,23 +222,23 @@ void Frontend::DrawGamboWindow()
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("Open..."))
+				if (ImGui::MenuItem("Open...", "Ctrl+O"))
 				{
-					std::wstring filePath = FileDialogs::OpenFile(L"Game Boy Rom\0*.gb");
-					if (filePath != L"")
-					{
-						gambo->InsertCartridge(filePath);
-					}
+					OpenGameFromFile();
 				}
 				ImGui::EndMenu();
 			}
 
-			std::string buttonName = !gambo->running ? "Play" : "Pause";
 			if (ImGui::BeginMenu("Gambo"))
 			{
-				if (ImGui::MenuItem(buttonName.c_str()))
+				if (ImGui::MenuItem(!gambo->running ? "Play" : "Pause", "Ctrl+P"))
 				{
-					gambo->running = !gambo->running;
+					SetGamboRunning();
+				}
+
+				if (ImGui::MenuItem("Step", "F7"))
+				{
+					SetGamboStep();
 				}
 				ImGui::EndMenu();
 			}
@@ -373,4 +363,17 @@ void Frontend::DrawDebugInfoWindow()
 	}
 	ImGui::End();
 	ImGui::PopStyleVar(1);
+}
+
+void Frontend::SetGamboRunning()
+{
+	gambo->running = !gambo->running;
+	if (gambo->running)
+		gambo->step = false;
+}
+
+void Frontend::SetGamboStep()
+{
+	gambo->running = false;
+	gambo->step = true;
 }

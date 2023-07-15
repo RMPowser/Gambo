@@ -48,6 +48,7 @@ public:
 
 	std::atomic<bool> done = false;
 	std::atomic<bool> running = false;
+	std::atomic<bool> step = false;
 
 private:
 	Bus gb;

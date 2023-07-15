@@ -15,6 +15,7 @@ public:
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
+	void Reset();
 
 	void InsertCartridge(std::wstring filePath);
 
@@ -33,7 +34,7 @@ public:
 	// FF00-FF7F | I / O Registers				  | 
 	// FF80-FFFE | High RAM(HRAM)				  | 
 	// FFFF-FFFF | Interrupt Enable register (IE) |
-	std::vector<u8> ram = std::vector<u8>(64KiB, 0xFF);
+	std::vector<u8> ram = std::vector<u8>(64KiB, 0x00);
 	std::map<uint16_t, std::string> mapAsm;
 	u16 lastWrite = 0;
 	u16 lastRead = 0;

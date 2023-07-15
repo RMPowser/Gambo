@@ -23,8 +23,6 @@ void GamboCore::Run()
 
 	//while (!done)
 	{
-		static bool step = false;
-
 		//SDL_Event e;
 		//while (SDL_PollEvent(&e))
 		//{
@@ -60,12 +58,13 @@ void GamboCore::Run()
 		//	}
 		//}
 
+		static bool disassemble = true;
 		if (running)
 		{
 			do
 			{
 				gb.cpu.Clock();
-				//if (gb.cpu.PC == 0xC448)
+				//if (gb.cpu.PC == 0xC000)
 				//{
 				//	running = false;
 				//	goto BREAK;
@@ -73,6 +72,7 @@ void GamboCore::Run()
 				gb.ppu.Clock();
 			} while (!gb.ppu.FrameComplete());
 
+			disassemble = true;
 		}
 		else if (step)
 		{
@@ -83,10 +83,14 @@ void GamboCore::Run()
 				gb.ppu.Clock();
 			} while (!gb.cpu.InstructionComplete());
 			step = false;
+			disassemble = true;
 		}
 
-
-		gb.Disassemble(gb.cpu.PC, 10);
+		if (disassemble)
+		{
+			gb.Disassemble(gb.cpu.PC, 10);
+			disassemble = false;
+		}
 
 		std::this_thread::sleep_until(timePoint - 1ms);
 		while (clock::now() <= timePoint)
@@ -146,9 +150,8 @@ void GamboCore::InsertCartridge(std::wstring filePath)
 {
 	running = false;
 
+	gb.Reset();
 	gb.InsertCartridge(filePath);
-
-	running = true;
 }
 
 void GamboCore::SetUseBootRom(bool b)

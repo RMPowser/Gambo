@@ -30,7 +30,7 @@ u8 Bus::Read(u16 addr)
 		}
 		else
 		{
-			return 0xFF;
+			return cpu.useBootRom ? 0xFF : ram[addr];
 		}
 	}
 	// normal ram
@@ -51,7 +51,7 @@ void Bus::Write(u16 addr, u8 data)
 	lastWrite = addr;
 
 	// cartridge
-	if (IsCartridgeAddress(addr))
+	if (IsCartridgeAddress(addr) && cart != nullptr)
 	{
 		cart->Write(addr, data);
 	}
@@ -84,21 +84,27 @@ void Bus::Write(u16 addr, u8 data)
 	}
 }
 
+void Bus::Reset()
+{
+	ram = std::vector<u8>(64KiB, 0x00);
+	mapAsm.clear();
+	lastWrite = 0;
+	lastRead = 0;
+	cpu.Reset();
+	ppu.Reset();
+	SAFE_DELETE(cart);
+}
+
 void Bus::InsertCartridge(std::wstring filePath)
 {
 	SAFE_DELETE(cart);
 	cart = new Cartridge(filePath);
-
-	ram = std::vector<u8>(ram.size(), 0xFF);
 
 	// copy the first 32KiB of the cartridge data into ram
 	for (u16 i = 0; i < 32KiB; i++)
 	{
 		ram[i] = cart->Read(i);
 	}
-
-	cpu.Reset();
-	ppu.Reset();
 }
 
 void Bus::Disassemble(u16 startAddr, int numInstr)
@@ -149,6 +155,14 @@ void Bus::Disassemble(u16 startAddr, int numInstr)
 				case 2:
 				{
 					u8 data = Read(addr++);
+					std::string firstTwoChar(instruction.mnemonic.begin(), instruction.mnemonic.begin() + 2);
+					if (firstTwoChar == "JR")
+					{
+						s16 sdata = (s8)data;
+						sdata += addr;
+						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(sdata, 4)));
+						break;
+					}
 					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
 					break;
 				}

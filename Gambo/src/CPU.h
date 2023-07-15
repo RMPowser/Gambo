@@ -70,6 +70,7 @@ public:
 	bool stopMode = false; // set to true by the stop command, set back to false by reset command
 	bool isHalted = false; // set to true by the halt command, set back to false by reset or interrupt
 	bool IME = false; // interrupt master enable flag
+	bool IMEOneInstructionDelay = false; // used to delay the effect of EI by one instruction
 		
 #pragma region Instructions
 	struct Instruction

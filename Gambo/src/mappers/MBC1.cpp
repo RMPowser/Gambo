@@ -45,7 +45,7 @@ u8 MBC1::Read(u16 addr)
 
 			// bits 14-18 are always 0 and bits 19-20
 			// come from ramBankNumber
-			wAddr |= ramBankNumber << 18;
+			wAddr |= ramBankNumber << 19;
 		}
 	}
 	else if (0x4000 <= addr && addr <= 0x7FFF)
@@ -54,10 +54,17 @@ u8 MBC1::Read(u16 addr)
 		wAddr = addr & 0x3FFF;
 
 		// bits 14-18 are from the rom bank number
-		wAddr |= romBankNumber << 13;
+		if (romBankNumber == 0)
+		{
+			wAddr |= 1 << 14;
+		}
+		else
+		{
+			wAddr |= romBankNumber << 14;
+		}
 
 		// bits 19-20 come from ramBankNumber
-		wAddr |= ramBankNumber << 18;
+		wAddr |= ramBankNumber << 19;
 	}
 	else if (0xA000 <= addr && addr <= 0xBFFF)
 	{
@@ -75,7 +82,7 @@ u8 MBC1::Read(u16 addr)
 				wAddr = addr & 0x1FFF;
 
 				// bits 13-14 come from ramBankNumber
-				wAddr |= ramBankNumber << 12;
+				wAddr |= ramBankNumber << 13;
 			}
 
 			return cart->ram[wAddr];

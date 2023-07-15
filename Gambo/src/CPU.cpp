@@ -16,7 +16,7 @@ u8 CPU::Read(u16 addr)
 	if ((bus->ppu.mode == PPU::Mode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
 		|| (bus->ppu.mode == PPU::Mode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
 	{
-		return 0xFF;
+		return 0x00;
 	}
 	else
 	{
@@ -26,6 +26,12 @@ u8 CPU::Read(u16 addr)
 
 void CPU::Write(u16 addr, u8 data)
 {
+	if ((bus->ppu.mode == PPU::Mode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
+		|| (bus->ppu.mode == PPU::Mode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
+	{
+		return;
+	}
+
     bus->Write(addr, data);
 	if (addr == HWAddr::DMA)
 	{
@@ -47,6 +53,12 @@ void CPU::Clock()
 		if (!isHalted)
 		{
 			// read and execute code normally
+			if (IMEOneInstructionDelay)
+			{
+				IME = true;
+				IMEOneInstructionDelay = false;
+			}
+
 			opcode = Read(PC++);
 			if (opcode == 0xCB)
 			{
@@ -258,7 +270,7 @@ void CPU::Reset()
 {
 	if (!useBootRom)
 	{
-		// this puts the cpu into back into a state as if it had just finished a legit boot sequence
+		// this puts the cpu back into a state as if it had just finished a legit boot sequence
 		A = 0x01;
 		SetFlag(fZ, 1);
 		SetFlag(fN, 0);
@@ -277,7 +289,7 @@ void CPU::Reset()
 		isHalted = false;
 
 		// this is what the hardware registers look like at PC = 0x0100
-		bus->ram[HWAddr::P1] = 0x0F;
+		bus->ram[HWAddr::P1] = 0xCF;
 		bus->ram[HWAddr::SB] = 0x00;
 		bus->ram[HWAddr::SC] = 0x7E;
 		bus->ram[HWAddr::DIV] = 0xAB;
@@ -477,7 +489,7 @@ u8 CPU::DI()
 
 u8 CPU::EI()
 {
-	IME = true; 
+	IMEOneInstructionDelay = true;
 
 	return 0;
 }
@@ -777,8 +789,8 @@ u8 CPU::RET_C()
 
 u8 CPU::RETI()
 {
-	Pop(PC);
-	IME = true; 
+	EI();
+	RET();
 
 	return 0;
 }

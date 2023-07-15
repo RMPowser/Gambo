@@ -2,6 +2,8 @@
 #include <atomic>
 #include "SDL.h"
 #include "GamboCore.h"
+#include "FileDialogs.h"
+#include <filesystem>
 
 class Frontend
 {
@@ -16,6 +18,7 @@ private:
 	void UpdateUI();
 	void EndFrame();
 	void HandleKeyboardShortcuts();
+	void OpenGameFromFile(std::filesystem::path filePath = FileDialogs::OpenFile(L"Game Boy Rom\0*.gb"));
 
 	std::unique_ptr<GamboCore> gambo;
 	SDL_Texture* gamboScreen = nullptr;
@@ -29,4 +32,6 @@ private:
 	// helpers
 	void DrawGamboWindow();
 	void DrawDebugInfoWindow();
+	void SetGamboRunning();
+	void SetGamboStep();
 };
