@@ -41,7 +41,6 @@ public:
 	float GetScreenHeight() const;
 	GamboState GetState() const;
 
-	void RemoveCartridge();
 	void InsertCartridge(std::wstring filePath);
 
 	void SetUseBootRom(bool b);
@@ -52,7 +51,6 @@ public:
 
 private:
 	Bus gb;
-	Cartridge* cartridge;
 
 	void DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col = WHITE, u32 scale = 1);
 	void DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);

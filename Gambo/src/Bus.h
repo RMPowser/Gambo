@@ -5,10 +5,21 @@
 #include "CPU.h"
 #include "PPU.h"
 #include "GamboDefine.h"
+#include "Cartridge.h"
 
 class Bus
 {
 public:
+	Bus();
+	~Bus();
+
+	u8 Read(u16 addr);
+	void Write(u16 addr, u8 data);
+
+	void InsertCartridge(std::wstring filePath);
+
+	void Disassemble(u16 startAddr, int numInstr);
+	
 	// 64KB total system memory. memory is mapped:
 	// 0000-3FFF | 16 KiB ROM bank 00			  | From cartridge, usually a fixed bank
 	// 4000-7FFF | 16 KiB ROM Bank 01~NN		  | From cartridge, switchable bank via mapper(if any)
@@ -22,140 +33,15 @@ public:
 	// FF00-FF7F | I / O Registers				  | 
 	// FF80-FFFE | High RAM(HRAM)				  | 
 	// FFFF-FFFF | Interrupt Enable register (IE) |
-	std::array<u8, 0x10000> ram;
+	std::vector<u8> ram = std::vector<u8>(64KiB, 0xFF);
 	std::map<uint16_t, std::string> mapAsm;
 	u16 lastWrite = 0;
 	u16 lastRead = 0;
 	CPU cpu;
 	PPU ppu;
+	Cartridge* cart;
 
-
-	Bus() 
-		: cpu(this)
-		, ppu(this)
-	{
-	};
-
-	u8 Read(uint16_t addr)
-	{
-		if (!(ram[HWAddr::BOOT] & 1) && addr >= 0x0000 && addr <= 0x00FF)
-		{
-			return cpu.bootRom[addr];
-		}
-
-		if (addr >= 0x0000 && addr <= 0xFFFF)
-		{
-			lastRead = addr;
-			return ram[addr];
-		}
-
-		return 0x00;
-	}
-
-	void Write(u16 addr, u8 data)
-	{
-		// TODO: remove this after implementing input
-		if (addr == HWAddr::P1)
-		{
-			return;
-		}
-
-		if (addr >= 0x0000 && addr <= 0xFFFF)
-		{
-			ram[addr] = data;
-
-			// this is the implementation for echo ram
-			if (addr >= 0xE000 && addr <= 0xFDFF)
-			{
-				ram[addr - 0x2000] = data;
-			}
-			else if (addr >= 0xC000 && addr <= 0xDDFF)
-			{
-				ram[addr + 0x2000] = data;
-			}
-
-			// top 3 bits in IF are always read as 1
-			if (addr == HWAddr::IF)
-			{
-				ram[HWAddr::IF] |= 0b11100000;
-			}
-			
-			// writing anything to the DIV register resets it to 0
-			if (addr == HWAddr::DIV)
-			{
-				ram[addr] = 0;
-			}
-
-			lastWrite = addr;
-		}
-	}
-
-
-	void Disassemble(u16 startAddr, int numInstr)
-	{
-		u32 addr = startAddr;
-		u8 value = 0x00, lo = 0x00, hi = 0x00;
-		u16 lineAddr = 0;
-
-		mapAsm.clear();
-
-		while (mapAsm.size() < numInstr)
-		{
-			
-			//if ((0x4000 <= addr && addr <= 0xBFFF) || // skip vram
-			//	(0x0104 <= addr && addr <= 0x014F) || // skip cartridge header
-			//	(0xFE00 <= addr && addr <= 0xFE7F) || // skip OAM and IO
-			//	(addr == 0xD800)) // skip this address in particular because if i dont, it breaks disassembly
-			//{
-			//	addr++;
-			//	continue;
-			//}
-
-			lineAddr = addr;
-
-			// prefix line with instruction addr
-			std::string s = "$" + hex(addr, 4) + ": ";
-
-			// read instruction and get readable name
-			u8 opcode = ram[addr++];
-			if (opcode == 0xCB)
-			{
-				// its a 16bit opcode so read another byte
-				opcode = ram[addr++];
-
-				s += cpu.instructions16bit[opcode].mnemonic;
-			}
-			else
-			{
-				auto& instruction = cpu.instructions8bit[opcode];
-				switch (instruction.bytes)
-				{
-					case 0:
-					case 1:
-					{
-						s += cpu.instructions8bit[opcode].mnemonic;
-						break;
-					}
-					case 2:
-					{
-						u8 data = Read(addr++);
-						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
-						break;
-					}
-					case 3:
-					{
-						u16 lo = Read(addr++);
-						u16 hi = Read(addr++);
-						u16 data = (hi << 8) | lo;
-						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
-						break;
-					}
-					default:
-						throw("opcode has more than 3 bytes");
-				}
-			}
-
-			mapAsm[lineAddr] = s;
-		}
-	}
+private:
+	bool IsBootRomAddress(u16 addr);
+	bool IsCartridgeAddress(u16 addr);
 };

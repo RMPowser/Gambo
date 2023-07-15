@@ -12,6 +12,7 @@
 #include <string>
 #include <array>
 #include <atomic>
+#include <map>
 
 typedef uint64_t u64;
 typedef  int64_t s64;
@@ -21,6 +22,19 @@ typedef uint16_t u16;
 typedef  int16_t s16;
 typedef uint8_t u8;
 typedef  int8_t s8;
+
+#pragma warning(push)
+#pragma warning(disable: 4455)
+constexpr unsigned long long operator""KiB(unsigned long long const x)
+{
+	return 1024L * x;
+}
+
+constexpr unsigned long long operator""MiB(unsigned long long const x)
+{
+	return 1024L * 1024L * x;
+}
+#pragma warning(pop)
 
 // addresses of hardware registers
 namespace HWAddr 

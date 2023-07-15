@@ -24,6 +24,7 @@ public:
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
 	void Clock();
+	void Reset();
 	bool FrameComplete();
 	SDL_Color* screen = new SDL_Color[GamboScreenSize];
 

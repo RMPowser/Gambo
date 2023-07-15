@@ -142,29 +142,11 @@ GamboState GamboCore::GetState() const
 	return g;
 }
 
-void GamboCore::RemoveCartridge()
-{
-	SAFE_DELETE(cartridge);
-}
-
 void GamboCore::InsertCartridge(std::wstring filePath)
 {
 	running = false;
 
-	RemoveCartridge();
-
-	cartridge = new Cartridge(filePath);
-
-	gb.ram.fill(0xFF);
-
-	// copy the initial cartridge data into ram
-	size_t size = std::min(gb.ram.size(), cartridge->GetData().size());
-	for (size_t i = 0; i < size; i++)
-	{
-		gb.ram[i] = cartridge->GetData()[i];
-	}
-
-	gb.cpu.Reset();
+	gb.InsertCartridge(filePath);
 
 	running = true;
 }

@@ -118,7 +118,7 @@ void PPU::Clock()
 			for (u16 currAddr = startAddr; currAddr < startAddr + 160; currAddr++)
 			{
 				static u8 data;
-				data = bus->ram[currAddr];
+				data = bus->Read(currAddr);
 				Write(HWAddr::OAM + (currAddr - startAddr), data);
 			}
 		}
@@ -237,7 +237,7 @@ void PPU::Clock()
 						static u16 tileIdAddr;
 						static int tileId;
 						tileIdAddr = BGAddr + (tileRowOffset * 32) + tileColOffset; // there are 32 rows of tiles in memory
-						tileId = isSigned ? (s8)(bus->ram[tileIdAddr]) : bus->ram[tileIdAddr];
+						tileId = isSigned ? (s8)bus->Read(tileIdAddr) : bus->Read(tileIdAddr);
 
 						// calculate the address of the tile data
 						static u16 tileDataAddr;
@@ -246,8 +246,8 @@ void PPU::Clock()
 						// calculate the vertical position within the tile data
 						static u8 data0;
 						static u8 data1;
-						data0 = bus->ram[tileDataAddr + pixelRowOffset];
-						data1 = bus->ram[tileDataAddr + pixelRowOffset + 1];
+						data0 = bus->Read(tileDataAddr + pixelRowOffset);
+						data1 = bus->Read(tileDataAddr + pixelRowOffset + 1);
 
 						// pixel 0 in the tile is bit 7 of both data1 and data2. Pixel 1 is bit 6 etc..
 						static u8 colorBitIndex;
@@ -337,6 +337,13 @@ void PPU::Clock()
 		frameComplete = true;
 		blankOnFirstFrame = false;
 	}
+}
+
+void PPU::Reset()
+{
+	cycles = 0;
+	frameComplete = false;
+	blankOnFirstFrame = false;
 }
 
 bool PPU::FrameComplete()
