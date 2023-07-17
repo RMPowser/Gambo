@@ -189,6 +189,21 @@ void Frontend::OpenGameFromFile(std::filesystem::path filePath)
 	{
 		gambo = std::make_unique<GamboCore>();
 		gambo->InsertCartridge(filePath);
+
+		auto& cart = gambo->GetCartridge();
+		if (cart.IsMapperNotSupported())
+		{
+			std::stringstream ss;
+			ss << "Gambo does not yet implement mapper " << cart.GetMapperTypeAsString() << ".";
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Mapper not supported!", ss.str().c_str(), window);
+			gambo = std::make_unique<GamboCore>();
+		}
+		else
+		{
+			std::stringstream ss;
+			ss << MainWindowTitle << ": " << cart.GetTitle() << " - " << cart.GetPublisher();
+			SDL_SetWindowTitle(window, ss.str().c_str());
+		}
 	}
 	else if (filePath != "")
 	{

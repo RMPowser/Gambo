@@ -293,10 +293,13 @@ void CPU::Reset()
 		isHalted = false;
 
 		// this is what the hardware registers look like at PC = 0x0100
+		for (size_t i = 0xFF00; i < 0x10000; i++)
+			bus->ram[i] = 0xFF;
+		
 		bus->ram[HWAddr::P1] = 0xCF;
 		bus->ram[HWAddr::SB] = 0x00;
 		bus->ram[HWAddr::SC] = 0x7E;
-		bus->ram[HWAddr::DIV] = 0xAB;
+		bus->ram[HWAddr::DIV] = 0xAC;
 		bus->ram[HWAddr::TIMA] = 0x00;
 		bus->ram[HWAddr::TMA] = 0x00;
 		bus->ram[HWAddr::TAC] = 0xF8;
@@ -323,7 +326,7 @@ void CPU::Reset()
 		bus->ram[HWAddr::NR51] = 0xF3;
 		bus->ram[HWAddr::NR52] = 0xF1;
 		bus->ram[HWAddr::LCDC] = 0x91;
-		bus->ram[HWAddr::STAT] = 0x85;
+		bus->ram[HWAddr::STAT] = 0x80;
 		bus->ram[HWAddr::SCY] = 0x00;
 		bus->ram[HWAddr::SCX] = 0x00;
 		bus->ram[HWAddr::LY] = 0x00;

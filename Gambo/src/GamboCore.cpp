@@ -58,7 +58,7 @@ void GamboCore::Run()
 		//	}
 		//}
 
-		static bool disassemble = true;
+		disassemble = true;
 		if (running)
 		{
 			do
@@ -144,6 +144,11 @@ GamboState GamboCore::GetState() const
 
 	g.mapAsm = gb.mapAsm;
 	return g;
+}
+
+const Cartridge& GamboCore::GetCartridge() const
+{
+	return *gb.cart;
 }
 
 void GamboCore::InsertCartridge(std::wstring filePath)

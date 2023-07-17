@@ -192,8 +192,15 @@ bool Bus::IsBootRomAddress(u16 addr)
 
 bool Bus::IsCartridgeAddress(u16 addr)
 {
-	return
-		!IsBootRomAddress(addr) &&
-		(0x0000 <= addr && addr <= 0x7FFF) ||	// rom
-		(0xA000 <= addr && addr <= 0xBFFF);		// ram
+	if (cart == nullptr)
+	{
+		return false;
+	}
+	else
+	{
+		return
+			!IsBootRomAddress(addr) &&
+			(0x0000 <= addr && addr <= 0x7FFF && addr < cart->GetRomSize()) ||	// rom
+			(0xA000 <= addr && addr <= 0xBFFF && addr < cart->GetRamSize());	// ram
+	}
 }

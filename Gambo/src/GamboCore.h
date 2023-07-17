@@ -41,6 +41,7 @@ public:
 	float GetScreenHeight() const;
 	GamboState GetState() const;
 
+	const Cartridge& GetCartridge() const;
 	void InsertCartridge(std::wstring filePath);
 
 	void SetUseBootRom(bool b);
@@ -61,4 +62,5 @@ private:
 	float screenWidth = GamboScreenWidth;
 	float screenHeight = GamboScreenHeight;
 	int screenScale = PixelScale; 
+	bool disassemble = true;
 };

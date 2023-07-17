@@ -3,6 +3,39 @@
 #include "MBC1.h"
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+
+std::map<MapperType, std::string> MapperTypeToString {
+	{ MapperType::ROM_ONLY, "ROM_ONLY" },
+	{ MapperType::MBC1, "MBC1" },
+	{ MapperType::MBC1_RAM, "MBC1_RAM" },
+	{ MapperType::MBC1_RAM_BATTERY, "MBC1_RAM_BATTERY" },
+	{ MapperType::MBC2, "MBC2" },
+	{ MapperType::MBC2_BATERRY, "MBC2_BATERRY" },
+	{ MapperType::ROM_RAM, "ROM_RAM" },
+	{ MapperType::ROM_RAM_BATTERY, "ROM_RAM_BATTERY" },
+	{ MapperType::MMM01, "MMM01" },
+	{ MapperType::MMM01_RAM, "MMM01_RAM" },
+	{ MapperType::MMM01_RAM_BATTERY, "MMM01_RAM_BATTERY" },
+	{ MapperType::MBC3_TIMER_BATTERY, "MBC3_TIMER_BATTERY" },
+	{ MapperType::MBC3_TIMER_RAM_BATTERY, "MBC3_TIMER_RAM_BATTERY" },
+	{ MapperType::MBC3, "MBC3" },
+	{ MapperType::MBC3_RAM, "MBC3_RAM" },
+	{ MapperType::MBC3_RAM_BATTERY, "MBC3_RAM_BATTERY" },
+	{ MapperType::MBC5, "MBC5" },
+	{ MapperType::MBC5_RAM, "MBC5_RAM" },
+	{ MapperType::MBC5_RAM_BATTERY, "MBC5_RAM_BATTERY" },
+	{ MapperType::MBC5_RUMBLE, "MBC5_RUMBLE" },
+	{ MapperType::MBC5_RUMBLE_RAM, "MBC5_RUMBLE_RAM" },
+	{ MapperType::MBC5_RUMBLE_RAM_BATTERY, "MBC5_RUMBLE_RAM_BATTERY" },
+	{ MapperType::MBC6, "MBC6" },
+	{ MapperType::MBC7_SENSOR_RUMBLE_RAM_BATTERY, "MBC7_SENSOR_RUMBLE_RAM_BATTERY" },
+	{ MapperType::POCKET_CAMERA, "POCKET_CAMERA" },
+	{ MapperType::BANDAI_TAMA5, "BANDAI_TAMA5" },
+	{ MapperType::HuC3, "HuC3" },
+	{ MapperType::HuC1_RAM_BATTERY, "HuC1_RAM_BATTERY" },
+};
 
 struct ROM_info
 {
@@ -265,6 +298,7 @@ const std::map<std::string, std::string> new_publisher_info =
 #pragma warning(push)
 #pragma warning(disable : 26495)
 Cartridge::Cartridge(std::wstring filePath)
+	: mapperNotSupported(false)
 {
 	std::ifstream input(filePath, std::ios::binary | std::ios::ate);
 	if (input.is_open())
@@ -303,8 +337,6 @@ Cartridge::~Cartridge()
 
 u8 Cartridge::Read(u16 addr) const
 {
-	assert(addr < rom.size());
-	
 	if (mapper != nullptr)
 	{
 		return mapper->Read(addr);
@@ -315,8 +347,6 @@ u8 Cartridge::Read(u16 addr) const
 
 void Cartridge::Write(u16 addr, u8 data)
 {
-	assert(addr < rom.size());
-
 	if (mapper != nullptr)
 	{
 		mapper->Write(addr, data);
@@ -329,7 +359,16 @@ void Cartridge::Write(u16 addr, u8 data)
 
 std::string Cartridge::GetTitle() const
 {
-	return std::string(header.title.begin(), header.title.end());
+	std::stringstream ss;
+	for (auto c : header.title)
+	{
+		if (c != '\0')
+			ss << c;
+		else
+			break;
+	}
+
+	return ss.str();
 }
 
 std::string Cartridge::GetManufacturerCode() const
@@ -351,7 +390,14 @@ std::string Cartridge::GetPublisher() const
 	else
 	{
 		std::string code(header.new_publisher_code.begin(), header.new_publisher_code.end());
-		return new_publisher_info.at(code);
+		if (!new_publisher_info.contains(code))
+		{
+			return code;
+		}
+		else
+		{
+			return new_publisher_info.at(code);
+		}
 	}
 }
 
@@ -363,6 +409,14 @@ u8 Cartridge::GetSGBFlag() const
 MapperType Cartridge::GetMapperType() const
 {
 	return header.type;
+}
+
+std::string Cartridge::GetMapperTypeAsString() const
+{
+	if (MapperTypeToString.contains(header.type))
+		return MapperTypeToString.at(header.type);
+	else
+		return "";
 }
 
 u64 Cartridge::GetRomSize() const
@@ -413,6 +467,11 @@ const BaseMapper* Cartridge::GetMapper() const
 	return mapper;
 }
 
+bool Cartridge::IsMapperNotSupported() const
+{
+	return mapperNotSupported;
+}
+
 void Cartridge::DeserializeHeader()
 {
 	for (size_t i = 0; i < header.title.size(); i++)
@@ -454,7 +513,8 @@ void Cartridge::InitializeMapper()
 			break;
 
 		default:
-			// unimplemented
+			mapper = nullptr;
+			mapperNotSupported = true;
 			break;
 	}
 }

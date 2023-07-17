@@ -56,6 +56,7 @@ public:
 	std::string	GetPublisher() const;
 	u8			GetSGBFlag() const;
 	MapperType	GetMapperType() const;
+	std::string	GetMapperTypeAsString() const;
 	u64			GetRomSize() const;
 	u16			GetRomBanks() const;
 	u64			GetRamSize() const;
@@ -66,6 +67,7 @@ public:
 	u16			GetGlobalChecksum() const;
 
 	const BaseMapper* GetMapper() const;
+	bool IsMapperNotSupported() const;
 
 private:
 	void DeserializeHeader();
@@ -73,6 +75,7 @@ private:
 
 	
 	BaseMapper* mapper;
+	bool mapperNotSupported;
 	std::vector<u8> rom;
 	std::vector<u8> ram;
 
