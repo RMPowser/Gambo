@@ -31,35 +31,48 @@ struct GamboState
 
 class GamboCore
 {
+	friend class CPU;
+	friend class PPU;
 public:
 	GamboCore();
 	~GamboCore();
 
 	void Run();
+	
+	u8 Read(u16 addr);
+	void Write(u16 addr, u8 data);
+	void Reset();
 
-	void* GetScreen() const;
+	const void* GetScreen() const;
 	float GetScreenWidth() const;
 	float GetScreenHeight() const;
 	GamboState GetState() const;
+
+	bool GetDone();
+	void SetDone(bool b);
+	bool GetRunning();
+	void SetRunning(bool b);
+	bool GetStep();
+	void SetStep(bool b);
 
 	const Cartridge& GetCartridge() const;
 	void InsertCartridge(std::filesystem::path filePath);
 
 	void SetUseBootRom(bool b);
-	bool GetUseBootRom();
+	bool IsUseBootRom();
 
-	std::atomic<bool> done = false;
-	std::atomic<bool> running = false;
-	std::atomic<bool> step = false;
 
-	u8 Read(u16 addr);
-	void Write(u16 addr, u8 data);
-	void Reset();
-
-	void Disassemble(u16 startAddr, int numInstr);
+private:
+	std::map<u16, std::string> Disassemble(u16 startAddr, int numInstr) const;
 
 	bool IsBootRomAddress(u16 addr);
 	bool IsCartridgeAddress(u16 addr);
+
+	void ResetRam();
+
+	std::atomic<bool> done;
+	std::atomic<bool> running;
+	std::atomic<bool> step;
 
 	// 64KB total system memory. memory is mapped:
 	// 0000-3FFF | 16 KiB ROM bank 00			  | From cartridge, usually a fixed bank
@@ -74,17 +87,16 @@ public:
 	// FF00-FF7F | I / O Registers				  | 
 	// FF80-FFFE | High RAM(HRAM)				  | 
 	// FFFF-FFFF | Interrupt Enable register (IE) |
-	std::vector<u8> ram = std::vector<u8>(64KiB, 0x00);
-	std::map<uint16_t, std::string> mapAsm;
-	u16 lastWrite = 0;
-	u16 lastRead = 0;
+	std::vector<u8> ram;
+	u16 lastWrite;
+	u16 lastRead;
 	CPU* cpu;
 	PPU* ppu;
-private:
 	Cartridge* cart;
 	
 	float screenWidth = GamboScreenWidth;
 	float screenHeight = GamboScreenHeight;
 	int screenScale = PixelScale; 
 	bool disassemble = true;
+	bool useBootRom;
 };

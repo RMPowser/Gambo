@@ -159,7 +159,7 @@ void Frontend::EndFrame()
 
 	if (done)
 	{
-		gambo->done = true;
+		gambo->SetDone(true);
 	}
 }
 
@@ -246,7 +246,7 @@ void Frontend::DrawGamboWindow()
 
 			if (ImGui::BeginMenu("Gambo"))
 			{
-				if (ImGui::MenuItem(!gambo->running ? "Play" : "Pause", "Ctrl+P"))
+				if (ImGui::MenuItem(!gambo->GetRunning() ? "Play" : "Pause", "Ctrl+P"))
 				{
 					SetGamboRunning();
 				}
@@ -260,7 +260,7 @@ void Frontend::DrawGamboWindow()
 
 			if (ImGui::BeginMenu("Options"))
 			{
-				static bool useBootRom = gambo->GetUseBootRom();
+				static bool useBootRom = gambo->IsUseBootRom();
 				if (ImGui::MenuItem("Use Boot Rom", nullptr, &useBootRom))
 					gambo->SetUseBootRom(useBootRom);
 
@@ -382,13 +382,13 @@ void Frontend::DrawDebugInfoWindow()
 
 void Frontend::SetGamboRunning()
 {
-	gambo->running = !gambo->running;
-	if (gambo->running)
-		gambo->step = false;
+	gambo->SetRunning(!gambo->GetRunning());
+	if (gambo->GetRunning())
+		gambo->SetStep(false);
 }
 
 void Frontend::SetGamboStep()
 {
-	gambo->running = false;
-	gambo->step = true;
+	gambo->SetRunning(false);
+	gambo->SetStep(true);
 }

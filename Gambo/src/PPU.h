@@ -14,22 +14,31 @@ enum class PPUMode
 class PPU
 {
 public:
-	bool DoDMATransfer = false;
-	PPUMode mode = PPUMode::OAMScan;
-
 	PPU(GamboCore* c);
 	~PPU();
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	void Clock();
+	void Tick();
 	void Reset();
-	bool FrameComplete();
-	SDL_Color* screen = new SDL_Color[GamboScreenSize];
+	bool FrameComplete() const;
+	const std::array<SDL_Color, GamboScreenSize>& GetScreen() const;
+	bool IsEnabled() const;
+	PPUMode GetMode() const;
+	void SetDoDMATransfer(bool b);
 
 private:
-	GamboCore* core = nullptr;
-	int cycles = 0;
-	bool frameComplete = false;
-	bool blankOnFirstFrame = false;
+	u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask) const;
+
+	GamboCore* core;
+	PPUMode mode;
+	bool doDMATransfer;
+	int DMATransferCycles;
+	int cycles;
+	bool frameComplete;
+	bool blankOnFirstFrame;
+	bool isEnabled;
+	bool windowEnabled;
+	int currScanlineCycles;
+	std::array<SDL_Color, GamboScreenSize> screen;
 };

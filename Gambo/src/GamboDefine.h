@@ -155,14 +155,6 @@ static inline std::string hex(uint32_t n, uint8_t d)
 	return s;
 };
 
-enum ColorIndex
-{
-	White,
-	LightGray,
-	DarkGray,
-	Black,
-	Transparent // for use in sprites
-};
 
 enum InterruptFlags
 {
@@ -171,6 +163,15 @@ enum InterruptFlags
 	Timer	= 0b00000100,
 	Serial	= 0b00001000,
 	Joypad	= 0b00010000,
+};
+
+enum ColorIndex
+{
+	White,
+	LightGray,
+	DarkGray,
+	Black,
+	Transparent // for use in sprites
 };
 
 static SDL_Color GameBoyColors[5]
@@ -183,5 +184,3 @@ static SDL_Color GameBoyColors[5]
 };
 
 static const auto DesiredFPS = 60;
-static auto FrameStart = 0.f;
-static auto FrameTime = 0.f;

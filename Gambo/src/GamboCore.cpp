@@ -9,11 +9,42 @@
 #include <chrono>
 #include <iostream>
 
+const std::array<u8, 256> bootRom = // this is a regular DMG boot rom. not DMG0.
+{
+	0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
+	0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3, 0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
+	0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0xCD, 0x95, 0x00, 0xCD, 0x96, 0x00, 0x13, 0x7B,
+	0xFE, 0x34, 0x20, 0xF3, 0x11, 0xD8, 0x00, 0x06, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x05, 0x20, 0xF9,
+	0x3E, 0x19, 0xEA, 0x10, 0x99, 0x21, 0x2F, 0x99, 0x0E, 0x0C, 0x3D, 0x28, 0x08, 0x32, 0x0D, 0x20,
+	0xF9, 0x2E, 0x0F, 0x18, 0xF3, 0x67, 0x3E, 0x64, 0x57, 0xE0, 0x42, 0x3E, 0x91, 0xE0, 0x40, 0x04,
+	0x1E, 0x02, 0x0E, 0x0C, 0xF0, 0x44, 0xFE, 0x90, 0x20, 0xFA, 0x0D, 0x20, 0xF7, 0x1D, 0x20, 0xF2,
+	0x0E, 0x13, 0x24, 0x7C, 0x1E, 0x83, 0xFE, 0x62, 0x28, 0x06, 0x1E, 0xC1, 0xFE, 0x64, 0x20, 0x06,
+	0x7B, 0xE2, 0x0C, 0x3E, 0x87, 0xE2, 0xF0, 0x42, 0x90, 0xE0, 0x42, 0x15, 0x20, 0xD2, 0x05, 0x20,
+	0x4F, 0x16, 0x20, 0x18, 0xCB, 0x4F, 0x06, 0x04, 0xC5, 0xCB, 0x11, 0x17, 0xC1, 0xCB, 0x11, 0x17,
+	0x05, 0x20, 0xF5, 0x22, 0x23, 0x22, 0x23, 0xC9, 0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
+	0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+	0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+	0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C,
+	0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
+	0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50,
+};
+
 GamboCore::GamboCore()
 	: cpu(new CPU(this))
 	, ppu(new PPU(this))
 	, cart(nullptr)
+	, useBootRom(false)
+	, screenWidth(GamboScreenWidth)
+	, screenHeight(GamboScreenHeight)
+	, screenScale(PixelScale)
+	, disassemble(true)
+	, lastRead(0)
+	, lastWrite(0)
+	, done(false)
+	, running(false)
+	, step(false)
 {
+	ram = std::vector<u8>(64KiB, 0x00);
 }
 
 GamboCore::~GamboCore()
@@ -36,13 +67,13 @@ void GamboCore::Run()
 	{
 		do
 		{
-			cpu->Clock();
+			cpu->Tick();
 			//if (cpu->PC == 0xC000)
 			//{
 			//	running = false;
 			//	goto BREAK;
 			//}
-			ppu->Clock();
+			ppu->Tick();
 		} while (!ppu->FrameComplete());
 
 		disassemble = true;
@@ -51,18 +82,12 @@ void GamboCore::Run()
 	{
 		do
 		{
-			cpu->Clock();
+			cpu->Tick();
 		BREAK:
-			ppu->Clock();
-		} while (!cpu->InstructionComplete());
+			ppu->Tick();
+		} while (!cpu->IsInstructionComplete());
 		step = false;
 		disassemble = true;
-	}
-
-	if (disassemble)
-	{
-		Disassemble(cpu->PC, 10);
-		disassemble = false;
 	}
 
 	std::this_thread::sleep_until(timePoint - 1ms);
@@ -73,9 +98,9 @@ void GamboCore::Run()
 	timePoint += framerate{1};
 }
 
-void* GamboCore::GetScreen() const
+const void* GamboCore::GetScreen() const
 {
-	return ppu->screen;
+	return (void*)ppu->GetScreen().data();
 }
 
 float GamboCore::GetScreenWidth() const
@@ -91,23 +116,23 @@ float GamboCore::GetScreenHeight() const
 GamboState GamboCore::GetState() const
 {
 	GamboState g;
-	g.flags.Z = cpu->F & (u8)CPUFlags::Z;
-	g.flags.N = cpu->F & (u8)CPUFlags::N;
-	g.flags.H = cpu->F & (u8)CPUFlags::H;
-	g.flags.C = cpu->F & (u8)CPUFlags::C;
-	g.flags.IME = cpu->IME;
+	g.flags.Z = cpu->GetFlag(CPUFlags::Z);
+	g.flags.N = cpu->GetFlag(CPUFlags::N);
+	g.flags.H = cpu->GetFlag(CPUFlags::H);
+	g.flags.C = cpu->GetFlag(CPUFlags::C);
+	g.flags.IME = cpu->GetIME();
 
-	g.registers.A = cpu->A;
-	g.registers.F = cpu->F;
-	g.registers.B = cpu->B;
-	g.registers.C = cpu->C;
-	g.registers.D = cpu->D;
-	g.registers.E = cpu->E;
-	g.registers.H = cpu->H;
-	g.registers.L = cpu->L;
+	g.registers.A = cpu->GetA();
+	g.registers.F = cpu->GetF();
+	g.registers.B = cpu->GetB();
+	g.registers.C = cpu->GetC();
+	g.registers.D = cpu->GetD();
+	g.registers.E = cpu->GetE();
+	g.registers.H = cpu->GetH();
+	g.registers.L = cpu->GetL();
 	
-	g.PC = cpu->PC;
-	g.SP = cpu->SP;
+	g.PC = cpu->GetPC();
+	g.SP = cpu->GetSP();
 
 	g.LCDC = ram[HWAddr::LCDC];
 	g.STAT = ram[HWAddr::STAT];
@@ -115,8 +140,42 @@ GamboState GamboCore::GetState() const
 	g.IE = ram[HWAddr::IE];
 	g.IF = ram[HWAddr::IF];
 
-	g.mapAsm = mapAsm;
+	if (disassemble)
+	{
+		g.mapAsm = Disassemble(g.PC, 10);
+	}
+
 	return g;
+}
+
+bool GamboCore::GetDone()
+{
+	return done;
+}
+
+void GamboCore::SetDone(bool b)
+{
+	done = b;
+}
+
+bool GamboCore::GetRunning()
+{
+	return running;
+}
+
+void GamboCore::SetRunning(bool b)
+{
+	running = b;
+}
+
+bool GamboCore::GetStep()
+{
+	return step;
+}
+
+void GamboCore::SetStep(bool b)
+{
+	step = b;
 }
 
 const Cartridge& GamboCore::GetCartridge() const
@@ -142,12 +201,12 @@ void GamboCore::InsertCartridge(std::filesystem::path filePath)
 
 void GamboCore::SetUseBootRom(bool b)
 {
-	cpu->useBootRom = b;
+	useBootRom = b;
 }
 
-bool GamboCore::GetUseBootRom()
+bool GamboCore::IsUseBootRom()
 {
-	return cpu->useBootRom;
+	return useBootRom;
 }
 
 u8 GamboCore::Read(u16 addr)
@@ -157,7 +216,7 @@ u8 GamboCore::Read(u16 addr)
 	// boot rom
 	if (IsBootRomAddress(addr))
 	{
-		return cpu->bootRom[addr];
+		return bootRom[addr];
 	}
 	// cartridge
 	else if (IsCartridgeAddress(addr))
@@ -168,7 +227,7 @@ u8 GamboCore::Read(u16 addr)
 		}
 		else
 		{
-			return cpu->useBootRom ? 0xFF : ram[addr];
+			return useBootRom ? 0xFF : ram[addr];
 		}
 	}
 	// normal ram
@@ -225,88 +284,17 @@ void GamboCore::Write(u16 addr, u8 data)
 void GamboCore::Reset()
 {
 	ram = std::vector<u8>(64KiB, 0x00);
-	mapAsm.clear();
 	lastWrite = 0;
 	lastRead = 0;
 	cpu->Reset();
 	ppu->Reset();
+	ResetRam();
 	SAFE_DELETE(cart);
 }
 
-void GamboCore::Disassemble(u16 startAddr, int numInstr)
+std::map<u16, std::string> GamboCore::Disassemble(u16 startAddr, int numInstr) const
 {
-	u32 addr = startAddr;
-	u8 value = 0x00, lo = 0x00, hi = 0x00;
-	u16 lineAddr = 0;
-
-	mapAsm.clear();
-
-	while (mapAsm.size() < numInstr)
-	{
-
-		//if ((0x4000 <= addr && addr <= 0xBFFF) || // skip vram
-		//	(0x0104 <= addr && addr <= 0x014F) || // skip cartridge header
-		//	(0xFE00 <= addr && addr <= 0xFE7F) || // skip OAM and IO
-		//	(addr == 0xD800)) // skip this address in particular because if i dont, it breaks disassembly
-		//{
-		//	addr++;
-		//	continue;
-		//}
-
-		lineAddr = addr;
-
-		// prefix line with instruction addr
-		std::string s = "$" + hex(addr, 4) + ": ";
-
-		// read instruction and get readable name
-		u8 opcode = Read(addr++);
-		if (opcode == 0xCB)
-		{
-			// its a 16bit opcode so read another byte
-			opcode = Read(addr++);
-
-			s += cpu->instructions16bit[opcode].mnemonic;
-		}
-		else
-		{
-			auto& instruction = cpu->instructions8bit[opcode];
-			switch (instruction.bytes)
-			{
-				case 0:
-				case 1:
-				{
-					s += cpu->instructions8bit[opcode].mnemonic;
-					break;
-				}
-				case 2:
-				{
-					u8 data = Read(addr++);
-					std::string firstTwoChar(instruction.mnemonic.begin(), instruction.mnemonic.begin() + 2);
-					if (firstTwoChar == "JR")
-					{
-						s16 sdata = (s8)data;
-						sdata += addr;
-						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(sdata, 4)));
-						break;
-					}
-					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
-					break;
-				}
-				case 3:
-				{
-					u16 lo = Read(addr++);
-					u16 hi = Read(addr++);
-					u16 data = (hi << 8) | lo;
-					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
-					break;
-				}
-				default:
-					throw("opcode has more than 3 bytes");
-			}
-		}
-
-		mapAsm[lineAddr] = s;
-	}
+	return cpu->Disassemble(startAddr, numInstr);
 }
 
 bool GamboCore::IsBootRomAddress(u16 addr)
@@ -328,5 +316,76 @@ bool GamboCore::IsCartridgeAddress(u16 addr)
 			!IsBootRomAddress(addr) &&
 			(0x0000 <= addr && addr <= 0x7FFF && addr < cart->GetRomSize()) ||	// rom
 			(0xA000 <= addr && addr <= 0xBFFF && addr < cart->GetRamSize());	// ram
+	}
+}
+
+void GamboCore::ResetRam()
+{
+	if (IsUseBootRom())
+	{
+		ram[HWAddr::BOOT] = 0xFE;
+		ram[HWAddr::P1] = 0x0F;
+	}
+	else
+	{
+		for (size_t i = 0xFF00; i < 0x10000; i++)
+			ram[i] = 0xFF;
+
+		ram[HWAddr::P1] = 0xCF;
+		ram[HWAddr::SB] = 0x00;
+		ram[HWAddr::SC] = 0x7E;
+		ram[HWAddr::DIV] = 0xAC;
+		ram[HWAddr::TIMA] = 0x00;
+		ram[HWAddr::TMA] = 0x00;
+		ram[HWAddr::TAC] = 0xF8;
+		ram[HWAddr::IF] = 0xE1;
+		ram[HWAddr::NR10] = 0x80;
+		ram[HWAddr::NR11] = 0xBF;
+		ram[HWAddr::NR12] = 0xF3;
+		ram[HWAddr::NR13] = 0xFF;
+		ram[HWAddr::NR14] = 0xBF;
+		ram[HWAddr::NR21] = 0x3F;
+		ram[HWAddr::NR22] = 0x00;
+		ram[HWAddr::NR23] = 0xFF;
+		ram[HWAddr::NR24] = 0xBF;
+		ram[HWAddr::NR30] = 0x7F;
+		ram[HWAddr::NR31] = 0xFF;
+		ram[HWAddr::NR32] = 0x9F;
+		ram[HWAddr::NR33] = 0xFF;
+		ram[HWAddr::NR34] = 0xBF;
+		ram[HWAddr::NR41] = 0xFF;
+		ram[HWAddr::NR42] = 0x00;
+		ram[HWAddr::NR43] = 0x00;
+		ram[HWAddr::NR44] = 0xBF;
+		ram[HWAddr::NR50] = 0x77;
+		ram[HWAddr::NR51] = 0xF3;
+		ram[HWAddr::NR52] = 0xF1;
+		ram[HWAddr::LCDC] = 0x91;
+		ram[HWAddr::STAT] = 0x80;
+		ram[HWAddr::SCY] = 0x00;
+		ram[HWAddr::SCX] = 0x00;
+		ram[HWAddr::LY] = 0x00;
+		ram[HWAddr::LYC] = 0x00;
+		ram[HWAddr::DMA] = 0xFF;
+		ram[HWAddr::BGP] = 0xFC;
+		ram[HWAddr::OBP0] = 0x00;
+		ram[HWAddr::OBP1] = 0x00;
+		ram[HWAddr::WY] = 0x00;
+		ram[HWAddr::WX] = 0x00;
+		ram[HWAddr::KEY1] = 0xFF;
+		ram[HWAddr::VBK] = 0xFF;
+		ram[HWAddr::BOOT] = 0xFF;
+		ram[HWAddr::HDMA1] = 0xFF;
+		ram[HWAddr::HDMA2] = 0xFF;
+		ram[HWAddr::HDMA3] = 0xFF;
+		ram[HWAddr::HDMA4] = 0xFF;
+		ram[HWAddr::HDMA5] = 0xFF;
+		ram[HWAddr::RP] = 0xFF;
+		ram[HWAddr::BCPS] = 0xFF;
+		ram[HWAddr::BCPD] = 0xFF;
+		ram[HWAddr::OCPS] = 0xFF;
+		ram[HWAddr::OCPD] = 0xFF;
+		ram[HWAddr::SVBK] = 0xFF;
+		ram[HWAddr::IE] = 0x00;
 	}
 }

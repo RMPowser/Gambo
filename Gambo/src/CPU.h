@@ -14,69 +14,81 @@ enum class CPUFlags : u8
 
 class CPU
 {
-public:
-	// note: some instructions will treat two of these
-	//       together as a single 16bit register. Thats why
-	//       theyre paired this way.
-	union
-	{
-		struct
-		{
-			u8 F;
-			u8 A;
-		};
-		u16 AF = 0x0000;
-	};
+public:	
+	CPU(GamboCore* c);
+	~CPU();
 
-	union
-	{
-		struct
-		{
-			u8 C;
-			u8 B;
-		};
-		u16 BC = 0x0000;
-	};
+	void Tick();
+	bool IsInstructionComplete() const;
+	void Reset();
 
-	union
-	{
-		struct
-		{
-			u8 E;
-			u8 D;
-		};
-		u16 DE = 0x0000;
-	};
+	const u8& GetA() const;
+	const u8& GetF() const;
+	const u8& GetB() const;
+	const u8& GetC() const;
+	const u8& GetD() const;
+	const u8& GetE() const;
+	const u8& GetH() const;
+	const u8& GetL() const;
+	const u16& GetAF() const;
+	const u16& GetBC() const;
+	const u16& GetDE() const;
+	const u16& GetHL() const;
+	const u16& GetSP() const;
+	const u16& GetPC() const;
+	bool GetFlag(CPUFlags f);
+	bool GetIME();
 
-	union
-	{
-		struct
-		{
-			u8 L;
-			u8 H;
-		};
-		u16 HL = 0x0000;
-	};
+	std::map<u16, std::string> Disassemble(u16 startAddr, int numInstr);
 
-	u16 SP = 0x0000; // stack pointer
-	u16 PC = 0x0000; // program counter
+private:
+	u8 Read(u16 addr);
+	void Write(u16 addr, u8 data);
 
-	GamboCore* core = nullptr;
-	int opcode = 0;
-	bool stopMode = false; // set to true by the stop command, set back to false by reset command
-	bool isHalted = false; // set to true by the halt command, set back to false by reset or interrupt
-	bool IME = false; // interrupt master enable flag
-	bool IMEOneInstructionDelay = false; // used to delay the effect of EI by one instruction
-		
+	void SetFlag(CPUFlags f, bool v);
+
+	void Push(const std::same_as<u16> auto data);
+	void Pop(std::same_as<u16> auto& data);
+
+	void UpdateTimers();
+	bool InterruptPending();
+	void HandleInterrupt(InterruptFlags f);
+
+	union {	struct { u8 F; u8 A; }; u16 AF; };
+	union { struct { u8 C; u8 B; }; u16 BC; };
+	union { struct { u8 E; u8 D; }; u16 DE; };
+	union { struct { u8 L; u8 H; }; u16 HL; };
+
+	u16 SP; // stack pointer
+	u16 PC; // program counter
+
+	GamboCore* core;
+	u8 cycles;
+	int opcode;
+	bool stopMode;					// set to true by the stop command, set back to false by reset command
+	bool isHalted;					// set to true by the halt command, set back to false by reset or interrupt
+	bool IME;						// interrupt master enable flag
+	bool IMEOneInstructionDelay;	// used to delay the effect of EI by one instruction
+	int DIVCounter;
+	int TIMACounter;
+	bool TIMAEnabled;
+	u8 TIMAFreqSelect;
+	u16 TIMAFreq;
+
+	// instruction helpers
+	void ADC(const u8 data);
+	void SBC(const u8 data);
+	void BIT(u8& reg, int bit);
+
 #pragma region Instructions
-	struct Instruction
+	struct CPUInstruction
 	{
 		std::string mnemonic;
 		u8 bytes = 0;
 		u8 cycles = 0;
 		u8(CPU::* Execute)(void);
 	};
-	const std::vector<Instruction> instructions8bit =
+	const std::vector<CPUInstruction> instructions8bit =
 	{
 		{"NOP"       ,1,4 ,&CPU::NOP     }, {"LD BC, {}" ,3,12,&CPU::LD_BC_d16 }, {"LD (BC), A"  ,1,8 ,&CPU::LD_aBC_A   }, {"INC BC"    ,1,8 ,&CPU::INC_BC  }, {"INC B"       ,1,4 ,&CPU::INC_B      }, {"DEC B"     ,1,4 ,&CPU::DEC_B   }, {"LD B, {}"   ,2,8 ,&CPU::LD_B_d8  }, {"RLCA"      ,1,4 ,&CPU::RLCA    }, {"LD ({}), SP" ,3,20,&CPU::LD_a16_SP     }, {"ADD HL, BC",1,8 ,&CPU::ADD_HL_BC}, {"LD A, (BC)"  ,1,8 ,&CPU::LD_A_aBC   }, {"DEC BC"  ,1,8 ,&CPU::DEC_BC }, {"INC C"      ,1,4 ,&CPU::INC_C     }, {"DEC C"   ,1,4 ,&CPU::DEC_C   }, {"LD C, {}"   ,2,8 ,&CPU::LD_C_d8  }, {"RRCA"    ,1,4 ,&CPU::RRCA   },
 		{"STOP"      ,1,4 ,&CPU::STOP    }, {"LD DE, {}" ,3,12,&CPU::LD_DE_d16 }, {"LD (DE), A"  ,1,8 ,&CPU::LD_aDE_A   }, {"INC DE"    ,1,8 ,&CPU::INC_DE  }, {"INC D"       ,1,4 ,&CPU::INC_D      }, {"DEC D"     ,1,4 ,&CPU::DEC_D   }, {"LD D, {}"   ,2,8 ,&CPU::LD_D_d8  }, {"RLA"       ,1,4 ,&CPU::RLA     }, {"JR {}"       ,2,12,&CPU::JR_s8         }, {"ADD HL, DE",1,8 ,&CPU::ADD_HL_DE}, {"LD A, (DE)"  ,1,8 ,&CPU::LD_A_aDE   }, {"DEC DE"  ,1,8 ,&CPU::DEC_DE }, {"INC E"      ,1,4 ,&CPU::INC_E     }, {"DEC E"   ,1,4 ,&CPU::DEC_E   }, {"LD E, {}"   ,2,8 ,&CPU::LD_E_d8  }, {"RRA"     ,1,4 ,&CPU::RRA    },
@@ -95,7 +107,7 @@ public:
 		{"LD ({}), A",2,12,&CPU::LD_aa8_A}, {"POP HL"    ,1,12,&CPU::POP_HL    }, {"LD (C), A"   ,1,8 ,&CPU::LD_aC_A    }, {"???"       ,0,0 ,&CPU::XXX     }, {"???"         ,0,0 ,&CPU::XXX        }, {"PUSH HL"   ,1,16,&CPU::PUSH_HL }, {"AND A, {}"  ,2,8 ,&CPU::AND_A_d8 }, {"RST 4"     ,1,16,&CPU::RST_4   }, {"ADD SP, {}"  ,2,16,&CPU::ADD_SP_s8     }, {"JP HL"     ,1,4 ,&CPU::JP_HL    }, {"LD ({}), A"  ,3,16,&CPU::LD_aa16_A  }, {"???"     ,0,0 ,&CPU::XXX    }, {"???"        ,0,0 ,&CPU::XXX       }, {"???"     ,0,0 ,&CPU::XXX     }, {"XOR A, {}"  ,2,8 ,&CPU::XOR_A_d8 }, {"RST 5"   ,1,16,&CPU::RST_5  },
 		{"LD A, ({})",2,12,&CPU::LD_A_aa8}, {"POP AF"    ,1,12,&CPU::POP_AF    }, {"LD A, (C)"   ,1,8 ,&CPU::LD_A_aC    }, {"DI"        ,1,4 ,&CPU::DI      }, {"???"         ,0,0 ,&CPU::XXX        }, {"PUSH AF"   ,1,16,&CPU::PUSH_AF }, {"OR A, {}"   ,2,8 ,&CPU::OR_A_d8  }, {"RST 6"     ,1,16,&CPU::RST_6   }, {"LD HL, SP+{}",2,12,&CPU::LD_HL_SPinc_s8}, {"LD SP, HL" ,1,8 ,&CPU::LD_SP_HL }, {"LD A, ({})"  ,3,16,&CPU::LD_A_aa16  }, {"EI"      ,1,4 ,&CPU::EI     }, {"???"        ,0,0 ,&CPU::XXX       }, {"???"     ,0,0 ,&CPU::XXX     }, {"CP A, {}"   ,2,8 ,&CPU::CP_A_d8  }, {"RST 7"   ,1,16,&CPU::RST_7  },
 	};
-	const std::vector<Instruction> instructions16bit =
+	const std::vector<CPUInstruction> instructions16bit =
 	{
 		{"RLC B"   ,2,8 ,&CPU::RLC_B  }, {"RLC C"   ,2,8 ,&CPU::RLC_C  }, {"RLC D"   ,2,8 ,&CPU::RLC_D  }, {"RLC E"   ,2,8 ,&CPU::RLC_E  }, {"RLC H"   ,2,8 ,&CPU::RLC_H  }, {"RLC L"   ,2,8 ,&CPU::RLC_L  }, {"RLC (HL)"   ,2,16,&CPU::RLC_aHL  }, {"RLC A"   ,2,8 ,&CPU::RLC_A  }, {"RRC B"   ,2,8 ,&CPU::RRC_B  }, {"RRC C"   ,2,8 ,&CPU::RRC_C  }, {"RRC D"   ,2,8 ,&CPU::RRC_D  }, {"RRC E"   ,2,8 ,&CPU::RRC_E  }, {"RRC H"   ,2,8 ,&CPU::RRC_H  }, {"RRC L"   ,2,8 ,&CPU::RRC_L  }, {"RRC (HL)"   ,2,16,&CPU::RRC_aHL  }, {"RRC A"   ,2,8 ,&CPU::RRC_A  },
 		{"RL B"    ,2,8 ,&CPU::RL_B   }, {"RL C"    ,2,8 ,&CPU::RL_C   }, {"RL D"    ,2,8 ,&CPU::RL_D   }, {"RL E"    ,2,8 ,&CPU::RL_E   }, {"RL H"    ,2,8 ,&CPU::RL_H   }, {"RL L"    ,2,8 ,&CPU::RL_L   }, {"RL (HL)"    ,2,16,&CPU::RL_aHL   }, {"RL A"    ,2,8 ,&CPU::RL_A   }, {"RR B"    ,2,8 ,&CPU::RR_B   }, {"RR C"    ,2,8 ,&CPU::RR_C   }, {"RR D"    ,2,8 ,&CPU::RR_D   }, {"RR E"    ,2,8 ,&CPU::RR_E   }, {"RR H"    ,2,8 ,&CPU::RR_H   }, {"RR L"    ,2,8 ,&CPU::RR_L   }, {"RR (HL)"    ,2,16,&CPU::RR_aHL   }, {"RR A"    ,2,8 ,&CPU::RR_A   },
@@ -115,55 +127,6 @@ public:
 		{"SET 6, B",2,8 ,&CPU::SET_6_B}, {"SET 6, C",2,8 ,&CPU::SET_6_C}, {"SET 6, D",2,8 ,&CPU::SET_6_D}, {"SET 6, E",2,8 ,&CPU::SET_6_E}, {"SET 6, H",2,8 ,&CPU::SET_6_H}, {"SET 6, L",2,8 ,&CPU::SET_6_L}, {"SET 6, (HL)",2,16,&CPU::SET_6_aHL}, {"SET 6, A",2,8 ,&CPU::SET_6_A}, {"SET 7, B",2,8 ,&CPU::SET_7_B}, {"SET 7, C",2,8 ,&CPU::SET_7_C}, {"SET 7, D",2,8 ,&CPU::SET_7_D}, {"SET 7, E",2,8 ,&CPU::SET_7_E}, {"SET 7, H",2,8 ,&CPU::SET_7_H}, {"SET 7, L",2,8 ,&CPU::SET_7_L}, {"SET 7, (HL)",2,16,&CPU::SET_7_aHL}, {"SET 7, A",2,8 ,&CPU::SET_7_A},
 	};
 #pragma endregion
-	
-	CPU(GamboCore* c);
-	~CPU();
-
-	void Clock();
-	void HandleInterrupt(InterruptFlags f);
-	bool InstructionComplete();
-	void Reset();
-
-	u8 Read(u16 addr);
-	void Write(u16 addr, u8 data);
-
-	void SetFlag(CPUFlags f, bool v);
-	bool GetFlag(CPUFlags f);
-
-	void Push(const std::same_as<u16> auto data);
-	void Pop(std::same_as<u16> auto& data);
-
-	std::atomic<bool> useBootRom = false;
-	const std::array<u8, 256> bootRom = // this is a regular DMG boot rom. not DMG0.
-	{
-		0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
-		0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3, 0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
-		0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0xCD, 0x95, 0x00, 0xCD, 0x96, 0x00, 0x13, 0x7B,
-		0xFE, 0x34, 0x20, 0xF3, 0x11, 0xD8, 0x00, 0x06, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x05, 0x20, 0xF9,
-		0x3E, 0x19, 0xEA, 0x10, 0x99, 0x21, 0x2F, 0x99, 0x0E, 0x0C, 0x3D, 0x28, 0x08, 0x32, 0x0D, 0x20,
-		0xF9, 0x2E, 0x0F, 0x18, 0xF3, 0x67, 0x3E, 0x64, 0x57, 0xE0, 0x42, 0x3E, 0x91, 0xE0, 0x40, 0x04,
-		0x1E, 0x02, 0x0E, 0x0C, 0xF0, 0x44, 0xFE, 0x90, 0x20, 0xFA, 0x0D, 0x20, 0xF7, 0x1D, 0x20, 0xF2,
-		0x0E, 0x13, 0x24, 0x7C, 0x1E, 0x83, 0xFE, 0x62, 0x28, 0x06, 0x1E, 0xC1, 0xFE, 0x64, 0x20, 0x06,
-		0x7B, 0xE2, 0x0C, 0x3E, 0x87, 0xE2, 0xF0, 0x42, 0x90, 0xE0, 0x42, 0x15, 0x20, 0xD2, 0x05, 0x20,
-		0x4F, 0x16, 0x20, 0x18, 0xCB, 0x4F, 0x06, 0x04, 0xC5, 0xCB, 0x11, 0x17, 0xC1, 0xCB, 0x11, 0x17,
-		0x05, 0x20, 0xF5, 0x22, 0x23, 0x22, 0x23, 0xC9, 0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
-		0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
-		0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
-		0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C,
-		0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
-		0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50,
-	};
-
-private:
-	u8 cycles = 0;
-
-	void UpdateTimers();
-	bool InterruptPending();
-
-	void ADC(const u8 data);
-	void SBC(const u8 data);
-	void BIT(u8& reg, int bit);
-
 #pragma region CPU Control Instructions
 	u8 XXX(); // catch all non existing instructions8bit
 	u8 NOP();

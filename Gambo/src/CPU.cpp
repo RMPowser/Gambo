@@ -14,8 +14,11 @@ CPU::~CPU()
 
 u8 CPU::Read(u16 addr)
 {
-	if ((core->ppu->mode == PPUMode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
-		|| (core->ppu->mode == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
+	if ((core->ppu->IsEnabled()) && 
+		(
+			(core->ppu->GetMode() == PPUMode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) ||										// accessing oam during oam scan
+			(core->ppu->GetMode() == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))	// accessing oam or vram during drawing
+		)) 
 	{
 		return 0x00;
 	}
@@ -27,8 +30,11 @@ u8 CPU::Read(u16 addr)
 
 void CPU::Write(u16 addr, u8 data)
 {
-	if ((core->ppu->mode == PPUMode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
-		|| (core->ppu->mode == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
+	if ((core->ppu->IsEnabled()) && 
+		(
+			(core->ppu->GetMode() == PPUMode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) ||										// accessing oam during oam scan
+			(core->ppu->GetMode() == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))	// accessing oam or vram during drawing
+		)) 
 	{
 		return;
 	}
@@ -36,11 +42,11 @@ void CPU::Write(u16 addr, u8 data)
     core->Write(addr, data);
 	if (addr == HWAddr::DMA)
 	{
-		core->ppu->DoDMATransfer = true;
+		core->ppu->SetDoDMATransfer(true);
 	}
 }
 
-void CPU::Clock()
+void CPU::Tick()
 {
 	if (cycles == 0)
 	{
@@ -53,7 +59,6 @@ void CPU::Clock()
 		
 		if (!isHalted)
 		{
-			// read and execute code normally
 			if (IMEOneInstructionDelay)
 			{
 				IME = true;
@@ -162,33 +167,23 @@ void CPU::HandleInterrupt(InterruptFlags f)
 void CPU::UpdateTimers()
 {
 	// DIV register always counts up every 256 clock cycles
-	static int DIVCounter = 0;
-	static u8& DIV = core->ram[HWAddr::DIV];
-
-	DIVCounter++;
-	DIVCounter %= 256;
+	DIVCounter = (DIVCounter + 1) % 256;
 
 	if (DIVCounter == 0)
-		DIV++;
-
+		core->ram[HWAddr::DIV]++; // set directly to prevent reset from Write() logic
 
 
 	// TIMA iterates at a specified frequency and only if it's enabled.
-	static int TIMACounter = 0;
-
-	static u8& TAC = core->ram[HWAddr::TAC];
-	static bool TIMAEnabled;
+	u8 TAC = core->Read(HWAddr::TAC);
 	TIMAEnabled = TAC & 0b100;
 	if (TIMAEnabled)
 	{
-		static u8 TIMAFreqSelect = 0;
 		if (TIMAFreqSelect != (TAC & 0b011))
 		{
 			TIMAFreqSelect = TAC & 0b011;
 			TIMACounter = 0;
 		}
 
-		static int TIMAFreq;
 		switch (TIMAFreqSelect)
 		{
 			case 0b00:
@@ -209,17 +204,16 @@ void CPU::UpdateTimers()
 		}
 
 		// iterate TIMA at specified frequency
-		TIMACounter++;
-		TIMACounter %= TIMAFreq;
+		TIMACounter = (TIMACounter + 1) % TIMAFreq;
 		if (TIMACounter == 0)
 		{
-			static u8& TIMA = core->ram[HWAddr::TIMA];
+			u8& TIMA = core->ram[HWAddr::TIMA];
 			TIMA++;
 			if (TIMA == 0x00)
 			{
 				// TIMA resets to TMA register value
-				TIMA = core->ram[HWAddr::TMA];
-				// request interrupt
+				TIMA = core->Read(HWAddr::TMA);
+				// request timer interrupt
 				core->ram[HWAddr::IF] |= InterruptFlags::Timer;
 			}
 		}
@@ -228,7 +222,7 @@ void CPU::UpdateTimers()
 
 bool CPU::InterruptPending()
 {
-	return (core->ram[HWAddr::IE] & core->ram[HWAddr::IF]) != 0;
+	return (core->Read(HWAddr::IE) & core->Read(HWAddr::IF)) != 0;
 }
 
 void CPU::ADC(const u8 data)
@@ -266,95 +260,25 @@ void CPU::BIT(u8& reg, int bit)
 	SetFlag(CPUFlags::N, 0);
 }
 
-bool CPU::InstructionComplete()
+bool CPU::IsInstructionComplete() const
 {
 	return cycles == 0;
 }
 
 void CPU::Reset()
 {
-	if (!useBootRom)
-	{
-		// this puts the cpu back into a state as if it had just finished a legit boot sequence
-		A = 0x01;
-		SetFlag(CPUFlags::Z, 1);
-		SetFlag(CPUFlags::N, 0);
-		SetFlag(CPUFlags::H, 1);
-		SetFlag(CPUFlags::C, 1);
-		B = 0x00;
-		C = 0x13;
-		D = 0x00;
-		E = 0xD8;
-		H = 0x01;
-		L = 0x4D;
-		PC = 0x0100;
-		SP = 0xFFFE;
-		IME = false;
-		stopMode = false;
-		isHalted = false;
+	cycles = 0;
+	opcode = 0;
+	IME = false;
+	stopMode = false;
+	isHalted = false;
+	IMEOneInstructionDelay = false;
+	DIVCounter = 0;
+	TIMACounter = 0;
+	TIMAEnabled = true;
+	
 
-		// this is what the hardware registers look like at PC = 0x0100
-		for (size_t i = 0xFF00; i < 0x10000; i++)
-			core->ram[i] = 0xFF;
-		
-		core->ram[HWAddr::P1] = 0xCF;
-		core->ram[HWAddr::SB] = 0x00;
-		core->ram[HWAddr::SC] = 0x7E;
-		core->ram[HWAddr::DIV] = 0xAC;
-		core->ram[HWAddr::TIMA] = 0x00;
-		core->ram[HWAddr::TMA] = 0x00;
-		core->ram[HWAddr::TAC] = 0xF8;
-		core->ram[HWAddr::IF] = 0xE1;
-		core->ram[HWAddr::NR10] = 0x80;
-		core->ram[HWAddr::NR11] = 0xBF;
-		core->ram[HWAddr::NR12] = 0xF3;
-		core->ram[HWAddr::NR13] = 0xFF;
-		core->ram[HWAddr::NR14] = 0xBF;
-		core->ram[HWAddr::NR21] = 0x3F;
-		core->ram[HWAddr::NR22] = 0x00;
-		core->ram[HWAddr::NR23] = 0xFF;
-		core->ram[HWAddr::NR24] = 0xBF;
-		core->ram[HWAddr::NR30] = 0x7F;
-		core->ram[HWAddr::NR31] = 0xFF;
-		core->ram[HWAddr::NR32] = 0x9F;
-		core->ram[HWAddr::NR33] = 0xFF;
-		core->ram[HWAddr::NR34] = 0xBF;
-		core->ram[HWAddr::NR41] = 0xFF;
-		core->ram[HWAddr::NR42] = 0x00;
-		core->ram[HWAddr::NR43] = 0x00;
-		core->ram[HWAddr::NR44] = 0xBF;
-		core->ram[HWAddr::NR50] = 0x77;
-		core->ram[HWAddr::NR51] = 0xF3;
-		core->ram[HWAddr::NR52] = 0xF1;
-		core->ram[HWAddr::LCDC] = 0x91;
-		core->ram[HWAddr::STAT] = 0x80;
-		core->ram[HWAddr::SCY] = 0x00;
-		core->ram[HWAddr::SCX] = 0x00;
-		core->ram[HWAddr::LY] = 0x00;
-		core->ram[HWAddr::LYC] = 0x00;
-		core->ram[HWAddr::DMA] = 0xFF;
-		core->ram[HWAddr::BGP] = 0xFC;
-		core->ram[HWAddr::OBP0] = 0x00;
-		core->ram[HWAddr::OBP1] = 0x00;
-		core->ram[HWAddr::WY] = 0x00;
-		core->ram[HWAddr::WX] = 0x00;
-		core->ram[HWAddr::KEY1] = 0xFF;
-		core->ram[HWAddr::VBK] = 0xFF;
-		core->ram[HWAddr::BOOT] = 0xFF;
-		core->ram[HWAddr::HDMA1] = 0xFF;
-		core->ram[HWAddr::HDMA2] = 0xFF;
-		core->ram[HWAddr::HDMA3] = 0xFF;
-		core->ram[HWAddr::HDMA4] = 0xFF;
-		core->ram[HWAddr::HDMA5] = 0xFF;
-		core->ram[HWAddr::RP] = 0xFF;
-		core->ram[HWAddr::BCPS] = 0xFF;
-		core->ram[HWAddr::BCPD] = 0xFF;
-		core->ram[HWAddr::OCPS] = 0xFF;
-		core->ram[HWAddr::OCPD] = 0xFF;
-		core->ram[HWAddr::SVBK] = 0xFF;
-		core->ram[HWAddr::IE] = 0x00;
-	}
-	else
+	if (core->IsUseBootRom())
 	{
 		A = 0x00;
 		SetFlag(CPUFlags::Z, 0);
@@ -369,12 +293,94 @@ void CPU::Reset()
 		L = 0x00;
 		PC = 0x0000;
 		SP = 0xFFFE;
-		IME = false;
-		stopMode = false;
-		isHalted = false;
-		core->ram[HWAddr::BOOT] = 0xFE;
-		core->ram[HWAddr::P1] = 0x0F;
+		
 	}
+	else
+	{
+		A = 0x01;
+		SetFlag(CPUFlags::Z, 1);
+		SetFlag(CPUFlags::N, 0);
+		SetFlag(CPUFlags::H, 1);
+		SetFlag(CPUFlags::C, 1);
+		B = 0x00;
+		C = 0x13;
+		D = 0x00;
+		E = 0xD8;
+		H = 0x01;
+		L = 0x4D;
+		PC = 0x0100;
+		SP = 0xFFFE;
+	}
+}
+
+const u8& CPU::GetA() const
+{
+	return A;
+}
+
+const u8& CPU::GetF() const
+{
+	return F;
+}
+
+const u8& CPU::GetB() const
+{
+	return B;
+}
+
+const u8& CPU::GetC() const
+{
+	return C;
+}
+
+const u8& CPU::GetD() const
+{
+	return D;
+}
+
+const u8& CPU::GetE() const
+{
+	return E;
+}
+
+const u8& CPU::GetH() const
+{
+	return H;
+}
+
+const u8& CPU::GetL() const
+{
+	return L;
+}
+
+const u16& CPU::GetAF() const
+{
+	return AF;
+}
+
+const u16& CPU::GetBC() const
+{
+	return BC;
+}
+
+const u16& CPU::GetDE() const
+{
+	return DE;
+}
+
+const u16& CPU::GetHL() const
+{
+	return HL;
+}
+
+const u16& CPU::GetSP() const
+{
+	return SP;
+}
+
+const u16& CPU::GetPC() const
+{
+	return PC;
 }
 
 void CPU::SetFlag(CPUFlags f, bool v)
@@ -390,6 +396,79 @@ bool CPU::GetFlag(CPUFlags f)
 	return ((F & (u8)f) > 0)
 		? true
 		: false;
+}
+
+bool CPU::GetIME()
+{
+	return IME;
+}
+
+std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
+{
+	u32 addr = startAddr;
+	u8 value = 0x00, lo = 0x00, hi = 0x00;
+	u16 lineAddr = 0;
+
+	std::map<u16, std::string> mapAsm;
+
+	while (mapAsm.size() < numInstr)
+	{
+		lineAddr = addr;
+
+		// prefix line with instruction addr
+		std::string s = "$" + hex(addr, 4) + ": ";
+
+		// read instruction and get readable name
+		u8 opcode = Read(addr++);
+		if (opcode == 0xCB)
+		{
+			// its a 16bit opcode so read another byte
+			opcode = Read(addr++);
+
+			s += instructions16bit[opcode].mnemonic;
+		}
+		else
+		{
+			auto& instruction = instructions8bit[opcode];
+			switch (instruction.bytes)
+			{
+				case 0:
+				case 1:
+				{
+					s += instructions8bit[opcode].mnemonic;
+					break;
+				}
+				case 2:
+				{
+					u8 data = Read(addr++);
+					std::string firstTwoChar(instruction.mnemonic.begin(), instruction.mnemonic.begin() + 2);
+					if (firstTwoChar == "JR")
+					{
+						s16 sdata = (s8)data;
+						sdata += addr;
+						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(sdata, 4)));
+						break;
+					}
+					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
+					break;
+				}
+				case 3:
+				{
+					u16 lo = Read(addr++);
+					u16 hi = Read(addr++);
+					u16 data = (hi << 8) | lo;
+					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
+					break;
+				}
+				default:
+					throw("opcode has more than 3 bytes");
+			}
+		}
+
+		mapAsm[lineAddr] = s;
+	}
+
+	return mapAsm;
 }
 
 void CPU::Push(const std::same_as<u16> auto data)

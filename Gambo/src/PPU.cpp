@@ -1,7 +1,45 @@
 #include "PPU.h"
+#include "GamboDefine.h"
 #include "GamboCore.h"
 #include <random>
 
+enum class LCDCBits
+{
+	BGAndWindowEnable			= 0,
+	OBJEnable					= 1,
+	OBJSize						= 2,
+	BGTileMapArea				= 3,
+	TileDataArea				= 4,
+	WindowEnable				= 5,
+	WindowTileMapArea			= 6,
+	LCDEnable					= 7,
+};
+
+enum class BGPBits
+{
+	BGColorForIndex0 = 0,
+	BGColorForIndex1 = 2,
+	BGColorForIndex2 = 4,
+	BGColorForIndex3 = 6,
+};
+
+enum class OBPBits
+{
+	OBPColorForIndex1 = 0,
+	OBPColorForIndex2 = 2,
+	OBPColorForIndex3 = 4,
+};
+
+enum class STATBits
+{
+	modeFlag							= 0,
+	LYC_equals_LYFlag					= 2,
+	Mode0StatInterruptEnable			= 3,
+	Mode1StatInterruptEnable			= 4,
+	Mode2StatInterruptEnable			= 5,
+	LYC_equals_LYStatInterruptEnable	= 6,
+	alwaysSet							= 7,
+};
 
 PPU::PPU(GamboCore* c)
 	: core(c)
@@ -11,7 +49,6 @@ PPU::PPU(GamboCore* c)
 
 PPU::~PPU()
 {
-	SAFE_DELETE_ARRAY(screen);
 }
 
 u8 PPU::Read(u16 addr)
@@ -24,83 +61,31 @@ void PPU::Write(u16 addr, u8 data)
 	core->Write(addr, data);
 }
 
-void PPU::Clock()
+void PPU::Tick()
 {
+	u8 LCDC = core->Read(HWAddr::LCDC);
+	isEnabled = GetBits(LCDC, (u8)LCDCBits::LCDEnable, 0b1);
+	windowEnabled = GetBits(LCDC, (u8)LCDCBits::WindowEnable, 0b1);
+
 	static int callCount = 0;
-	frameComplete = false;
-	static int currScanlineCycles = 0;
 
-	static u8& LCDC = core->ram[HWAddr::LCDC];
-	static bool LCDEnable;					// 0=Off, 1=On
-	static bool WindowTileMapArea;			// 0=9800-9BFF, 1=9C00-9FFF
-	static bool WindowEnable;				// 0=Off, 1=On
-	static bool BGAndWindowTileDataArea;	// 0=8800-97FF, 1=8000-8FFF
-	static bool BGTileMapArea;				// 0=9800-9BFF, 1=9C00-9FFF
-	static bool OBJSize;					// 0=8x8, 1=8x16
-	static bool OBJEnable;					// 0=Off, 1=On
-	static bool BGAndWindowEnable;			// BGAndWindowPriority for CGB; 0=Off, 1=On
-	static u8& SCY	= core->ram[HWAddr::SCY];	// viewport y position
-	static u8& SCX	= core->ram[HWAddr::SCX];	// viewport x position
-	static u8& LY	= core->ram[HWAddr::LY];		// LCD Y coordinate
-	static u8& LYC	= core->ram[HWAddr::LYC];	// LY compare
-	static u8& WY	= core->ram[HWAddr::WY];		// window Y position
-	static u8& WX	= core->ram[HWAddr::WX];		// window X position + 7
-	static u8& BGP	= core->ram[HWAddr::BGP];	// BG pallette data
-	static u8 BGColorForIndex3;
-	static u8 BGColorForIndex2;
-	static u8 BGColorForIndex1;
-	static u8 BGColorForIndex0;
-	static u8& OBP0 = core->ram[HWAddr::OBP0];	// OBJ pallette data
-	static u8& OBP1 = core->ram[HWAddr::OBP1];	// OBJ pallette data
-	static u8 OBP0ColorForIndex3;
-	static u8 OBP0ColorForIndex2;
-	static u8 OBP0ColorForIndex1;
-	static u8 OBP0ColorForIndex0 = ColorIndex::Transparent;
-	static u8 OBP1ColorForIndex3;
-	static u8 OBP1ColorForIndex2;
-	static u8 OBP1ColorForIndex1;
-	static u8 OBP1ColorForIndex0 = ColorIndex::Transparent;
-	static u8& DMA	= core->ram[HWAddr::DMA];
-	static u8& STAT	= core->ram[HWAddr::STAT];
-	static u8 modeFlag;
-	static bool LYC_equals_LYFlag;
-	static bool Mode0StatInterruptEnable;
-	static bool Mode1StatInterruptEnable;
-	static bool Mode2StatInterruptEnable;
-	static bool LYC_equals_LYStatInterruptEnable;
-	static u8& IF = core->ram[HWAddr::IF];
-
-
-	LCDEnable				= LCDC & (1 << 7);
-	WindowTileMapArea		= LCDC & (1 << 6);
-	WindowEnable			= LCDC & (1 << 5);
-	BGAndWindowTileDataArea	= LCDC & (1 << 4);
-	BGTileMapArea			= LCDC & (1 << 3);
-	OBJSize					= LCDC & (1 << 2);
-	OBJEnable				= LCDC & (1 << 1);
-	BGAndWindowEnable		= LCDC & (1 << 0);
-	BGColorForIndex3	= (BGP & 0b11000000) >> 6;
-	BGColorForIndex2	= (BGP & 0b00110000) >> 4;
-	BGColorForIndex1	= (BGP & 0b00001100) >> 2;
-	BGColorForIndex0	= (BGP & 0b00000011) >> 0;
-	OBP0ColorForIndex3		= (OBP0 & 0b11000000) >> 6;
-	OBP0ColorForIndex2		= (OBP0 & 0b00110000) >> 4;
-	OBP0ColorForIndex1		= (OBP0 & 0b00001100) >> 2;
-	OBP1ColorForIndex3		= (OBP1 & 0b11000000) >> 6;
-	OBP1ColorForIndex2		= (OBP1 & 0b00110000) >> 4;
-	OBP1ColorForIndex1		= (OBP1 & 0b00001100) >> 2;
-	LYC_equals_LYStatInterruptEnable	= STAT & 0b01000000;
-	Mode2StatInterruptEnable			= STAT & 0b00100000;
-	Mode1StatInterruptEnable			= STAT & 0b00010000;
-	Mode0StatInterruptEnable			= STAT & 0b00001000;
-	LYC_equals_LYFlag					= STAT & 0b00000100;
-	modeFlag							= STAT & 0b00000011;
+	const u8 SCY	= core->Read(HWAddr::SCY);	// viewport y position
+	const u8 SCX	= core->Read(HWAddr::SCX);	// viewport x position
+	const u8 LYC	= core->Read(HWAddr::LYC);	// LY compare
+	const u8 WY		= core->Read(HWAddr::WY);	// window Y position
+	const u8 WX		= core->Read(HWAddr::WX);	// window X position + 7
+	const u8 BGP	= core->Read(HWAddr::BGP);	// BG pallette data
+	const u8 OBP0	= core->Read(HWAddr::OBP0);	// OBJ pallette data
+	const u8 OBP1	= core->Read(HWAddr::OBP1);	// OBJ pallette data
+	const u8 DMA	= core->Read(HWAddr::DMA);
+	u8 LY			= core->Read(HWAddr::LY);	// LCD Y coordinate
+	u8 STAT			= core->Read(HWAddr::STAT);
+	u8 IF			= core->Read(HWAddr::IF);
 
 	//STAT bit 7 is always 1
 	STAT |= 0b10000000;
 
-	static int DMATransferCycles = 0;
-	if (DoDMATransfer && DMATransferCycles == 0)
+	if (doDMATransfer && DMATransferCycles == 0)
 	{
 		DMATransferCycles = 160;
 	}
@@ -111,7 +96,7 @@ void PPU::Clock()
 
 		if (DMATransferCycles == 0)
 		{
-			DoDMATransfer = false;
+			doDMATransfer = false;
 
 			static u16 startAddr;
 			startAddr = DMA << 8;
@@ -125,14 +110,14 @@ void PPU::Clock()
 		}
 	}
 
-	if (LCDEnable)
+	if (isEnabled)
 	{
 		if (LY >= 144)
 		{
 			if (mode != PPUMode::VBlank)
 			{
 				mode = PPUMode::VBlank;
-				if (Mode1StatInterruptEnable)
+				if (GetBits(STAT, (u8)STATBits::Mode1StatInterruptEnable, 0b1))
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
 				}
@@ -143,7 +128,7 @@ void PPU::Clock()
 			if (mode != PPUMode::OAMScan)
 			{
 				mode = PPUMode::OAMScan;
-				if (Mode2StatInterruptEnable)
+				if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
 				}
@@ -158,51 +143,51 @@ void PPU::Clock()
 			if (mode != PPUMode::HBlank)
 			{
 				mode = PPUMode::HBlank;
-				if (Mode0StatInterruptEnable)
+				if (GetBits(STAT, (u8)STATBits::Mode0StatInterruptEnable, 0b1))
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
 				}
 			}
 		}
 
+		// clear and then set new mode
 		STAT &= ~0b00000011;
 		STAT |= (u8)mode;
 
-
-
 		switch (mode)
 		{
-			case PPUMode::OAMScan:
-			{
+			case PPUMode::HBlank:
 				break;
-			}
+
+			case PPUMode::VBlank:
+				break;
+
+			case PPUMode::OAMScan:
+				break;
 
 			case PPUMode::Draw:
 				if (currScanlineCycles == 80)
 				{
 					// are we using the window?
-					static bool usingWindow;
-					usingWindow = (WindowEnable && WY <= LY) ? true : false;
+					bool usingWindow = (GetBits(LCDC, (u8)LCDCBits::WindowEnable, 0b1) && WY <= LY) ? true : false;
 
 					// which bg map?
-					static u16 BGAddr;
+					u16 BGAddr;
 					if (usingWindow)
 					{
-						BGAddr = WindowTileMapArea ? 0x9C00 : 0x9800;
+						BGAddr = GetBits(LCDC, (u8)LCDCBits::WindowTileMapArea, 0b1) ? 0x9C00 : 0x9800;
 					}
 					else
 					{
-						BGAddr = BGTileMapArea ? 0x9C00 : 0x9800;
+						BGAddr = GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0b1) ? 0x9C00 : 0x9800;
 					}
 
 					// which tile data set are we using?
-					static u16 tileDataBaseAddr;
-					static bool isSigned;
-					tileDataBaseAddr	= BGAndWindowTileDataArea ? 0x8000 : 0x9000;
-					isSigned			= BGAndWindowTileDataArea ?  false :   true;
+					u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x9000;
+					bool isSigned = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? false : true;
 
 					// calculate the tile row on the screen
-					static u8 tileRowOffset;
+					u8 tileRowOffset;
 					if (usingWindow)
 					{
 						tileRowOffset = (u8)(LY + WY) / (u8)8;
@@ -213,14 +198,12 @@ void PPU::Clock()
 					}
 
 					// which of the 8 vertical pixels of the current tile is the scanline on?
-					static u8 pixelRowOffset;
-					pixelRowOffset = LY % 8 * 2; // each row takes up two bytes of memory
+					u8 pixelRowOffset = (LY % 8) * 2; // each row takes up two bytes of memory
 
 					// time to start drawing the scanline
+					u8 xPos;
 					for (int pixel = 0; pixel < GamboScreenWidth; pixel++)
 					{
-						static u8 xPos;
-
 						if (usingWindow && pixel >= WX)
 						{
 							xPos = pixel - WX;
@@ -231,55 +214,45 @@ void PPU::Clock()
 						}
 
 						// calculate the tile column
-						static u16 tileColOffset;
-						tileColOffset = (xPos / 8);
+						u16 tileColOffset = (xPos / 8);
 
 						// get the tile id number. Remember it can be signed or unsigned
-						static u16 tileIdAddr;
-						static int tileId;
-						tileIdAddr = BGAddr + (tileRowOffset * 32) + tileColOffset; // there are 32 rows of tiles in memory
-						tileId = isSigned ? (s8)core->Read(tileIdAddr) : core->Read(tileIdAddr);
+						u16 tileIdAddr = BGAddr + (tileRowOffset * 32) + tileColOffset; // there are 32 rows of tiles in memory
+						int tileId = isSigned ? (s8)core->Read(tileIdAddr) : core->Read(tileIdAddr);
 
 						// calculate the address of the tile data
-						static u16 tileDataAddr;
-						tileDataAddr = tileDataBaseAddr + (tileId * 16); // 16 bits per row of pixels within the tile
+						u16 tileDataAddr = tileDataBaseAddr + (tileId * 16); // 16 bits per row of pixels within the tile
 
 						// calculate the vertical position within the tile data
-						static u8 data0;
-						static u8 data1;
-						data0 = core->Read(tileDataAddr + pixelRowOffset);
-						data1 = core->Read(tileDataAddr + pixelRowOffset + 1);
+						u8 data0 = core->Read(tileDataAddr + pixelRowOffset);
+						u8 data1 = core->Read(tileDataAddr + pixelRowOffset + 1);
 
 						// pixel 0 in the tile is bit 7 of both data1 and data2. Pixel 1 is bit 6 etc..
-						static u8 colorBitIndex;
-						colorBitIndex = 7 - (xPos % 8);
+						u8 colorBitIndex = 7 - (xPos % 8);
 
 						// combine data2 and data1 to get the color id for this pixel in the tile
-						static u8 colorIndex;
-						static bool colorBit0;
-						static bool colorBit1;
-						colorBit0 = data0 & (1 << colorBitIndex);
-						colorBit1 = data1 & (1 << colorBitIndex);
-						colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
+						bool colorBit0 = data0 & (1 << colorBitIndex);
+						bool colorBit1 = data1 & (1 << colorBitIndex);
+						u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
 
 						// now we have the color id, get the actual color from BG palette 0xFF47
-						static u8 color;
+						u8 color;
 						switch (colorIndex)
 						{
 							case 0:
-								color = BGColorForIndex0;
+								color = GetBits(BGP, (u8)BGPBits::BGColorForIndex0, 0b11);
 								break;
 
 							case 1:
-								color = BGColorForIndex1;
+								color = GetBits(BGP, (u8)BGPBits::BGColorForIndex1, 0b11);
 								break;
 
 							case 2:
-								color = BGColorForIndex2;
+								color = GetBits(BGP, (u8)BGPBits::BGColorForIndex2, 0b11);
 								break;
 
 							case 3:
-								color = BGColorForIndex3;
+								color = GetBits(BGP, (u8)BGPBits::BGColorForIndex3, 0b11);
 								break;
 
 							default:
@@ -287,13 +260,11 @@ void PPU::Clock()
 								break;
 						}
 
-						screen[(LY * GamboScreenWidth) + pixel] = blankOnFirstFrame ? GameBoyColors[White] : GameBoyColors[color];
+						// we can finally draw a pixel
+						size_t index = ((size_t)LY * GamboScreenWidth) + pixel;
+						screen[index] = blankOnFirstFrame ? GameBoyColors[White] : GameBoyColors[color];
 					}
 				}
-				break;
-			case PPUMode::HBlank:
-				break;
-			case PPUMode::VBlank:
 				break;
 			default:
 				throw;
@@ -311,7 +282,7 @@ void PPU::Clock()
 			if (LY == LYC)
 			{
 				STAT |= 0x0000100;
-				if (LYC_equals_LYStatInterruptEnable)
+				if (GetBits(STAT, (u8)STATBits::LYC_equals_LYStatInterruptEnable, 0b1))
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
 				}
@@ -345,17 +316,52 @@ void PPU::Clock()
 	{
 		frameComplete = true;
 	}
+
+	Write(HWAddr::LY, LY);
+	Write(HWAddr::STAT, STAT);
+	Write(HWAddr::IF, IF);
 }
 
 void PPU::Reset()
 {
+	mode = PPUMode::VBlank;
+	doDMATransfer = false;
+	DMATransferCycles = 0;
 	cycles = 0;
 	frameComplete = false;
 	blankOnFirstFrame = false;
-	std::fill(&(screen[0]), &(screen[GamboScreenSize]), SDL_Color{ 0, 0, 0, 255 });
+	isEnabled = true;
+	windowEnabled = false;
+	currScanlineCycles = 0;
+	screen.fill({ 0, 0, 0, 255 });
 }
 
-bool PPU::FrameComplete()
+bool PPU::FrameComplete() const
 {
 	return frameComplete;
+}
+
+const std::array<SDL_Color, GamboScreenSize>& PPU::GetScreen() const
+{
+	return screen;
+}
+
+bool PPU::IsEnabled() const
+{
+	return isEnabled;
+}
+
+PPUMode PPU::GetMode() const
+{
+	return mode;
+}
+
+void PPU::SetDoDMATransfer(bool b)
+{
+	doDMATransfer = true;
+}
+
+u8 PPU::GetBits(u8 reg, u8 bitIndex, u8 bitMask) const
+{
+	return (reg & (bitMask << bitIndex)) >> bitIndex;
 }
