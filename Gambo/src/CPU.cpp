@@ -180,8 +180,12 @@ void CPU::UpdateTimers()
 	TIMAEnabled = TAC & 0b100;
 	if (TIMAEnabled)
 	{
-		static u8 TIMAFreqSelect;
-		TIMAFreqSelect = TAC & 0b011;
+		static u8 TIMAFreqSelect = 0;
+		if (TIMAFreqSelect != (TAC & 0b011))
+		{
+			TIMAFreqSelect = TAC & 0b011;
+			TIMACounter = 0;
+		}
 
 		static int TIMAFreq;
 		switch (TIMAFreqSelect)
