@@ -1,10 +1,10 @@
 #include "PPU.h"
-#include "Bus.h"
+#include "GamboCore.h"
 #include <random>
 
 
-PPU::PPU(Bus* b)
-	:bus(b)
+PPU::PPU(GamboCore* c)
+	: core(c)
 {
 	Reset();
 }
@@ -16,12 +16,12 @@ PPU::~PPU()
 
 u8 PPU::Read(u16 addr)
 {
-	return bus->Read(addr);
+	return core->Read(addr);
 }
 
 void PPU::Write(u16 addr, u8 data)
 {
-	bus->Write(addr, data);
+	core->Write(addr, data);
 }
 
 void PPU::Clock()
@@ -30,7 +30,7 @@ void PPU::Clock()
 	frameComplete = false;
 	static int currScanlineCycles = 0;
 
-	static u8& LCDC = bus->ram[HWAddr::LCDC];
+	static u8& LCDC = core->ram[HWAddr::LCDC];
 	static bool LCDEnable;					// 0=Off, 1=On
 	static bool WindowTileMapArea;			// 0=9800-9BFF, 1=9C00-9FFF
 	static bool WindowEnable;				// 0=Off, 1=On
@@ -39,19 +39,19 @@ void PPU::Clock()
 	static bool OBJSize;					// 0=8x8, 1=8x16
 	static bool OBJEnable;					// 0=Off, 1=On
 	static bool BGAndWindowEnable;			// BGAndWindowPriority for CGB; 0=Off, 1=On
-	static u8& SCY	= bus->ram[HWAddr::SCY];	// viewport y position
-	static u8& SCX	= bus->ram[HWAddr::SCX];	// viewport x position
-	static u8& LY	= bus->ram[HWAddr::LY];		// LCD Y coordinate
-	static u8& LYC	= bus->ram[HWAddr::LYC];	// LY compare
-	static u8& WY	= bus->ram[HWAddr::WY];		// window Y position
-	static u8& WX	= bus->ram[HWAddr::WX];		// window X position + 7
-	static u8& BGP	= bus->ram[HWAddr::BGP];	// BG pallette data
+	static u8& SCY	= core->ram[HWAddr::SCY];	// viewport y position
+	static u8& SCX	= core->ram[HWAddr::SCX];	// viewport x position
+	static u8& LY	= core->ram[HWAddr::LY];		// LCD Y coordinate
+	static u8& LYC	= core->ram[HWAddr::LYC];	// LY compare
+	static u8& WY	= core->ram[HWAddr::WY];		// window Y position
+	static u8& WX	= core->ram[HWAddr::WX];		// window X position + 7
+	static u8& BGP	= core->ram[HWAddr::BGP];	// BG pallette data
 	static u8 BGColorForIndex3;
 	static u8 BGColorForIndex2;
 	static u8 BGColorForIndex1;
 	static u8 BGColorForIndex0;
-	static u8& OBP0 = bus->ram[HWAddr::OBP0];	// OBJ pallette data
-	static u8& OBP1 = bus->ram[HWAddr::OBP1];	// OBJ pallette data
+	static u8& OBP0 = core->ram[HWAddr::OBP0];	// OBJ pallette data
+	static u8& OBP1 = core->ram[HWAddr::OBP1];	// OBJ pallette data
 	static u8 OBP0ColorForIndex3;
 	static u8 OBP0ColorForIndex2;
 	static u8 OBP0ColorForIndex1;
@@ -60,15 +60,15 @@ void PPU::Clock()
 	static u8 OBP1ColorForIndex2;
 	static u8 OBP1ColorForIndex1;
 	static u8 OBP1ColorForIndex0 = ColorIndex::Transparent;
-	static u8& DMA	= bus->ram[HWAddr::DMA];
-	static u8& STAT	= bus->ram[HWAddr::STAT];
+	static u8& DMA	= core->ram[HWAddr::DMA];
+	static u8& STAT	= core->ram[HWAddr::STAT];
 	static u8 modeFlag;
 	static bool LYC_equals_LYFlag;
 	static bool Mode0StatInterruptEnable;
 	static bool Mode1StatInterruptEnable;
 	static bool Mode2StatInterruptEnable;
 	static bool LYC_equals_LYStatInterruptEnable;
-	static u8& IF = bus->ram[HWAddr::IF];
+	static u8& IF = core->ram[HWAddr::IF];
 
 
 	LCDEnable				= LCDC & (1 << 7);
@@ -119,7 +119,7 @@ void PPU::Clock()
 			for (u16 currAddr = startAddr; currAddr < startAddr + 160; currAddr++)
 			{
 				static u8 data;
-				data = bus->Read(currAddr);
+				data = core->Read(currAddr);
 				Write(HWAddr::OAM + (currAddr - startAddr), data);
 			}
 		}
@@ -129,9 +129,9 @@ void PPU::Clock()
 	{
 		if (LY >= 144)
 		{
-			if (mode != Mode::VBlank)
+			if (mode != PPUMode::VBlank)
 			{
-				mode = Mode::VBlank;
+				mode = PPUMode::VBlank;
 				if (Mode1StatInterruptEnable)
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
@@ -140,9 +140,9 @@ void PPU::Clock()
 		}
 		else if (currScanlineCycles < 80)
 		{
-			if (mode != Mode::OAMScan)
+			if (mode != PPUMode::OAMScan)
 			{
-				mode = Mode::OAMScan;
+				mode = PPUMode::OAMScan;
 				if (Mode2StatInterruptEnable)
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
@@ -151,13 +151,13 @@ void PPU::Clock()
 		}
 		else if (currScanlineCycles < 172) // 289
 		{
-			mode = Mode::Draw;
+			mode = PPUMode::Draw;
 		}
 		else if (currScanlineCycles < 456)
 		{
-			if (mode != Mode::HBlank)
+			if (mode != PPUMode::HBlank)
 			{
-				mode = Mode::HBlank;
+				mode = PPUMode::HBlank;
 				if (Mode0StatInterruptEnable)
 				{
 					IF |= InterruptFlags::LCDStat; // request LCDStat interrupt
@@ -172,12 +172,12 @@ void PPU::Clock()
 
 		switch (mode)
 		{
-			case PPU::Mode::OAMScan:
+			case PPUMode::OAMScan:
 			{
 				break;
 			}
 
-			case PPU::Mode::Draw:
+			case PPUMode::Draw:
 				if (currScanlineCycles == 80)
 				{
 					// are we using the window?
@@ -238,7 +238,7 @@ void PPU::Clock()
 						static u16 tileIdAddr;
 						static int tileId;
 						tileIdAddr = BGAddr + (tileRowOffset * 32) + tileColOffset; // there are 32 rows of tiles in memory
-						tileId = isSigned ? (s8)bus->Read(tileIdAddr) : bus->Read(tileIdAddr);
+						tileId = isSigned ? (s8)core->Read(tileIdAddr) : core->Read(tileIdAddr);
 
 						// calculate the address of the tile data
 						static u16 tileDataAddr;
@@ -247,8 +247,8 @@ void PPU::Clock()
 						// calculate the vertical position within the tile data
 						static u8 data0;
 						static u8 data1;
-						data0 = bus->Read(tileDataAddr + pixelRowOffset);
-						data1 = bus->Read(tileDataAddr + pixelRowOffset + 1);
+						data0 = core->Read(tileDataAddr + pixelRowOffset);
+						data1 = core->Read(tileDataAddr + pixelRowOffset + 1);
 
 						// pixel 0 in the tile is bit 7 of both data1 and data2. Pixel 1 is bit 6 etc..
 						static u8 colorBitIndex;
@@ -291,9 +291,9 @@ void PPU::Clock()
 					}
 				}
 				break;
-			case PPU::Mode::HBlank:
+			case PPUMode::HBlank:
 				break;
-			case PPU::Mode::VBlank:
+			case PPUMode::VBlank:
 				break;
 			default:
 				throw;

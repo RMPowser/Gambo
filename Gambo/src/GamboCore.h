@@ -1,17 +1,18 @@
 #pragma once
 #include "GamboDefine.h"
-#include "Cartridge.h"
-#include "Bus.h"
-#include <atomic>
+
+class CPU;
+class PPU;
+class Cartridge;
 
 struct GamboState
 {
-	struct _flags
+	struct
 	{
 		bool Z, N, H, C, IME;
 	} flags;
 
-	struct _reg
+	struct
 	{
 		u8 A, F, B, C, D, E, H, L;
 	} registers;
@@ -42,7 +43,7 @@ public:
 	GamboState GetState() const;
 
 	const Cartridge& GetCartridge() const;
-	void InsertCartridge(std::wstring filePath);
+	void InsertCartridge(std::filesystem::path filePath);
 
 	void SetUseBootRom(bool b);
 	bool GetUseBootRom();
@@ -51,13 +52,36 @@ public:
 	std::atomic<bool> running = false;
 	std::atomic<bool> step = false;
 
-private:
-	Bus gb;
+	u8 Read(u16 addr);
+	void Write(u16 addr, u8 data);
+	void Reset();
 
-	void DrawString(SDL_Color* target, u32 targetWidth, u32 targetHeight, s32 x, s32 y, const std::string& sText, ImVec4 col = WHITE, u32 scale = 1);
-	void DrawCode(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);
-	void DrawStackPointer(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);
-	void DrawRamWrites(SDL_Color* target, int targetWidth, int targetHeight, int x, int y, int nLines);
+	void Disassemble(u16 startAddr, int numInstr);
+
+	bool IsBootRomAddress(u16 addr);
+	bool IsCartridgeAddress(u16 addr);
+
+	// 64KB total system memory. memory is mapped:
+	// 0000-3FFF | 16 KiB ROM bank 00			  | From cartridge, usually a fixed bank
+	// 4000-7FFF | 16 KiB ROM Bank 01~NN		  | From cartridge, switchable bank via mapper(if any)
+	// 8000-9FFF | 8 KiB Video RAM(VRAM)		  | In CGB mode, switchable bank 0 / 1
+	// A000-BFFF | 8 KiB External RAM			  | From cartridge, switchable bank if any
+	// C000-CFFF | 4 KiB Work RAM(WRAM)			  | 
+	// D000-DFFF | 4 KiB Work RAM(WRAM)			  | In CGB mode, switchable bank 1~7
+	// E000-FDFF | Mirror of C000~DDFF(ECHO RAM)  | Nintendo says use of this area is prohibited.
+	// FE00-FE9F | Sprite attribute table(OAM)	  | 
+	// FEA0-FEFF | Not Usable					  | Nintendo says use of this area is prohibited
+	// FF00-FF7F | I / O Registers				  | 
+	// FF80-FFFE | High RAM(HRAM)				  | 
+	// FFFF-FFFF | Interrupt Enable register (IE) |
+	std::vector<u8> ram = std::vector<u8>(64KiB, 0x00);
+	std::map<uint16_t, std::string> mapAsm;
+	u16 lastWrite = 0;
+	u16 lastRead = 0;
+	CPU* cpu;
+	PPU* ppu;
+private:
+	Cartridge* cart;
 	
 	float screenWidth = GamboScreenWidth;
 	float screenHeight = GamboScreenHeight;

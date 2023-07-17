@@ -1,8 +1,9 @@
 #include "CPU.h"
-#include "Bus.h"
+#include "GamboCore.h"
+#include "PPU.h"
 
-CPU::CPU(Bus* b)
-	: bus(b)
+CPU::CPU(GamboCore* c)
+	: core(c)
 {
 	Reset();
 }
@@ -13,29 +14,29 @@ CPU::~CPU()
 
 u8 CPU::Read(u16 addr)
 {
-	if ((bus->ppu.mode == PPU::Mode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
-		|| (bus->ppu.mode == PPU::Mode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
+	if ((core->ppu->mode == PPUMode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
+		|| (core->ppu->mode == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
 	{
 		return 0x00;
 	}
 	else
 	{
-		return bus->Read(addr);
+		return core->Read(addr);
 	}
 }
 
 void CPU::Write(u16 addr, u8 data)
 {
-	if ((bus->ppu.mode == PPU::Mode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
-		|| (bus->ppu.mode == PPU::Mode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
+	if ((core->ppu->mode == PPUMode::OAMScan && (0xFE00 <= addr && addr <= 0xFE9F)) // accessing oam during oam scan
+		|| (core->ppu->mode == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))) // accessing oam or vram during drawing
 	{
 		return;
 	}
 
-    bus->Write(addr, data);
+    core->Write(addr, data);
 	if (addr == HWAddr::DMA)
 	{
-		bus->ppu.DoDMATransfer = true;
+		core->ppu->DoDMATransfer = true;
 	}
 }
 
@@ -82,8 +83,8 @@ void CPU::Clock()
 
 
 
-			static u8& IF = bus->ram[HWAddr::IF];
-			static u8& IE = bus->ram[HWAddr::IE];
+			static u8& IF = core->ram[HWAddr::IF];
+			static u8& IE = core->ram[HWAddr::IE];
 
 			// handle interrupts in priority order
 			if (IF & InterruptFlags::VBlank && IE & InterruptFlags::VBlank)
@@ -116,7 +117,7 @@ void CPU::Clock()
 
 void CPU::HandleInterrupt(InterruptFlags f)
 {
-	static u8& IF = bus->ram[HWAddr::IF];
+	static u8& IF = core->ram[HWAddr::IF];
 
 	// give control to the interrupt if IME is enabled
 	if (IME)
@@ -162,7 +163,7 @@ void CPU::UpdateTimers()
 {
 	// DIV register always counts up every 256 clock cycles
 	static int DIVCounter = 0;
-	static u8& DIV = bus->ram[HWAddr::DIV];
+	static u8& DIV = core->ram[HWAddr::DIV];
 
 	DIVCounter++;
 	DIVCounter %= 256;
@@ -175,7 +176,7 @@ void CPU::UpdateTimers()
 	// TIMA iterates at a specified frequency and only if it's enabled.
 	static int TIMACounter = 0;
 
-	static u8& TAC = bus->ram[HWAddr::TAC];
+	static u8& TAC = core->ram[HWAddr::TAC];
 	static bool TIMAEnabled;
 	TIMAEnabled = TAC & 0b100;
 	if (TIMAEnabled)
@@ -212,14 +213,14 @@ void CPU::UpdateTimers()
 		TIMACounter %= TIMAFreq;
 		if (TIMACounter == 0)
 		{
-			static u8& TIMA = bus->ram[HWAddr::TIMA];
+			static u8& TIMA = core->ram[HWAddr::TIMA];
 			TIMA++;
 			if (TIMA == 0x00)
 			{
 				// TIMA resets to TMA register value
-				TIMA = bus->ram[HWAddr::TMA];
+				TIMA = core->ram[HWAddr::TMA];
 				// request interrupt
-				bus->ram[HWAddr::IF] |= InterruptFlags::Timer;
+				core->ram[HWAddr::IF] |= InterruptFlags::Timer;
 			}
 		}
 	}
@@ -227,42 +228,42 @@ void CPU::UpdateTimers()
 
 bool CPU::InterruptPending()
 {
-	return (bus->ram[HWAddr::IE] & bus->ram[HWAddr::IF]) != 0;
+	return (core->ram[HWAddr::IE] & core->ram[HWAddr::IF]) != 0;
 }
 
 void CPU::ADC(const u8 data)
 {
-	int carry = GetFlag(fC);
+	int carry = GetFlag(CPUFlags::C);
 
 	int sum = A + data + carry;
 
-	SetFlag(fN, 0);
-	SetFlag(fH, ((A & 0xF) + (data & 0xF) + carry) > 0xF);
-	SetFlag(fC, sum > 0xFF);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, ((A & 0xF) + (data & 0xF) + carry) > 0xF);
+	SetFlag(CPUFlags::C, sum > 0xFF);
 
 	A = (u8)sum;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 }
 
 void CPU::SBC(const u8 data)
 {
-	int carry = GetFlag(fC);
+	int carry = GetFlag(CPUFlags::C);
 
 	int sum = A - data - carry;
 
-	SetFlag(fN, 1);
-	SetFlag(fH, ((A & 0xF) - (data & 0xF) - carry) < 0);
-	SetFlag(fC, sum < 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, ((A & 0xF) - (data & 0xF) - carry) < 0);
+	SetFlag(CPUFlags::C, sum < 0);
 
 	A = (u8)sum;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 }
 
 void CPU::BIT(u8& reg, int bit)
 {
-	SetFlag(fZ, ((reg >> bit) & 0x01) == 0);
-	SetFlag(fH, 1);
-	SetFlag(fN, 0);
+	SetFlag(CPUFlags::Z, ((reg >> bit) & 0x01) == 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::N, 0);
 }
 
 bool CPU::InstructionComplete()
@@ -276,10 +277,10 @@ void CPU::Reset()
 	{
 		// this puts the cpu back into a state as if it had just finished a legit boot sequence
 		A = 0x01;
-		SetFlag(fZ, 1);
-		SetFlag(fN, 0);
-		SetFlag(fH, 1);
-		SetFlag(fC, 1);
+		SetFlag(CPUFlags::Z, 1);
+		SetFlag(CPUFlags::N, 0);
+		SetFlag(CPUFlags::H, 1);
+		SetFlag(CPUFlags::C, 1);
 		B = 0x00;
 		C = 0x13;
 		D = 0x00;
@@ -294,72 +295,72 @@ void CPU::Reset()
 
 		// this is what the hardware registers look like at PC = 0x0100
 		for (size_t i = 0xFF00; i < 0x10000; i++)
-			bus->ram[i] = 0xFF;
+			core->ram[i] = 0xFF;
 		
-		bus->ram[HWAddr::P1] = 0xCF;
-		bus->ram[HWAddr::SB] = 0x00;
-		bus->ram[HWAddr::SC] = 0x7E;
-		bus->ram[HWAddr::DIV] = 0xAC;
-		bus->ram[HWAddr::TIMA] = 0x00;
-		bus->ram[HWAddr::TMA] = 0x00;
-		bus->ram[HWAddr::TAC] = 0xF8;
-		bus->ram[HWAddr::IF] = 0xE1;
-		bus->ram[HWAddr::NR10] = 0x80;
-		bus->ram[HWAddr::NR11] = 0xBF;
-		bus->ram[HWAddr::NR12] = 0xF3;
-		bus->ram[HWAddr::NR13] = 0xFF;
-		bus->ram[HWAddr::NR14] = 0xBF;
-		bus->ram[HWAddr::NR21] = 0x3F;
-		bus->ram[HWAddr::NR22] = 0x00;
-		bus->ram[HWAddr::NR23] = 0xFF;
-		bus->ram[HWAddr::NR24] = 0xBF;
-		bus->ram[HWAddr::NR30] = 0x7F;
-		bus->ram[HWAddr::NR31] = 0xFF;
-		bus->ram[HWAddr::NR32] = 0x9F;
-		bus->ram[HWAddr::NR33] = 0xFF;
-		bus->ram[HWAddr::NR34] = 0xBF;
-		bus->ram[HWAddr::NR41] = 0xFF;
-		bus->ram[HWAddr::NR42] = 0x00;
-		bus->ram[HWAddr::NR43] = 0x00;
-		bus->ram[HWAddr::NR44] = 0xBF;
-		bus->ram[HWAddr::NR50] = 0x77;
-		bus->ram[HWAddr::NR51] = 0xF3;
-		bus->ram[HWAddr::NR52] = 0xF1;
-		bus->ram[HWAddr::LCDC] = 0x91;
-		bus->ram[HWAddr::STAT] = 0x80;
-		bus->ram[HWAddr::SCY] = 0x00;
-		bus->ram[HWAddr::SCX] = 0x00;
-		bus->ram[HWAddr::LY] = 0x00;
-		bus->ram[HWAddr::LYC] = 0x00;
-		bus->ram[HWAddr::DMA] = 0xFF;
-		bus->ram[HWAddr::BGP] = 0xFC;
-		bus->ram[HWAddr::OBP0] = 0x00;
-		bus->ram[HWAddr::OBP1] = 0x00;
-		bus->ram[HWAddr::WY] = 0x00;
-		bus->ram[HWAddr::WX] = 0x00;
-		bus->ram[HWAddr::KEY1] = 0xFF;
-		bus->ram[HWAddr::VBK] = 0xFF;
-		bus->ram[HWAddr::BOOT] = 0xFF;
-		bus->ram[HWAddr::HDMA1] = 0xFF;
-		bus->ram[HWAddr::HDMA2] = 0xFF;
-		bus->ram[HWAddr::HDMA3] = 0xFF;
-		bus->ram[HWAddr::HDMA4] = 0xFF;
-		bus->ram[HWAddr::HDMA5] = 0xFF;
-		bus->ram[HWAddr::RP] = 0xFF;
-		bus->ram[HWAddr::BCPS] = 0xFF;
-		bus->ram[HWAddr::BCPD] = 0xFF;
-		bus->ram[HWAddr::OCPS] = 0xFF;
-		bus->ram[HWAddr::OCPD] = 0xFF;
-		bus->ram[HWAddr::SVBK] = 0xFF;
-		bus->ram[HWAddr::IE] = 0x00;
+		core->ram[HWAddr::P1] = 0xCF;
+		core->ram[HWAddr::SB] = 0x00;
+		core->ram[HWAddr::SC] = 0x7E;
+		core->ram[HWAddr::DIV] = 0xAC;
+		core->ram[HWAddr::TIMA] = 0x00;
+		core->ram[HWAddr::TMA] = 0x00;
+		core->ram[HWAddr::TAC] = 0xF8;
+		core->ram[HWAddr::IF] = 0xE1;
+		core->ram[HWAddr::NR10] = 0x80;
+		core->ram[HWAddr::NR11] = 0xBF;
+		core->ram[HWAddr::NR12] = 0xF3;
+		core->ram[HWAddr::NR13] = 0xFF;
+		core->ram[HWAddr::NR14] = 0xBF;
+		core->ram[HWAddr::NR21] = 0x3F;
+		core->ram[HWAddr::NR22] = 0x00;
+		core->ram[HWAddr::NR23] = 0xFF;
+		core->ram[HWAddr::NR24] = 0xBF;
+		core->ram[HWAddr::NR30] = 0x7F;
+		core->ram[HWAddr::NR31] = 0xFF;
+		core->ram[HWAddr::NR32] = 0x9F;
+		core->ram[HWAddr::NR33] = 0xFF;
+		core->ram[HWAddr::NR34] = 0xBF;
+		core->ram[HWAddr::NR41] = 0xFF;
+		core->ram[HWAddr::NR42] = 0x00;
+		core->ram[HWAddr::NR43] = 0x00;
+		core->ram[HWAddr::NR44] = 0xBF;
+		core->ram[HWAddr::NR50] = 0x77;
+		core->ram[HWAddr::NR51] = 0xF3;
+		core->ram[HWAddr::NR52] = 0xF1;
+		core->ram[HWAddr::LCDC] = 0x91;
+		core->ram[HWAddr::STAT] = 0x80;
+		core->ram[HWAddr::SCY] = 0x00;
+		core->ram[HWAddr::SCX] = 0x00;
+		core->ram[HWAddr::LY] = 0x00;
+		core->ram[HWAddr::LYC] = 0x00;
+		core->ram[HWAddr::DMA] = 0xFF;
+		core->ram[HWAddr::BGP] = 0xFC;
+		core->ram[HWAddr::OBP0] = 0x00;
+		core->ram[HWAddr::OBP1] = 0x00;
+		core->ram[HWAddr::WY] = 0x00;
+		core->ram[HWAddr::WX] = 0x00;
+		core->ram[HWAddr::KEY1] = 0xFF;
+		core->ram[HWAddr::VBK] = 0xFF;
+		core->ram[HWAddr::BOOT] = 0xFF;
+		core->ram[HWAddr::HDMA1] = 0xFF;
+		core->ram[HWAddr::HDMA2] = 0xFF;
+		core->ram[HWAddr::HDMA3] = 0xFF;
+		core->ram[HWAddr::HDMA4] = 0xFF;
+		core->ram[HWAddr::HDMA5] = 0xFF;
+		core->ram[HWAddr::RP] = 0xFF;
+		core->ram[HWAddr::BCPS] = 0xFF;
+		core->ram[HWAddr::BCPD] = 0xFF;
+		core->ram[HWAddr::OCPS] = 0xFF;
+		core->ram[HWAddr::OCPD] = 0xFF;
+		core->ram[HWAddr::SVBK] = 0xFF;
+		core->ram[HWAddr::IE] = 0x00;
 	}
 	else
 	{
 		A = 0x00;
-		SetFlag(fZ, 0);
-		SetFlag(fN, 0);
-		SetFlag(fH, 0);
-		SetFlag(fC, 0);
+		SetFlag(CPUFlags::Z, 0);
+		SetFlag(CPUFlags::N, 0);
+		SetFlag(CPUFlags::H, 0);
+		SetFlag(CPUFlags::C, 0);
 		B = 0x00;
 		C = 0x00;
 		D = 0x00;
@@ -371,22 +372,22 @@ void CPU::Reset()
 		IME = false;
 		stopMode = false;
 		isHalted = false;
-		bus->ram[HWAddr::BOOT] = 0xFE;
-		bus->ram[HWAddr::P1] = 0x0F;
+		core->ram[HWAddr::BOOT] = 0xFE;
+		core->ram[HWAddr::P1] = 0x0F;
 	}
 }
 
-void CPU::SetFlag(Flags f, bool v)
+void CPU::SetFlag(CPUFlags f, bool v)
 {
 	if (v)
-		F |= f;
+		F |= (u8)f;
 	else
-		F &= ~f;
+		F &= ~(u8)f;
 }
 
-bool CPU::GetFlag(Flags f)
+bool CPU::GetFlag(CPUFlags f)
 {
-	return ((F & f) > 0)
+	return ((F & (u8)f) > 0)
 		? true
 		: false;
 }
@@ -433,23 +434,23 @@ u8 CPU::STOP()
 
 u8 CPU::DAA()
 {
-	if (!GetFlag(fN)) {  // after an addition, adjust if (half-)carry occurred or if result is out of bounds
-		if (GetFlag(fC) || A > 0x99) 
+	if (!GetFlag(CPUFlags::N)) {  // after an addition, adjust if (half-)carry occurred or if result is out of bounds
+		if (GetFlag(CPUFlags::C) || A > 0x99) 
 		{ 
 			A += 0x60;
-			SetFlag(fC, 1); 
+			SetFlag(CPUFlags::C, 1); 
 		}
-		if (GetFlag(fH) || (A & 0x0F) > 0x09) 
+		if (GetFlag(CPUFlags::H) || (A & 0x0F) > 0x09) 
 		{ A += 0x6; }
 	}
 	else {  // after a subtraction, only adjust if (half-)carry occurred
-		if (GetFlag(fC)) { A -= 0x60; }
-		if (GetFlag(fH)) { A -= 0x6; }
+		if (GetFlag(CPUFlags::C)) { A -= 0x60; }
+		if (GetFlag(CPUFlags::H)) { A -= 0x6; }
 	}
 
 	// these flags are always updated
-	SetFlag(fZ, A == 0); // the usual z flag
-	SetFlag(fH, 0); // h flag is always cleared
+	SetFlag(CPUFlags::Z, A == 0); // the usual z flag
+	SetFlag(CPUFlags::H, 0); // h flag is always cleared
 	return 0;
 }
 
@@ -457,26 +458,26 @@ u8 CPU::CPL()
 {
 	A = ~A;
 
-	SetFlag(fN, 1);
-	SetFlag(fH, 1);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, 1);
 	return 0;
 }
 
 u8 CPU::SCF()
 {
-	SetFlag(fC, 1);
+	SetFlag(CPUFlags::C, 1);
 
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
 	return 0;
 }
 
 u8 CPU::CCF()
 {
-	SetFlag(fC, !GetFlag(fC));
+	SetFlag(CPUFlags::C, !GetFlag(CPUFlags::C));
 
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
 	return 0;
 }
 
@@ -511,7 +512,7 @@ u8 CPU::JR_s8()
 
 u8 CPU::JR_NZ_s8()
 {
-	if (!GetFlag(fZ))
+	if (!GetFlag(CPUFlags::Z))
 	{
 		PC = (s8)Read(PC) + PC + 1;
 		return 4;
@@ -525,7 +526,7 @@ u8 CPU::JR_NZ_s8()
 
 u8 CPU::JR_Z_s8()
 {
-	if (GetFlag(fZ))
+	if (GetFlag(CPUFlags::Z))
 	{
 		PC = (s8)Read(PC) + PC + 1;
 		return 4;
@@ -539,7 +540,7 @@ u8 CPU::JR_Z_s8()
 
 u8 CPU::JR_NC_s8()
 {
-	if (!GetFlag(fC))
+	if (!GetFlag(CPUFlags::C))
 	{
 		PC = (s8)Read(PC) + PC + 1;
 		return 4;
@@ -553,7 +554,7 @@ u8 CPU::JR_NC_s8()
 
 u8 CPU::JR_C_s8()
 {
-	if (GetFlag(fC))
+	if (GetFlag(CPUFlags::C))
 	{
 		PC = (s8)Read(PC) + PC + 1;
 		return 4;
@@ -567,7 +568,7 @@ u8 CPU::JR_C_s8()
 
 u8 CPU::RET_NZ()
 {
-	if (!GetFlag(fZ))
+	if (!GetFlag(CPUFlags::Z))
 	{
 		Pop(PC);
 		return 12;
@@ -587,7 +588,7 @@ u8 CPU::JP_NZ_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (!GetFlag(fZ))
+	if (!GetFlag(CPUFlags::Z))
 	{
 		PC = addr;
 		return 4;
@@ -618,7 +619,7 @@ u8 CPU::CALL_NZ_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (!GetFlag(fZ))
+	if (!GetFlag(CPUFlags::Z))
 	{
 		Push(PC);
 		PC = addr;
@@ -640,7 +641,7 @@ u8 CPU::RST_0()
 
 u8 CPU::RET_Z()
 {
-	if (GetFlag(fZ))
+	if (GetFlag(CPUFlags::Z))
 	{
 		Pop(PC);
 		return 12;
@@ -666,7 +667,7 @@ u8 CPU::JP_Z_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (GetFlag(fZ))
+	if (GetFlag(CPUFlags::Z))
 	{
 		PC = addr;
 		return 4;
@@ -686,7 +687,7 @@ u8 CPU::CALL_Z_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (GetFlag(fZ))
+	if (GetFlag(CPUFlags::Z))
 	{
 		Push(PC);
 		PC = addr;
@@ -722,7 +723,7 @@ u8 CPU::RST_1()
 
 u8 CPU::RET_NC()
 {
-	if (!GetFlag(fC))
+	if (!GetFlag(CPUFlags::C))
 	{
 		Pop(PC);
 		return 12;
@@ -742,7 +743,7 @@ u8 CPU::JP_NC_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (!GetFlag(fC))
+	if (!GetFlag(CPUFlags::C))
 	{
 		PC = addr;
 		return 4;
@@ -762,7 +763,7 @@ u8 CPU::CALL_NC_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (!GetFlag(fC))
+	if (!GetFlag(CPUFlags::C))
 	{
 		Push(PC);
 		PC = addr;
@@ -783,7 +784,7 @@ u8 CPU::RST_2()
 
 u8 CPU::RET_C()
 {
-	if (GetFlag(fC))
+	if (GetFlag(CPUFlags::C))
 	{
 		Pop(PC);
 		return 12;
@@ -811,7 +812,7 @@ u8 CPU::JP_C_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (GetFlag(fC))
+	if (GetFlag(CPUFlags::C))
 	{
 		PC = addr;
 		return 4;
@@ -831,7 +832,7 @@ u8 CPU::CALL_C_a16()
 	high = Read(PC++);
 
 	addr = (high << 8) | low;
-	if (GetFlag(fC))
+	if (GetFlag(CPUFlags::C))
 	{
 		Push(PC);
 		PC = addr;
@@ -1517,10 +1518,10 @@ u8 CPU::LD_HL_SPinc_s8()
 
 	HL = sum;
 
-	SetFlag(fZ, 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::Z, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	return 0;
 }
@@ -1538,9 +1539,9 @@ u8 CPU::INC_B()
 	prev = B;
 	B++;
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (B & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (B & 0xF) < (prev & 0xF));
 	
 	return 0;
 }
@@ -1549,9 +1550,9 @@ u8 CPU::DEC_B()
 {
 	B--;
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (B & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (B & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1562,9 +1563,9 @@ u8 CPU::INC_C()
 	prev = C;
 	C++;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (C & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (C & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1573,9 +1574,9 @@ u8 CPU::DEC_C()
 {
 	C--;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (C & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (C & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1586,9 +1587,9 @@ u8 CPU::INC_D()
 	prev = D;
 	D++;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (D & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (D & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1597,9 +1598,9 @@ u8 CPU::DEC_D()
 {
 	D--;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (D & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (D & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1610,9 +1611,9 @@ u8 CPU::INC_E()
 	prev = E;
 	E++;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (E & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (E & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1621,9 +1622,9 @@ u8 CPU::DEC_E()
 {
 	E--;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (E & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (E & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1634,9 +1635,9 @@ u8 CPU::INC_H()
 	prev = H;
 	H++;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (H & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (H & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1645,9 +1646,9 @@ u8 CPU::DEC_H()
 {
 	H--;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (H & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (H & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1658,9 +1659,9 @@ u8 CPU::INC_L()
 	prev = L;
 	L++;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (L & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (L & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1669,9 +1670,9 @@ u8 CPU::DEC_L()
 {
 	L--;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (L & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (L & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1682,9 +1683,9 @@ u8 CPU::INC_aHL()
 	prev = Read(HL);
 	Write(HL, prev + 1);
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (Read(HL) & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (Read(HL) & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1695,9 +1696,9 @@ u8 CPU::DEC_aHL()
 	data = Read(HL);
 	Write(HL, --data);
 
-	SetFlag(fZ, data == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (data & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, data == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (data & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1708,9 +1709,9 @@ u8 CPU::INC_A()
 	prev = A;
 	A++;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, (A & 0xF) < (prev & 0xF));
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, (A & 0xF) < (prev & 0xF));
 
 	return 0;
 }
@@ -1719,9 +1720,9 @@ u8 CPU::DEC_A()
 {
 	A--;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) == 0xF);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) == 0xF);
 
 	return 0;
 }
@@ -1732,12 +1733,12 @@ u8 CPU::ADD_A_B()
 	int noCarrySum = A ^ B;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += B;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1747,12 +1748,12 @@ u8 CPU::ADD_A_C()
 	int noCarrySum = A ^ C;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += C;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1762,12 +1763,12 @@ u8 CPU::ADD_A_D()
 	int noCarrySum = A ^ D;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += D;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1777,12 +1778,12 @@ u8 CPU::ADD_A_E()
 	int noCarrySum = A ^ E;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += E;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1792,12 +1793,12 @@ u8 CPU::ADD_A_H()
 	int noCarrySum = A ^ H;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += H;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1807,12 +1808,12 @@ u8 CPU::ADD_A_L()
 	int noCarrySum = A ^ L;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += L;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1823,12 +1824,12 @@ u8 CPU::ADD_A_aHL()
 	int noCarrySum = A ^ data;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += data;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1838,12 +1839,12 @@ u8 CPU::ADD_A_A()
 	int noCarrySum = A ^ A;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += A;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1897,67 +1898,67 @@ u8 CPU::ADC_A_A()
 
 u8 CPU::SUB_A_B()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (B & 0xF));
-	SetFlag(fC, A < B);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (B & 0xF));
+	SetFlag(CPUFlags::C, A < B);
 
 	A -= B;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_C()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (C & 0xF));
-	SetFlag(fC, A < C);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (C & 0xF));
+	SetFlag(CPUFlags::C, A < C);
 
 	A -= C;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_D()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (D & 0xF));
-	SetFlag(fC, A < D);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (D & 0xF));
+	SetFlag(CPUFlags::C, A < D);
 
 	A -= D;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_E()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (E & 0xF));
-	SetFlag(fC, A < E);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (E & 0xF));
+	SetFlag(CPUFlags::C, A < E);
 
 	A -= E;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_H()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (H & 0xF));
-	SetFlag(fC, A < H);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (H & 0xF));
+	SetFlag(CPUFlags::C, A < H);
 
 	A -= H;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_L()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (L & 0xF));
-	SetFlag(fC, A < L);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (L & 0xF));
+	SetFlag(CPUFlags::C, A < L);
 
 	A -= L;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -1966,23 +1967,23 @@ u8 CPU::SUB_A_aHL()
 	static u8 data;
 	data = Read(HL);
 
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (data & 0xF));
-	SetFlag(fC, A < data);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (data & 0xF));
+	SetFlag(CPUFlags::C, A < data);
 
 	A -= data;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
 u8 CPU::SUB_A_A()
 {
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (A & 0xF));
-	SetFlag(fC, A < A);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (A & 0xF));
+	SetFlag(CPUFlags::C, A < A);
 
 	A -= A;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -2038,10 +2039,10 @@ u8 CPU::AND_A_B()
 {
 	A &= B;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2050,10 +2051,10 @@ u8 CPU::AND_A_C()
 {
 	A &= C;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2062,10 +2063,10 @@ u8 CPU::AND_A_D()
 {
 	A &= D;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2074,10 +2075,10 @@ u8 CPU::AND_A_E()
 {
 	A &= E;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2086,10 +2087,10 @@ u8 CPU::AND_A_H()
 {
 	A &= H;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2098,10 +2099,10 @@ u8 CPU::AND_A_L()
 {
 	A &= L;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2110,10 +2111,10 @@ u8 CPU::AND_A_aHL()
 {
 	A &= Read(HL);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2122,10 +2123,10 @@ u8 CPU::AND_A_A()
 {
 	A &= A;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2134,10 +2135,10 @@ u8 CPU::XOR_A_B()
 {
 	A ^= B;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2146,10 +2147,10 @@ u8 CPU::XOR_A_C()
 {
 	A ^= C;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2158,10 +2159,10 @@ u8 CPU::XOR_A_D()
 {
 	A ^= D;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2170,10 +2171,10 @@ u8 CPU::XOR_A_E()
 {
 	A ^= E;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2182,10 +2183,10 @@ u8 CPU::XOR_A_H()
 {
 	A ^= H;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2194,10 +2195,10 @@ u8 CPU::XOR_A_L()
 {
 	A ^= L;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2206,10 +2207,10 @@ u8 CPU::XOR_A_aHL()
 {
 	A ^= Read(HL);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2218,10 +2219,10 @@ u8 CPU::XOR_A_A()
 {
 	A ^= A;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2230,10 +2231,10 @@ u8 CPU::OR_A_B()
 {
 	A |= B;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2242,10 +2243,10 @@ u8 CPU::OR_A_C()
 {
 	A |= C;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2254,10 +2255,10 @@ u8 CPU::OR_A_D()
 {
 	A |= D;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2266,10 +2267,10 @@ u8 CPU::OR_A_E()
 {
 	A |= E;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2278,10 +2279,10 @@ u8 CPU::OR_A_H()
 {
 	A |= H;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2290,10 +2291,10 @@ u8 CPU::OR_A_L()
 {
 	A |= L;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2302,10 +2303,10 @@ u8 CPU::OR_A_aHL()
 {
 	A |= Read(HL);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2314,10 +2315,10 @@ u8 CPU::OR_A_A()
 {
 	A |= A;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2327,10 +2328,10 @@ u8 CPU::CP_A_B()
 	static u16 result;
 	result = A - B;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (B & 0xF));
-	SetFlag(fC, A < B);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (B & 0xF));
+	SetFlag(CPUFlags::C, A < B);
 
 	return 0;
 }
@@ -2340,10 +2341,10 @@ u8 CPU::CP_A_C()
 	static u16 result;
 	result = A - C;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (C & 0xF));
-	SetFlag(fC, A < C);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (C & 0xF));
+	SetFlag(CPUFlags::C, A < C);
 
 	return 0;
 }
@@ -2353,10 +2354,10 @@ u8 CPU::CP_A_D()
 	static u16 result;
 	result = A - D;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (D & 0xF));
-	SetFlag(fC, A < D);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (D & 0xF));
+	SetFlag(CPUFlags::C, A < D);
 
 	return 0;
 }
@@ -2366,10 +2367,10 @@ u8 CPU::CP_A_E()
 	static u16 result;
 	result = A - E;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (E & 0xF));
-	SetFlag(fC, A < E);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (E & 0xF));
+	SetFlag(CPUFlags::C, A < E);
 
 	return 0;
 }
@@ -2379,10 +2380,10 @@ u8 CPU::CP_A_H()
 	static u16 result;
 	result = A - H;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (H & 0xF));
-	SetFlag(fC, A < H);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (H & 0xF));
+	SetFlag(CPUFlags::C, A < H);
 
 	return 0;
 }
@@ -2392,10 +2393,10 @@ u8 CPU::CP_A_L()
 	static u16 result;
 	result = A - L;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (L & 0xF));
-	SetFlag(fC, A < L);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (L & 0xF));
+	SetFlag(CPUFlags::C, A < L);
 
 	return 0;
 }
@@ -2407,10 +2408,10 @@ u8 CPU::CP_A_aHL()
 	data = Read(HL);
 	result = A - data;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (data & 0xF));
-	SetFlag(fC, A < data);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (data & 0xF));
+	SetFlag(CPUFlags::C, A < data);
 
 	return 0;
 }
@@ -2420,10 +2421,10 @@ u8 CPU::CP_A_A()
 	static s16 result;
 	result = A - A;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (A & 0xF));
-	SetFlag(fC, A < A);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (A & 0xF));
+	SetFlag(CPUFlags::C, A < A);
 
 	return 0;
 }
@@ -2437,12 +2438,12 @@ u8 CPU::ADD_A_d8()
 	int noCarrySum = A ^ data;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	A += data;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -2457,12 +2458,12 @@ u8 CPU::SUB_A_d8()
 	static u8 data;
 	data = Read(PC++);
 
-	SetFlag(fN, 1);
-	SetFlag(fC, A < data);
-	SetFlag(fH, (A & 0xF) < (data & 0xF));
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::C, A < data);
+	SetFlag(CPUFlags::H, (A & 0xF) < (data & 0xF));
 
 	A -= data;
-	SetFlag(fZ, A == 0);
+	SetFlag(CPUFlags::Z, A == 0);
 	return 0;
 }
 
@@ -2476,10 +2477,10 @@ u8 CPU::AND_A_d8()
 {
 	A &= Read(PC++);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 1);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 1);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2488,10 +2489,10 @@ u8 CPU::XOR_A_d8()
 {
 	A ^= Read(PC++);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2500,10 +2501,10 @@ u8 CPU::OR_A_d8()
 {
 	A |= Read(PC++);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -2515,10 +2516,10 @@ u8 CPU::CP_A_d8()
 	data = Read(PC++);
 	result = A - data;
 
-	SetFlag(fZ, result == 0);
-	SetFlag(fN, 1);
-	SetFlag(fH, (A & 0xF) < (data & 0xF));
-	SetFlag(fC, A < data);
+	SetFlag(CPUFlags::Z, result == 0);
+	SetFlag(CPUFlags::N, 1);
+	SetFlag(CPUFlags::H, (A & 0xF) < (data & 0xF));
+	SetFlag(CPUFlags::C, A < data);
 
 	return 0;
 }
@@ -2536,9 +2537,9 @@ u8 CPU::ADD_HL_BC()
 	int noCarrySum = HL ^ BC;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x1000);
-	SetFlag(fC, carryBits & 0x10000);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x1000);
+	SetFlag(CPUFlags::C, carryBits & 0x10000);
 
 	HL += BC;
 	return 0;
@@ -2562,9 +2563,9 @@ u8 CPU::ADD_HL_DE()
 	int noCarrySum = HL ^ DE;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x1000);
-	SetFlag(fC, carryBits & 0x10000);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x1000);
+	SetFlag(CPUFlags::C, carryBits & 0x10000);
 
 	HL += DE;
 	return 0;
@@ -2588,9 +2589,9 @@ u8 CPU::ADD_HL_HL()
 	int noCarrySum = HL ^ HL;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x1000);
-	SetFlag(fC, carryBits & 0x10000);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x1000);
+	SetFlag(CPUFlags::C, carryBits & 0x10000);
 
 	HL += HL;
 	return 0;
@@ -2614,9 +2615,9 @@ u8 CPU::ADD_HL_SP()
 	int noCarrySum = HL ^ SP;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x1000);
-	SetFlag(fC, carryBits & 0x10000);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x1000);
+	SetFlag(CPUFlags::C, carryBits & 0x10000);
 
 	HL += SP;
 	return 0;
@@ -2635,10 +2636,10 @@ u8 CPU::ADD_SP_s8()
 	int noCarrySum = SP ^ data;
 	int carryBits = sum ^ noCarrySum; // this sets all bits that carried
 
-	SetFlag(fZ, 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, carryBits & 0x10);
-	SetFlag(fC, carryBits & 0x100);
+	SetFlag(CPUFlags::Z, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, carryBits & 0x10);
+	SetFlag(CPUFlags::C, carryBits & 0x100);
 
 	SP += data;
 	return 0;
@@ -2652,10 +2653,10 @@ u8 CPU::RLCA()
 
 	A = (A << 1) | (u8)bit7;
 
-	SetFlag(fZ, 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2667,10 +2668,10 @@ u8 CPU::RRCA()
 
 	A = (A >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2680,12 +2681,12 @@ u8 CPU::RLA()
 	static bool bit7;
 	bit7 = A & 0b10000000;
 
-	A = (A << 1) | (u8)GetFlag(fC);
+	A = (A << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2695,12 +2696,12 @@ u8 CPU::RRA()
 	static bool bit0;
 	bit0 = A & 0b00000001;
 
-	A = (A >> 1) | ((u8)GetFlag(fC) << 7);
+	A = (A >> 1) | ((u8)GetFlag(CPUFlags::C) << 7);
 
-	SetFlag(fZ, 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2712,10 +2713,10 @@ u8 CPU::RLC_B()
 
 	B = (B << 1) | (u8)bit7;
 	
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 	
 	return 0;
 }
@@ -2727,10 +2728,10 @@ u8 CPU::RLC_C()
 
 	C = (C << 1) | (u8)bit7;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2742,10 +2743,10 @@ u8 CPU::RLC_D()
 
 	D = (D << 1) | (u8)bit7;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2757,10 +2758,10 @@ u8 CPU::RLC_E()
 
 	E = (E << 1) | (u8)bit7;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2772,10 +2773,10 @@ u8 CPU::RLC_H()
 
 	H = (H << 1) | (u8)bit7;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2787,10 +2788,10 @@ u8 CPU::RLC_L()
 
 	L = (L << 1) | (u8)bit7;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2804,10 +2805,10 @@ u8 CPU::RLC_aHL()
 
 	Write(HL, (data << 1) | (u8)bit7);
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2819,10 +2820,10 @@ u8 CPU::RLC_A()
 
 	A = (A << 1) | (u8)bit7;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2834,10 +2835,10 @@ u8 CPU::RRC_B()
 
 	B = (B >> 1) | (bit0 << 7);
 	
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2849,10 +2850,10 @@ u8 CPU::RRC_C()
 
 	C = (C >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2864,10 +2865,10 @@ u8 CPU::RRC_D()
 
 	D = (D >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2879,10 +2880,10 @@ u8 CPU::RRC_E()
 
 	E = (E >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2894,10 +2895,10 @@ u8 CPU::RRC_H()
 
 	H = (H >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2909,10 +2910,10 @@ u8 CPU::RRC_L()
 
 	L = (L >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2926,10 +2927,10 @@ u8 CPU::RRC_aHL()
 
 	Write(HL, (data >> 1) | (bit0 << 7));
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2941,10 +2942,10 @@ u8 CPU::RRC_A()
 
 	A = (A >> 1) | (bit0 << 7);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -2954,12 +2955,12 @@ u8 CPU::RL_B()
 	static bool bit7;
 	bit7 = B & 0b10000000;
 
-	B = (B << 1) | (u8)GetFlag(fC);
+	B = (B << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2969,12 +2970,12 @@ u8 CPU::RL_C()
 	static bool bit7;
 	bit7 = C & 0b10000000;
 
-	C = (C << 1) | (u8)GetFlag(fC);
+	C = (C << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2984,12 +2985,12 @@ u8 CPU::RL_D()
 	static bool bit7;
 	bit7 = D & 0b10000000;
 
-	D = (D << 1) | (u8)GetFlag(fC);
+	D = (D << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -2999,12 +3000,12 @@ u8 CPU::RL_E()
 	static bool bit7;
 	bit7 = E & 0b10000000;
 
-	E = (E << 1) | (u8)GetFlag(fC);
+	E = (E << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3014,12 +3015,12 @@ u8 CPU::RL_H()
 	static bool bit7;
 	bit7 = H & 0b10000000;
 
-	H = (H << 1) | (u8)GetFlag(fC);
+	H = (H << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3029,12 +3030,12 @@ u8 CPU::RL_L()
 	static bool bit7;
 	bit7 = L & 0b10000000;
 
-	L = (L << 1) | (u8)GetFlag(fC);
+	L = (L << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3046,12 +3047,12 @@ u8 CPU::RL_aHL()
 	data = Read(HL);
 	bit7 = data & 0b10000000;
 
-	Write(HL, (data << 1) | (u8)GetFlag(fC));
+	Write(HL, (data << 1) | (u8)GetFlag(CPUFlags::C));
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3061,12 +3062,12 @@ u8 CPU::RL_A()
 	static bool bit7;
 	bit7 = A & 0b10000000;
 
-	A = (A << 1) | (u8)GetFlag(fC);
+	A = (A << 1) | (u8)GetFlag(CPUFlags::C);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3076,12 +3077,12 @@ u8 CPU::RR_B()
 	static bool bit0;
 	bit0 = B & 0b00000001;
 
-	B = (B >> 1) | (u8)GetFlag(fC) << 7;
+	B = (B >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3091,12 +3092,12 @@ u8 CPU::RR_C()
 	static bool bit0;
 	bit0 = C & 0b00000001;
 
-	C = (C >> 1) | (u8)GetFlag(fC) << 7;
+	C = (C >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3106,12 +3107,12 @@ u8 CPU::RR_D()
 	static bool bit0;
 	bit0 = D & 0b00000001;
 
-	D = (D >> 1) | (u8)GetFlag(fC) << 7;
+	D = (D >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3121,12 +3122,12 @@ u8 CPU::RR_E()
 	static bool bit0;
 	bit0 = E & 0b00000001;
 
-	E = (E >> 1) | (u8)GetFlag(fC) << 7;
+	E = (E >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3136,12 +3137,12 @@ u8 CPU::RR_H()
 	static bool bit0;
 	bit0 = H & 0b00000001;
 
-	H = (H >> 1) | (u8)GetFlag(fC) << 7;
+	H = (H >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3151,12 +3152,12 @@ u8 CPU::RR_L()
 	static bool bit0;
 	bit0 = L & 0b00000001;
 
-	L = (L >> 1) | (u8)GetFlag(fC) << 7;
+	L = (L >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3168,12 +3169,12 @@ u8 CPU::RR_aHL()
 	data = Read(HL);
 	bit0 = data & 0b00000001;
 
-	Write(HL, (data >> 1) | (u8)GetFlag(fC) << 7);
+	Write(HL, (data >> 1) | (u8)GetFlag(CPUFlags::C) << 7);
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3183,12 +3184,12 @@ u8 CPU::RR_A()
 	static bool bit0;
 	bit0 = A & 0b00000001;
 
-	A = (A >> 1) | (u8)GetFlag(fC) << 7;
+	A = (A >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3200,10 +3201,10 @@ u8 CPU::SLA_B()
 
 	B <<= 1;
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3215,10 +3216,10 @@ u8 CPU::SLA_C()
 
 	C <<= 1;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3230,10 +3231,10 @@ u8 CPU::SLA_D()
 
 	D <<= 1;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3245,10 +3246,10 @@ u8 CPU::SLA_E()
 
 	E <<= 1;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3260,10 +3261,10 @@ u8 CPU::SLA_H()
 
 	H <<= 1;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3275,10 +3276,10 @@ u8 CPU::SLA_L()
 
 	L <<= 1;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3292,10 +3293,10 @@ u8 CPU::SLA_aHL()
 
 	Write(HL, data << 1);
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3307,10 +3308,10 @@ u8 CPU::SLA_A()
 
 	A <<= 1;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit7);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit7);
 
 	return 0;
 }
@@ -3324,10 +3325,10 @@ u8 CPU::SRA_B()
 
 	B = (B >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3341,10 +3342,10 @@ u8 CPU::SRA_C()
 
 	C = (C >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3358,10 +3359,10 @@ u8 CPU::SRA_D()
 
 	D = (D >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3375,10 +3376,10 @@ u8 CPU::SRA_E()
 
 	E = (E >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3392,10 +3393,10 @@ u8 CPU::SRA_H()
 
 	H = (H >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3409,10 +3410,10 @@ u8 CPU::SRA_L()
 
 	L = (L >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3428,10 +3429,10 @@ u8 CPU::SRA_aHL()
 
 	Write(HL, (data >> 1) | (bit7 << 7));
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3445,10 +3446,10 @@ u8 CPU::SRA_A()
 
 	A = (A >> 1) | (bit7 << 7);
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3462,10 +3463,10 @@ u8 CPU::SWAP_B()
 
 	B = (low << 4) | high;
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3479,10 +3480,10 @@ u8 CPU::SWAP_C()
 
 	C = (low << 4) | high;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3496,10 +3497,10 @@ u8 CPU::SWAP_D()
 
 	D = (low << 4) | high;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3513,10 +3514,10 @@ u8 CPU::SWAP_E()
 
 	E = (low << 4) | high;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3530,10 +3531,10 @@ u8 CPU::SWAP_H()
 
 	H = (low << 4) | high;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3547,10 +3548,10 @@ u8 CPU::SWAP_L()
 
 	L = (low << 4) | high;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3567,10 +3568,10 @@ u8 CPU::SWAP_aHL()
 
 	Write(HL, (low << 4) | high);
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3584,10 +3585,10 @@ u8 CPU::SWAP_A()
 
 	A = (low << 4) | high;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, 0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, 0);
 
 	return 0;
 }
@@ -3599,10 +3600,10 @@ u8 CPU::SRL_B()
 
 	B >>= 1;
 
-	SetFlag(fZ, B == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, B == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3614,10 +3615,10 @@ u8 CPU::SRL_C()
 
 	C >>= 1;
 
-	SetFlag(fZ, C == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, C == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3629,10 +3630,10 @@ u8 CPU::SRL_D()
 
 	D >>= 1;
 
-	SetFlag(fZ, D == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, D == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3644,10 +3645,10 @@ u8 CPU::SRL_E()
 
 	E >>= 1;
 
-	SetFlag(fZ, E == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, E == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3659,10 +3660,10 @@ u8 CPU::SRL_H()
 
 	H >>= 1;
 
-	SetFlag(fZ, H == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, H == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3674,10 +3675,10 @@ u8 CPU::SRL_L()
 
 	L >>= 1;
 
-	SetFlag(fZ, L == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, L == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3691,10 +3692,10 @@ u8 CPU::SRL_aHL()
 
 	Write(HL, data >> 1);
 
-	SetFlag(fZ, Read(HL) == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, Read(HL) == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }
@@ -3706,10 +3707,10 @@ u8 CPU::SRL_A()
 
 	A >>= 1;
 
-	SetFlag(fZ, A == 0);
-	SetFlag(fN, 0);
-	SetFlag(fH, 0);
-	SetFlag(fC, bit0);
+	SetFlag(CPUFlags::Z, A == 0);
+	SetFlag(CPUFlags::N, 0);
+	SetFlag(CPUFlags::H, 0);
+	SetFlag(CPUFlags::C, bit0);
 
 	return 0;
 }

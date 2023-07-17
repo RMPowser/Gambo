@@ -13,6 +13,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <filesystem>
 
 typedef uint64_t u64;
 typedef  int64_t s64;

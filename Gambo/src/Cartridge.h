@@ -1,6 +1,9 @@
 #pragma once
 #include "GamboDefine.h"
 
+class BaseMapper;
+class MBC1;
+
 
 enum class MapperType
 {
@@ -34,8 +37,6 @@ enum class MapperType
 	HuC1_RAM_BATTERY = 0xFF,
 };
 
-class BaseMapper;
-class MBC1;
 
 class Cartridge
 {

@@ -1,11 +1,16 @@
 #pragma once
-
-#include <vector>
-#include <string>
-#include <map>
 #include "GamboDefine.h"
 
-class Bus;
+class GamboCore;
+
+enum class CPUFlags : u8
+{
+	// 0 thru 3 are unused
+	C = (1 << 4), // carry
+	H = (1 << 5), // half carry
+	N = (1 << 6), // subtract
+	Z = (1 << 7), // zero
+};
 
 class CPU
 {
@@ -56,16 +61,7 @@ public:
 	u16 SP = 0x0000; // stack pointer
 	u16 PC = 0x0000; // program counter
 
-	enum Flags
-	{
-		// 0 thru 3 are unused
-		fC = (1 << 4), // carry
-		fH = (1 << 5), // half carry
-		fN = (1 << 6), // subtract
-		fZ = (1 << 7), // zero
-	};
-
-	Bus* bus = nullptr;
+	GamboCore* core = nullptr;
 	int opcode = 0;
 	bool stopMode = false; // set to true by the stop command, set back to false by reset command
 	bool isHalted = false; // set to true by the halt command, set back to false by reset or interrupt
@@ -120,7 +116,7 @@ public:
 	};
 #pragma endregion
 	
-	CPU(Bus* b);
+	CPU(GamboCore* c);
 	~CPU();
 
 	void Clock();
@@ -131,8 +127,8 @@ public:
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
 
-	void SetFlag(Flags f, bool v);
-	bool GetFlag(Flags f);
+	void SetFlag(CPUFlags f, bool v);
+	bool GetFlag(CPUFlags f);
 
 	void Push(const std::same_as<u16> auto data);
 	void Pop(std::same_as<u16> auto& data);
