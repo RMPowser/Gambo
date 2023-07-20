@@ -158,6 +158,7 @@ static inline std::string hex(uint32_t n, uint8_t d)
 
 enum InterruptFlags
 {
+	None	= 0b00000000,
 	VBlank	= 0b00000001,
 	LCDStat	= 0b00000010,
 	Timer	= 0b00000100,
@@ -184,3 +185,14 @@ static SDL_Color GameBoyColors[5]
 };
 
 static const auto DesiredFPS = 60;
+
+constexpr u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask)
+{
+	return (reg & (bitMask << bitIndex)) >> bitIndex;
+}
+
+#if defined NDEBUG
+	#define DebugLog( format, ... )
+#else
+	#define DebugLog( format, ... )   printf( "%s::%s(%d) " format "\n", __FILE__, __FUNCTION__,  __LINE__, __VA_ARGS__ )
+#endif

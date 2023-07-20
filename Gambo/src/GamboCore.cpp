@@ -61,31 +61,34 @@ void GamboCore::Run()
 	using framerate = duration<int, std::ratio<1, DesiredFPS>>;
 	auto timePoint = clock::now() + framerate{1};
 
-	
-	disassemble = true;
-	if (running)
+	if (running || step)
 	{
-		do
+		bool vblank = false;
+		int totalCycles = 0;
+		while (!vblank)
 		{
-			cpu->Tick();
+			int cycles = cpu->RunFor(1);
 			//if (cpu->PC == 0xC000)
 			//{
 			//	running = false;
 			//	goto BREAK;
 			//}
-			ppu->Tick();
-		} while (!ppu->FrameComplete());
+			vblank = ppu->Tick(cycles);
 
+			totalCycles += cycles;
+			if (totalCycles > 702240)
+				vblank = true;
+		}
+
+		step = false;
 		disassemble = true;
 	}
 	else if (step)
 	{
-		do
-		{
-			cpu->Tick();
+		int cycles = cpu->RunFor(1);
 		BREAK:
-			ppu->Tick();
-		} while (!cpu->IsInstructionComplete());
+		ppu->Tick(cycles);
+		
 		step = false;
 		disassemble = true;
 	}
@@ -255,6 +258,19 @@ void GamboCore::Write(u16 addr, u8 data)
 	// normal ram
 	else
 	{
+		if (addr == HWAddr::LCDC)
+		{
+			u8 curr = ram[addr];
+
+			if (!GetBits(curr, (u8)LCDCBits::WindowEnable, 0b1) && GetBits(data, (u8)LCDCBits::WindowEnable, 0b1))
+				ppu->ResetWindowLine();
+
+			if (GetBits(data, (u8)LCDCBits::LCDEnable, 0b1))
+				ppu->Enable();
+			else
+				ppu->Disable();
+		}
+
 		ram[addr] = data;
 
 		// this is the implementation for echo ram

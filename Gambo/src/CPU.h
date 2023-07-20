@@ -18,8 +18,7 @@ public:
 	CPU(GamboCore* c);
 	~CPU();
 
-	void Tick();
-	bool IsInstructionComplete() const;
+	u8 RunFor(u8 ticks);
 	void Reset();
 
 	const u8& GetA() const;
@@ -39,6 +38,8 @@ public:
 	bool GetFlag(CPUFlags f);
 	bool GetIME();
 
+	void RequestInterrupt(InterruptFlags f);
+
 	std::map<u16, std::string> Disassemble(u16 startAddr, int numInstr);
 
 private:
@@ -50,9 +51,10 @@ private:
 	void Push(const std::same_as<u16> auto data);
 	void Pop(std::same_as<u16> auto& data);
 
-	void UpdateTimers();
+	void UpdateTimers(u8 ticks);
 	bool InterruptPending();
-	void HandleInterrupt(InterruptFlags f);
+	InterruptFlags GetPendingInterrupt();
+	bool HandleInterrupt(InterruptFlags f);
 
 	union {	struct { u8 F; u8 A; }; u16 AF; };
 	union { struct { u8 C; u8 B; }; u16 BC; };
@@ -63,17 +65,16 @@ private:
 	u16 PC; // program counter
 
 	GamboCore* core;
-	u8 cycles;
-	int opcode;
 	bool stopMode;					// set to true by the stop command, set back to false by reset command
 	bool isHalted;					// set to true by the halt command, set back to false by reset or interrupt
+	bool haltBug;
+	int unhaltCycles;				
+	int currentCycles;
+	int vblankInterruptCycles;
 	bool IME;						// interrupt master enable flag
-	bool IMEOneInstructionDelay;	// used to delay the effect of EI by one instruction
+	int IMEcycles;					// used to delay the enabling of IME by one instruction
 	int DIVCounter;
 	int TIMACounter;
-	bool TIMAEnabled;
-	u8 TIMAFreqSelect;
-	u16 TIMAFreq;
 
 	// instruction helpers
 	void ADC(const u8 data);

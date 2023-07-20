@@ -3,6 +3,36 @@
 
 class GamboCore;
 
+enum class LCDCBits
+{
+	BGAndWindowEnable = 0,
+	OBJEnable = 1,
+	OBJSize = 2,
+	BGTileMapArea = 3,
+	TileDataArea = 4,
+	WindowEnable = 5,
+	WindowTileMapArea = 6,
+	LCDEnable = 7,
+};
+
+enum class OBPBits
+{
+	OBPColorForIndex1 = 0,
+	OBPColorForIndex2 = 2,
+	OBPColorForIndex3 = 4,
+};
+
+enum class STATBits
+{
+	modeFlag = 0,
+	LYC_equals_LYFlag = 2,
+	Mode0StatInterruptEnable = 3,
+	Mode1StatInterruptEnable = 4,
+	Mode2StatInterruptEnable = 5,
+	LYC_equals_LYStatInterruptEnable = 6,
+	alwaysSet = 7,
+};
+
 enum class PPUMode
 {
 	HBlank, // horizontal blank. 85-208 cycles depending on duration of previous mode 3
@@ -19,26 +49,34 @@ public:
 
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	void Tick();
+	bool Tick(u8 cycles);
 	void Reset();
-	bool FrameComplete() const;
 	const std::array<SDL_Color, GamboScreenSize>& GetScreen() const;
+	void Enable();
+	void Disable();
 	bool IsEnabled() const;
+	void ResetWindowLine();
 	PPUMode GetMode() const;
 	void SetDoDMATransfer(bool b);
 
 private:
-	u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask) const;
+	void CheckForLYCStatInterrupt();
+	void DrawBG(); // draw background
+	void DrawSL(); // draw scanline
 
 	GamboCore* core;
 	PPUMode mode;
 	bool doDMATransfer;
-	int DMATransferCycles;
-	int cycles;
-	bool frameComplete;
-	bool blankOnFirstFrame;
+	int blankFrame;
 	bool isEnabled;
-	bool windowEnabled;
-	int currScanlineCycles;
+	int modeCounter;
+	int modeCounterForVBlank;
+	int lineNumberDuringVBlank;
+	int windowLine;
+	int pixelCounter;
+	int tileCycleCounter;
+	bool scanlineComplete;
+	int LY; // this is read only which is why we keep a local copy and write it into ram
+	int screenEnableDelayCycles;
 	std::array<SDL_Color, GamboScreenSize> screen;
 };

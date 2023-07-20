@@ -46,145 +46,172 @@ void CPU::Write(u16 addr, u8 data)
 	}
 }
 
-void CPU::Tick()
+u8 CPU::RunFor(u8 ticks)
 {
-	if (cycles == 0)
-	{
-		cycles = instructions8bit[0].cycles;
+	int cycles = 0;
 
-		if (isHalted && InterruptPending())
+	while (cycles < ticks)
+	{
+		currentCycles = 0;
+
+		if (isHalted)
 		{
-			isHalted = false;
-		}
-		
-		if (!isHalted)
-		{
-			if (IMEOneInstructionDelay)
+			// count cycles as if NOP during halt
+			currentCycles += 4;
+
+			if (unhaltCycles > 0)
 			{
-				IME = true;
-				IMEOneInstructionDelay = false;
+				if ((unhaltCycles -= currentCycles) <= 0)
+				{
+					unhaltCycles = 0;
+					isHalted = false;
+				}
 			}
 
-			opcode = Read(PC++);
-			if (opcode == 0xCB)
+			if (isHalted && InterruptPending() && unhaltCycles == 0)
 			{
-				// its a 16bit opcode
-				opcode = Read(PC++);
+				unhaltCycles = 12;
+			}
+		}
 
-				// lookup the initial number of clock cycles this instruction takes
-				cycles = instructions16bit[opcode].cycles;
+		bool handledInterrupt = false;
 
-				// execute the instruction and see if we require additional clock cycles
-				cycles += (this->*instructions16bit[opcode].Execute)();
+		if (!isHalted)
+		{
+			if (IME && InterruptPending())
+			{
+				handledInterrupt = HandleInterrupt(GetPendingInterrupt());
 			}
 			else
 			{
-				// lookup the initial number of cycles this instruction takes
-				cycles = instructions8bit[opcode].cycles;
+				u8 opcode = Read(PC++);
+
+				if (haltBug)
+				{
+					haltBug = false;
+					PC--;
+				}
+
+				const std::vector<CPUInstruction>* opcodeTable;
+				if (opcode == 0xCB)
+				{
+					// read the next byte because its a 16 bit opcode
+					opcode = Read(PC++);
+
+					// halt bug applies to both bytes
+					if (haltBug)
+					{
+						haltBug = false;
+						PC--;
+					}
+
+					opcodeTable = &instructions16bit;
+				}
+				else
+				{
+					opcodeTable = &instructions8bit;
+				}
+
+				// lookup the initial number of clock cycles this instruction takes
+				currentCycles = (*opcodeTable)[opcode].cycles;
 
 				// execute the instruction and see if we require additional clock cycles
-				cycles += (this->*instructions8bit[opcode].Execute)();
-			}
-
-
-
-			static u8& IF = core->ram[HWAddr::IF];
-			static u8& IE = core->ram[HWAddr::IE];
-
-			// handle interrupts in priority order
-			if (IF & InterruptFlags::VBlank && IE & InterruptFlags::VBlank)
-			{
-				HandleInterrupt(InterruptFlags::VBlank);
-			}
-			else if (IF & InterruptFlags::LCDStat && IE & InterruptFlags::LCDStat)
-			{
-				HandleInterrupt(InterruptFlags::LCDStat);
-			}
-			else if (IF & InterruptFlags::Timer && IE & InterruptFlags::Timer)
-			{
-				HandleInterrupt(InterruptFlags::Timer);
-			}
-			else if (IF & InterruptFlags::Serial && IE & InterruptFlags::Serial)
-			{
-				HandleInterrupt(InterruptFlags::Serial);
-			}
-			else if (IF & InterruptFlags::Joypad && IE & InterruptFlags::Joypad)
-			{
-				HandleInterrupt(InterruptFlags::Joypad);
+				currentCycles += (this->*(*opcodeTable)[opcode].Execute)();
 			}
 		}
-	}
 
-	cycles--;
-
-	UpdateTimers();
-}
-
-void CPU::HandleInterrupt(InterruptFlags f)
-{
-	static u8& IF = core->ram[HWAddr::IF];
-
-	// give control to the interrupt if IME is enabled
-	if (IME)
-	{
-		IME = false;
-
-		// acknowledge the interrupt
-		IF &= ~(f);
-
-		cycles = 50;
-
-		Push(PC);
-
-		switch (f)
+		if (!handledInterrupt && vblankInterruptCycles > 0)
 		{
-			case VBlank:
-				PC = 0x0040;
-				break;
-
-			case LCDStat:
-				PC = 0x0048;
-				break;
-
-			case Timer:
-				PC = 0x0050;
-				break;
-
-			case Serial:
-				PC = 0x0058;
-				break;
-
-			case Joypad:
-				PC = 0x0060;
-				break;
-
-			default:
-				throw;
+			vblankInterruptCycles = 0;
 		}
+
+		if (!handledInterrupt && IMEcycles > 0)
+		{
+			if ((IMEcycles -= currentCycles) <= 0)
+			{
+				IMEcycles = 0;
+				IME = true;
+			}
+		}
+
+		cycles += currentCycles;
+	}
+
+	UpdateTimers(cycles);
+	return cycles;
+}
+
+void CPU::RequestInterrupt(InterruptFlags f)
+{
+	Write(HWAddr::IF, Read(HWAddr::IF) | f);
+
+	if (f == (u8)InterruptFlags::VBlank)
+	{
+		vblankInterruptCycles = 4;
 	}
 }
 
-void CPU::UpdateTimers()
+
+bool CPU::HandleInterrupt(InterruptFlags f)
+{
+	if (f == InterruptFlags::None)
+		return false;
+	
+	u8& IF = core->ram[HWAddr::IF];
+
+	IME = false;
+
+	// acknowledge the interrupt
+	IF &= ~(f);
+
+	Push(PC);
+
+	switch (f)
+	{
+		case VBlank:
+			vblankInterruptCycles = 0;
+			PC = 0x0040;
+			break;
+
+		case LCDStat:
+			PC = 0x0048;
+			break;
+
+		case Timer:
+			PC = 0x0050;
+			break;
+
+		case Serial:
+			PC = 0x0058;
+			break;
+
+		case Joypad:
+			PC = 0x0060;
+			break;
+
+		default:
+			throw;
+	}
+
+	return true;
+}
+
+void CPU::UpdateTimers(u8 ticks)
 {
 	// DIV register always counts up every 256 clock cycles
-	DIVCounter = (DIVCounter + 1) % 256;
-
-	if (DIVCounter == 0)
-		core->ram[HWAddr::DIV]++; // set directly to prevent reset from Write() logic
-
-
-	// TIMA iterates at a specified frequency and only if it's enabled.
-	u8 TAC = core->Read(HWAddr::TAC);
-	TIMAEnabled = TAC & 0b100;
-	if (TIMAEnabled)
+	if ((DIVCounter += ticks) >= 256)
 	{
-		if (TIMAFreqSelect != (TAC & 0b011))
-		{
-			TIMAFreqSelect = TAC & 0b011;
-			TIMACounter = 0;
-		}
+		DIVCounter -= 256;
+		core->ram[HWAddr::DIV]++; // set directly to prevent reset from Write() logic
+	}
 
-		switch (TIMAFreqSelect)
+	// if TIMA is enabled
+	u8& TAC = core->ram[HWAddr::TAC];
+	if (TAC & 0b100)
+	{
+		int TIMAFreq = 0;
+		// switch on frequency index
+		switch (TAC & 0b011)
 		{
 			case 0b00:
 				TIMAFreq = 1024;
@@ -203,26 +230,53 @@ void CPU::UpdateTimers()
 				break;
 		}
 
-		// iterate TIMA at specified frequency
-		TIMACounter = (TIMACounter + 1) % TIMAFreq;
-		if (TIMACounter == 0)
+		u8& TIMA = core->ram[HWAddr::TIMA];
+		TIMACounter += ticks;
+		while (TIMACounter >= TIMAFreq)
 		{
-			u8& TIMA = core->ram[HWAddr::TIMA];
-			TIMA++;
-			if (TIMA == 0x00)
+			TIMACounter -= TIMAFreq;
+			if (TIMA == 0xFF)
 			{
 				// TIMA resets to TMA register value
 				TIMA = core->Read(HWAddr::TMA);
 				// request timer interrupt
 				core->ram[HWAddr::IF] |= InterruptFlags::Timer;
 			}
+			else
+				TIMA++;
 		}
 	}
 }
 
 bool CPU::InterruptPending()
 {
-	return (core->Read(HWAddr::IE) & core->Read(HWAddr::IF)) != 0;
+	u8 IE = core->Read(HWAddr::IE);
+	u8 IF = core->Read(HWAddr::IF);
+	return (IE & IF & 0b11111) != 0;
+}
+
+InterruptFlags CPU::GetPendingInterrupt()
+{
+	u8 IF = core->ram[HWAddr::IF];
+	u8 IE = core->ram[HWAddr::IE];
+	u8 IE_IF = IE & IF;
+
+	if (IE_IF & InterruptFlags::VBlank)
+		return InterruptFlags::VBlank;
+
+	if (IE_IF & InterruptFlags::LCDStat)
+		return InterruptFlags::LCDStat;
+
+	if (IE_IF & InterruptFlags::Timer)
+		return InterruptFlags::Timer;
+
+	if (IE_IF & InterruptFlags::Serial)
+		return InterruptFlags::Serial;
+
+	if (IE_IF & InterruptFlags::Joypad)
+		return InterruptFlags::Joypad;
+
+	return InterruptFlags::None;
 }
 
 void CPU::ADC(const u8 data)
@@ -260,23 +314,14 @@ void CPU::BIT(u8& reg, int bit)
 	SetFlag(CPUFlags::N, 0);
 }
 
-bool CPU::IsInstructionComplete() const
-{
-	return cycles == 0;
-}
-
 void CPU::Reset()
 {
-	cycles = 0;
-	opcode = 0;
 	IME = false;
 	stopMode = false;
 	isHalted = false;
-	IMEOneInstructionDelay = false;
+	IMEcycles = false;
 	DIVCounter = 0;
 	TIMACounter = 0;
-	TIMAEnabled = true;
-	
 
 	if (core->IsUseBootRom())
 	{
@@ -473,11 +518,8 @@ std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
 
 void CPU::Push(const std::same_as<u16> auto data)
 {
-	static u8 high;
-	static u8 low;
-
-	high = data >> 8;
-	low = data & 0xFF;
+	u8 high = data >> 8;
+	u8 low = data & 0xFF;
 
 	Write(--SP, high);
 	Write(--SP, low);
@@ -485,10 +527,8 @@ void CPU::Push(const std::same_as<u16> auto data)
 
 void CPU::Pop(std::same_as<u16> auto& reg)
 {
-	static u16 high;
-	static u16 low;
-	low = Read(SP++);
-	high = Read(SP++);
+	u16 low = Read(SP++);
+	u16 high = Read(SP++);
 
 	reg = (high << 8) | low;
 }
@@ -562,7 +602,23 @@ u8 CPU::CCF()
 
 u8 CPU::HALT()
 {
-	isHalted = true;
+	if (IMEcycles > 0)
+	{
+		// pending interrupts are triggered before the halt
+		IMEcycles = 0;
+		IME = true;
+		PC--; // go back one instruction so the halt executes again after the interrupt
+	}
+	else
+	{
+		isHalted = true;
+		
+		// the halt instruction will fail to increment the program counter in this case
+		if (!IME && (Read(HWAddr::IF) & Read(HWAddr::IE) & 0x0b11111))
+		{
+			haltBug = true;
+		}
+	}
 
 	return 0;
 }
@@ -570,13 +626,14 @@ u8 CPU::HALT()
 u8 CPU::DI()
 {
 	IME = false;
+	IMEcycles = 0;
 
 	return 0;
 }
 
 u8 CPU::EI()
 {
-	IMEOneInstructionDelay = true;
+	IMEcycles = 8;
 
 	return 0;
 }
@@ -660,13 +717,9 @@ u8 CPU::RET_NZ()
 
 u8 CPU::JP_NZ_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
-
-	addr = (high << 8) | low;
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 	if (!GetFlag(CPUFlags::Z))
 	{
 		PC = addr;
@@ -680,10 +733,8 @@ u8 CPU::JP_NZ_a16()
 
 u8 CPU::JP_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	low = Read(PC++);
-	high = Read(PC++);
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
 
 	PC = (high << 8) | low;
 	return 0;
@@ -691,13 +742,9 @@ u8 CPU::JP_a16()
 
 u8 CPU::CALL_NZ_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
-
-	addr = (high << 8) | low;
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 	if (!GetFlag(CPUFlags::Z))
 	{
 		Push(PC);
@@ -739,13 +786,9 @@ u8 CPU::RET()
 
 u8 CPU::JP_Z_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
-
-	addr = (high << 8) | low;
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 	if (GetFlag(CPUFlags::Z))
 	{
 		PC = addr;
@@ -759,13 +802,9 @@ u8 CPU::JP_Z_a16()
 
 u8 CPU::CALL_Z_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
-
-	addr = (high << 8) | low;
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 	if (GetFlag(CPUFlags::Z))
 	{
 		Push(PC);
@@ -780,13 +819,9 @@ u8 CPU::CALL_Z_a16()
 
 u8 CPU::CALL_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
-
-	addr = (high << 8) | low;
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 	Push(PC);
 	PC = addr;
 
@@ -815,13 +850,10 @@ u8 CPU::RET_NC()
 
 u8 CPU::JP_NC_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 
-	addr = (high << 8) | low;
 	if (!GetFlag(CPUFlags::C))
 	{
 		PC = addr;
@@ -835,13 +867,10 @@ u8 CPU::JP_NC_a16()
 
 u8 CPU::CALL_NC_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 
-	addr = (high << 8) | low;
 	if (!GetFlag(CPUFlags::C))
 	{
 		Push(PC);
@@ -876,21 +905,18 @@ u8 CPU::RET_C()
 
 u8 CPU::RETI()
 {
-	EI();
 	RET();
+	IME = true;
 
 	return 0;
 }
 
 u8 CPU::JP_C_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 
-	addr = (high << 8) | low;
 	if (GetFlag(CPUFlags::C))
 	{
 		PC = addr;
@@ -904,13 +930,10 @@ u8 CPU::JP_C_a16()
 
 u8 CPU::CALL_C_a16()
 {
-	static u16 low = 0;
-	static u16 high = 0;
-	static u16 addr = 0;
-	low = Read(PC++);
-	high = Read(PC++);
+	u16 low = Read(PC++);
+	u16 high = Read(PC++);
+	u16 addr = (high << 8) | low;
 
-	addr = (high << 8) | low;
 	if (GetFlag(CPUFlags::C))
 	{
 		Push(PC);
@@ -1045,8 +1068,7 @@ u8 CPU::LD_aHLdec_A()
 
 u8 CPU::LD_aHL_d8()
 {
-	static u8 data;
-	data = Read(PC++);
+	u8 data = Read(PC++);
 	Write(HL, data);
 	return 0;
 }
@@ -1585,9 +1607,7 @@ u8 CPU::PUSH_AF()
 
 u8 CPU::LD_HL_SPinc_s8()
 {
-	static s8 data;
-	static s16 result8;
-	static int result16;
+	s8 data;
 
 	data = Read(PC++);
 
@@ -1614,8 +1634,7 @@ u8 CPU::LD_SP_HL()
 #pragma region 8bit Arithmetic Instructions
 u8 CPU::INC_B()
 {
-	static int prev;
-	prev = B;
+	int prev = B;
 	B++;
 
 	SetFlag(CPUFlags::Z, B == 0);
@@ -1638,8 +1657,7 @@ u8 CPU::DEC_B()
 
 u8 CPU::INC_C()
 {
-	static int prev;
-	prev = C;
+	int prev = C;
 	C++;
 
 	SetFlag(CPUFlags::Z, C == 0);
@@ -1662,8 +1680,7 @@ u8 CPU::DEC_C()
 
 u8 CPU::INC_D()
 {
-	static int prev;
-	prev = D;
+	int prev = D;
 	D++;
 
 	SetFlag(CPUFlags::Z, D == 0);
@@ -1686,8 +1703,7 @@ u8 CPU::DEC_D()
 
 u8 CPU::INC_E()
 {
-	static int prev;
-	prev = E;
+	int prev = E;
 	E++;
 
 	SetFlag(CPUFlags::Z, E == 0);
@@ -1710,8 +1726,7 @@ u8 CPU::DEC_E()
 
 u8 CPU::INC_H()
 {
-	static int prev;
-	prev = H;
+	int prev = H;
 	H++;
 
 	SetFlag(CPUFlags::Z, H == 0);
@@ -1734,8 +1749,7 @@ u8 CPU::DEC_H()
 
 u8 CPU::INC_L()
 {
-	static int prev;
-	prev = L;
+	int prev = L;
 	L++;
 
 	SetFlag(CPUFlags::Z, L == 0);
@@ -1758,8 +1772,7 @@ u8 CPU::DEC_L()
 
 u8 CPU::INC_aHL()
 {
-	static int prev;
-	prev = Read(HL);
+	int prev = Read(HL);
 	Write(HL, prev + 1);
 
 	SetFlag(CPUFlags::Z, Read(HL) == 0);
@@ -1771,8 +1784,7 @@ u8 CPU::INC_aHL()
 
 u8 CPU::DEC_aHL()
 {
-	static int data;
-	data = Read(HL);
+	int data = Read(HL);
 	Write(HL, --data);
 
 	SetFlag(CPUFlags::Z, data == 0);
@@ -1784,8 +1796,7 @@ u8 CPU::DEC_aHL()
 
 u8 CPU::INC_A()
 {
-	static int prev;
-	prev = A;
+	int prev = A;
 	A++;
 
 	SetFlag(CPUFlags::Z, A == 0);
@@ -2043,8 +2054,7 @@ u8 CPU::SUB_A_L()
 
 u8 CPU::SUB_A_aHL()
 {
-	static u8 data;
-	data = Read(HL);
+	u8 data = Read(HL);
 
 	SetFlag(CPUFlags::N, 1);
 	SetFlag(CPUFlags::H, (A & 0xF) < (data & 0xF));
@@ -2404,8 +2414,7 @@ u8 CPU::OR_A_A()
 
 u8 CPU::CP_A_B()
 {
-	static u16 result;
-	result = A - B;
+	u16 result = A - B;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2417,8 +2426,7 @@ u8 CPU::CP_A_B()
 
 u8 CPU::CP_A_C()
 {
-	static u16 result;
-	result = A - C;
+	u16 result = A - C;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2430,8 +2438,7 @@ u8 CPU::CP_A_C()
 
 u8 CPU::CP_A_D()
 {
-	static u16 result;
-	result = A - D;
+	u16 result = A - D;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2443,8 +2450,7 @@ u8 CPU::CP_A_D()
 
 u8 CPU::CP_A_E()
 {
-	static u16 result;
-	result = A - E;
+	u16 result = A - E;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2456,8 +2462,7 @@ u8 CPU::CP_A_E()
 
 u8 CPU::CP_A_H()
 {
-	static u16 result;
-	result = A - H;
+	u16 result = A - H;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2469,8 +2474,7 @@ u8 CPU::CP_A_H()
 
 u8 CPU::CP_A_L()
 {
-	static u16 result;
-	result = A - L;
+	u16 result = A - L;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2482,10 +2486,8 @@ u8 CPU::CP_A_L()
 
 u8 CPU::CP_A_aHL()
 {
-	static u16 result;
-	static u8 data;
-	data = Read(HL);
-	result = A - data;
+	u8 data = Read(HL);
+	u16 result = A - data;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2497,8 +2499,7 @@ u8 CPU::CP_A_aHL()
 
 u8 CPU::CP_A_A()
 {
-	static s16 result;
-	result = A - A;
+	s16 result = A - A;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2510,8 +2511,7 @@ u8 CPU::CP_A_A()
 
 u8 CPU::ADD_A_d8()
 {
-	static u8 data;
-	data = Read(PC++);
+	u8 data = Read(PC++);
 
 	int sum = A + data;
 	int noCarrySum = A ^ data;
@@ -2534,8 +2534,7 @@ u8 CPU::ADC_A_d8()
 
 u8 CPU::SUB_A_d8()
 {
-	static u8 data;
-	data = Read(PC++);
+	u8 data = Read(PC++);
 
 	SetFlag(CPUFlags::N, 1);
 	SetFlag(CPUFlags::C, A < data);
@@ -2590,10 +2589,8 @@ u8 CPU::OR_A_d8()
 
 u8 CPU::CP_A_d8()
 {
-	static u16 result;
-	static u8 data;
-	data = Read(PC++);
-	result = A - data;
+	u8 data = Read(PC++);
+	u16 result = A - data;
 
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
@@ -2727,8 +2724,7 @@ u8 CPU::ADD_SP_s8()
 #pragma region 8bit bit instructions
 u8 CPU::RLCA()
 {
-	static bool bit7;
-	bit7 = A & 0b10000000;
+	bool bit7 = A & 0b10000000;
 
 	A = (A << 1) | (u8)bit7;
 
@@ -2742,8 +2738,7 @@ u8 CPU::RLCA()
 
 u8 CPU::RRCA()
 {
-	static u8 bit0;
-	bit0 = A & 0b00000001;
+	u8 bit0 = A & 0b00000001;
 
 	A = (A >> 1) | (bit0 << 7);
 
@@ -2757,8 +2752,7 @@ u8 CPU::RRCA()
 
 u8 CPU::RLA()
 {
-	static bool bit7;
-	bit7 = A & 0b10000000;
+	bool bit7 = A & 0b10000000;
 
 	A = (A << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -2772,8 +2766,7 @@ u8 CPU::RLA()
 
 u8 CPU::RRA()
 {
-	static bool bit0;
-	bit0 = A & 0b00000001;
+	bool bit0 = A & 0b00000001;
 
 	A = (A >> 1) | ((u8)GetFlag(CPUFlags::C) << 7);
 
@@ -2787,8 +2780,7 @@ u8 CPU::RRA()
 
 u8 CPU::RLC_B()
 {
-	static bool bit7;
-	bit7 = B & 0b10000000;
+	bool bit7 = B & 0b10000000;
 
 	B = (B << 1) | (u8)bit7;
 	
@@ -2802,8 +2794,7 @@ u8 CPU::RLC_B()
 
 u8 CPU::RLC_C()
 {
-	static bool bit7;
-	bit7 = C & 0b10000000;
+	bool bit7 = C & 0b10000000;
 
 	C = (C << 1) | (u8)bit7;
 
@@ -2817,8 +2808,7 @@ u8 CPU::RLC_C()
 
 u8 CPU::RLC_D()
 {
-	static bool bit7;
-	bit7 = D & 0b10000000;
+	bool bit7 = D & 0b10000000;
 
 	D = (D << 1) | (u8)bit7;
 
@@ -2832,8 +2822,7 @@ u8 CPU::RLC_D()
 
 u8 CPU::RLC_E()
 {
-	static bool bit7;
-	bit7 = E & 0b10000000;
+	bool bit7 = E & 0b10000000;
 
 	E = (E << 1) | (u8)bit7;
 
@@ -2847,8 +2836,7 @@ u8 CPU::RLC_E()
 
 u8 CPU::RLC_H()
 {
-	static bool bit7;
-	bit7 = H & 0b10000000;
+	bool bit7 = H & 0b10000000;
 
 	H = (H << 1) | (u8)bit7;
 
@@ -2862,8 +2850,7 @@ u8 CPU::RLC_H()
 
 u8 CPU::RLC_L()
 {
-	static bool bit7;
-	bit7 = L & 0b10000000;
+	bool bit7 = L & 0b10000000;
 
 	L = (L << 1) | (u8)bit7;
 
@@ -2877,10 +2864,8 @@ u8 CPU::RLC_L()
 
 u8 CPU::RLC_aHL()
 {
-	static bool bit7;
-	static u8 data;
-	data = Read(HL);
-	bit7 = data & 0b10000000;
+	u8 data = Read(HL);
+	bool bit7 = data & 0b10000000;
 
 	Write(HL, (data << 1) | (u8)bit7);
 
@@ -2894,8 +2879,7 @@ u8 CPU::RLC_aHL()
 
 u8 CPU::RLC_A()
 {
-	static bool bit7;
-	bit7 = A & 0b10000000;
+	bool bit7 = A & 0b10000000;
 
 	A = (A << 1) | (u8)bit7;
 
@@ -2909,8 +2893,7 @@ u8 CPU::RLC_A()
 
 u8 CPU::RRC_B()
 {
-	static u8 bit0;
-	bit0 = B & 0b00000001;
+	u8 bit0 = B & 0b00000001;
 
 	B = (B >> 1) | (bit0 << 7);
 	
@@ -2924,8 +2907,7 @@ u8 CPU::RRC_B()
 
 u8 CPU::RRC_C()
 {
-	static u8 bit0;
-	bit0 = C & 0b00000001;
+	u8 bit0 = C & 0b00000001;
 
 	C = (C >> 1) | (bit0 << 7);
 
@@ -2939,8 +2921,7 @@ u8 CPU::RRC_C()
 
 u8 CPU::RRC_D()
 {
-	static u8 bit0;
-	bit0 = D & 0b00000001;
+	u8 bit0 = D & 0b00000001;
 
 	D = (D >> 1) | (bit0 << 7);
 
@@ -2954,8 +2935,7 @@ u8 CPU::RRC_D()
 
 u8 CPU::RRC_E()
 {
-	static u8 bit0;
-	bit0 = E & 0b00000001;
+	u8 bit0 = E & 0b00000001;
 
 	E = (E >> 1) | (bit0 << 7);
 
@@ -2969,8 +2949,7 @@ u8 CPU::RRC_E()
 
 u8 CPU::RRC_H()
 {
-	static u8 bit0;
-	bit0 = H & 0b00000001;
+	u8 bit0 = H & 0b00000001;
 
 	H = (H >> 1) | (bit0 << 7);
 
@@ -2984,8 +2963,7 @@ u8 CPU::RRC_H()
 
 u8 CPU::RRC_L()
 {
-	static u8 bit0;
-	bit0 = L & 0b00000001;
+	u8 bit0 = L & 0b00000001;
 
 	L = (L >> 1) | (bit0 << 7);
 
@@ -2999,10 +2977,8 @@ u8 CPU::RRC_L()
 
 u8 CPU::RRC_aHL()
 {
-	static u8 bit0;
-	static u8 data;
-	data = Read(HL);
-	bit0 = data & 0b00000001;
+	u8 data = Read(HL);
+	u8 bit0 = data & 0b00000001;
 
 	Write(HL, (data >> 1) | (bit0 << 7));
 
@@ -3016,8 +2992,7 @@ u8 CPU::RRC_aHL()
 
 u8 CPU::RRC_A()
 {
-	static u8 bit0;
-	bit0 = A & 0b00000001;
+	u8 bit0  = A & 0b00000001;
 
 	A = (A >> 1) | (bit0 << 7);
 
@@ -3031,8 +3006,7 @@ u8 CPU::RRC_A()
 
 u8 CPU::RL_B()
 {
-	static bool bit7;
-	bit7 = B & 0b10000000;
+	bool bit7 = B & 0b10000000;
 
 	B = (B << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3046,8 +3020,7 @@ u8 CPU::RL_B()
 
 u8 CPU::RL_C()
 {
-	static bool bit7;
-	bit7 = C & 0b10000000;
+	bool bit7 = C & 0b10000000;
 
 	C = (C << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3061,8 +3034,7 @@ u8 CPU::RL_C()
 
 u8 CPU::RL_D()
 {
-	static bool bit7;
-	bit7 = D & 0b10000000;
+	bool bit7 = D & 0b10000000;
 
 	D = (D << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3076,8 +3048,7 @@ u8 CPU::RL_D()
 
 u8 CPU::RL_E()
 {
-	static bool bit7;
-	bit7 = E & 0b10000000;
+	bool bit7 = E & 0b10000000;
 
 	E = (E << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3091,8 +3062,7 @@ u8 CPU::RL_E()
 
 u8 CPU::RL_H()
 {
-	static bool bit7;
-	bit7 = H & 0b10000000;
+	bool bit7 = H & 0b10000000;
 
 	H = (H << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3106,8 +3076,7 @@ u8 CPU::RL_H()
 
 u8 CPU::RL_L()
 {
-	static bool bit7;
-	bit7 = L & 0b10000000;
+	bool bit7 = L & 0b10000000;
 
 	L = (L << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3121,10 +3090,8 @@ u8 CPU::RL_L()
 
 u8 CPU::RL_aHL()
 {
-	static bool bit7;
-	static u8 data;
-	data = Read(HL);
-	bit7 = data & 0b10000000;
+	u8 data = Read(HL);
+	bool bit7 = data & 0b10000000;
 
 	Write(HL, (data << 1) | (u8)GetFlag(CPUFlags::C));
 
@@ -3138,8 +3105,7 @@ u8 CPU::RL_aHL()
 
 u8 CPU::RL_A()
 {
-	static bool bit7;
-	bit7 = A & 0b10000000;
+	bool bit7 = A & 0b10000000;
 
 	A = (A << 1) | (u8)GetFlag(CPUFlags::C);
 
@@ -3153,8 +3119,7 @@ u8 CPU::RL_A()
 
 u8 CPU::RR_B()
 {
-	static bool bit0;
-	bit0 = B & 0b00000001;
+	bool bit0 = B & 0b00000001;
 
 	B = (B >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3168,8 +3133,7 @@ u8 CPU::RR_B()
 
 u8 CPU::RR_C()
 {
-	static bool bit0;
-	bit0 = C & 0b00000001;
+	bool bit0 = C & 0b00000001;
 
 	C = (C >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3183,8 +3147,7 @@ u8 CPU::RR_C()
 
 u8 CPU::RR_D()
 {
-	static bool bit0;
-	bit0 = D & 0b00000001;
+	bool bit0 = D & 0b00000001;
 
 	D = (D >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3198,8 +3161,7 @@ u8 CPU::RR_D()
 
 u8 CPU::RR_E()
 {
-	static bool bit0;
-	bit0 = E & 0b00000001;
+	bool bit0 = E & 0b00000001;
 
 	E = (E >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3213,8 +3175,7 @@ u8 CPU::RR_E()
 
 u8 CPU::RR_H()
 {
-	static bool bit0;
-	bit0 = H & 0b00000001;
+	bool bit0 = H & 0b00000001;
 
 	H = (H >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3228,8 +3189,7 @@ u8 CPU::RR_H()
 
 u8 CPU::RR_L()
 {
-	static bool bit0;
-	bit0 = L & 0b00000001;
+	bool bit0 = L & 0b00000001;
 
 	L = (L >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3243,10 +3203,8 @@ u8 CPU::RR_L()
 
 u8 CPU::RR_aHL()
 {
-	static bool bit0;
-	static u8 data;
-	data = Read(HL);
-	bit0 = data & 0b00000001;
+	u8 data = Read(HL);
+	bool bit0 = data & 0b00000001;
 
 	Write(HL, (data >> 1) | (u8)GetFlag(CPUFlags::C) << 7);
 
@@ -3260,8 +3218,7 @@ u8 CPU::RR_aHL()
 
 u8 CPU::RR_A()
 {
-	static bool bit0;
-	bit0 = A & 0b00000001;
+	bool bit0 = A & 0b00000001;
 
 	A = (A >> 1) | (u8)GetFlag(CPUFlags::C) << 7;
 
@@ -3275,8 +3232,7 @@ u8 CPU::RR_A()
 
 u8 CPU::SLA_B()
 {
-	static bool bit7;
-	bit7 = B & 0b10000000;
+	bool bit7 = B & 0b10000000;
 
 	B <<= 1;
 
@@ -3290,8 +3246,7 @@ u8 CPU::SLA_B()
 
 u8 CPU::SLA_C()
 {
-	static bool bit7;
-	bit7 = C & 0b10000000;
+	bool bit7 = C & 0b10000000;
 
 	C <<= 1;
 
@@ -3305,8 +3260,7 @@ u8 CPU::SLA_C()
 
 u8 CPU::SLA_D()
 {
-	static bool bit7;
-	bit7 = D & 0b10000000;
+	bool bit7 = D & 0b10000000;
 
 	D <<= 1;
 
@@ -3320,8 +3274,7 @@ u8 CPU::SLA_D()
 
 u8 CPU::SLA_E()
 {
-	static bool bit7;
-	bit7 = E & 0b10000000;
+	bool bit7 = E & 0b10000000;
 
 	E <<= 1;
 
@@ -3335,8 +3288,7 @@ u8 CPU::SLA_E()
 
 u8 CPU::SLA_H()
 {
-	static bool bit7;
-	bit7 = H & 0b10000000;
+	bool bit7 = H & 0b10000000;
 
 	H <<= 1;
 
@@ -3350,8 +3302,7 @@ u8 CPU::SLA_H()
 
 u8 CPU::SLA_L()
 {
-	static bool bit7;
-	bit7 = L & 0b10000000;
+	bool bit7 = L & 0b10000000;
 
 	L <<= 1;
 
@@ -3365,10 +3316,8 @@ u8 CPU::SLA_L()
 
 u8 CPU::SLA_aHL()
 {
-	static bool bit7;
-	static u8 data;
-	data = Read(HL);
-	bit7 = data & 0b10000000;
+	u8 data = Read(HL);
+	bool bit7 = data & 0b10000000;
 
 	Write(HL, data << 1);
 
@@ -3382,8 +3331,7 @@ u8 CPU::SLA_aHL()
 
 u8 CPU::SLA_A()
 {
-	static bool bit7;
-	bit7 = A & 0b10000000;
+	bool bit7 = A & 0b10000000;
 
 	A <<= 1;
 
@@ -3397,10 +3345,8 @@ u8 CPU::SLA_A()
 
 u8 CPU::SRA_B()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = B & 0b00000001;
-	bit7 = B & 0b10000000;
+	bool bit0 = B & 0b00000001;
+	bool bit7 = B & 0b10000000;
 
 	B = (B >> 1) | (bit7 << 7);
 
@@ -3414,10 +3360,8 @@ u8 CPU::SRA_B()
 
 u8 CPU::SRA_C()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = C & 0b00000001;
-	bit7 = C & 0b10000000;
+	bool bit0 = C & 0b00000001;
+	bool bit7 = C & 0b10000000;
 
 	C = (C >> 1) | (bit7 << 7);
 
@@ -3431,10 +3375,8 @@ u8 CPU::SRA_C()
 
 u8 CPU::SRA_D()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = D & 0b00000001;
-	bit7 = D & 0b10000000;
+	bool bit0 = D & 0b00000001;
+	bool bit7 = D & 0b10000000;
 
 	D = (D >> 1) | (bit7 << 7);
 
@@ -3448,10 +3390,8 @@ u8 CPU::SRA_D()
 
 u8 CPU::SRA_E()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = E & 0b00000001;
-	bit7 = E & 0b10000000;
+	bool bit0 = E & 0b00000001;
+	bool bit7 = E & 0b10000000;
 
 	E = (E >> 1) | (bit7 << 7);
 
@@ -3465,10 +3405,8 @@ u8 CPU::SRA_E()
 
 u8 CPU::SRA_H()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = H & 0b00000001;
-	bit7 = H & 0b10000000;
+	bool bit0 = H & 0b00000001;
+	bool bit7 = H & 0b10000000;
 
 	H = (H >> 1) | (bit7 << 7);
 
@@ -3482,10 +3420,8 @@ u8 CPU::SRA_H()
 
 u8 CPU::SRA_L()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = L & 0b00000001;
-	bit7 = L & 0b10000000;
+	bool bit0 = L & 0b00000001;
+	bool bit7 = L & 0b10000000;
 
 	L = (L >> 1) | (bit7 << 7);
 
@@ -3499,12 +3435,9 @@ u8 CPU::SRA_L()
 
 u8 CPU::SRA_aHL()
 {
-	static u8 data;
-	static bool bit0;
-	static bool bit7;
-	data = Read(HL);
-	bit0 = data & 0b00000001;
-	bit7 = (data & 0b10000000) >> 7;
+	u8 data = Read(HL);
+	bool bit0 = data & 0b00000001;
+	bool bit7 = (data & 0b10000000) >> 7;
 
 	Write(HL, (data >> 1) | (bit7 << 7));
 
@@ -3518,10 +3451,8 @@ u8 CPU::SRA_aHL()
 
 u8 CPU::SRA_A()
 {
-	static bool bit0;
-	static bool bit7;
-	bit0 = A & 0b00000001;
-	bit7 = A & 0b10000000;
+	bool bit0 = A & 0b00000001;
+	bool bit7 = A & 0b10000000;
 
 	A = (A >> 1) | (bit7 << 7);
 
@@ -3535,10 +3466,8 @@ u8 CPU::SRA_A()
 
 u8 CPU::SWAP_B()
 {
-	static u8 low;
-	static u8 high;
-	low = B & 0b00001111;
-	high = B >> 4;
+	u8 low = B & 0b00001111;
+	u8 high = B >> 4;
 
 	B = (low << 4) | high;
 
@@ -3552,10 +3481,8 @@ u8 CPU::SWAP_B()
 
 u8 CPU::SWAP_C()
 {
-	static u8 low;
-	static u8 high;
-	low = C & 0b00001111;
-	high = C >> 4;
+	u8 low = C & 0b00001111;
+	u8 high = C >> 4;
 
 	C = (low << 4) | high;
 
@@ -3569,10 +3496,8 @@ u8 CPU::SWAP_C()
 
 u8 CPU::SWAP_D()
 {
-	static u8 low;
-	static u8 high;
-	low = D & 0b00001111;
-	high = D >> 4;
+	u8 low = D & 0b00001111;
+	u8 high = D >> 4;
 
 	D = (low << 4) | high;
 
@@ -3586,10 +3511,8 @@ u8 CPU::SWAP_D()
 
 u8 CPU::SWAP_E()
 {
-	static u8 low;
-	static u8 high;
-	low = E & 0b00001111;
-	high = E >> 4;
+	u8 low = E & 0b00001111;
+	u8 high = E >> 4;
 
 	E = (low << 4) | high;
 
@@ -3603,10 +3526,8 @@ u8 CPU::SWAP_E()
 
 u8 CPU::SWAP_H()
 {
-	static u8 low;
-	static u8 high;
-	low = H & 0b00001111;
-	high = H >> 4;
+	u8 low = H & 0b00001111;
+	u8 high = H >> 4;
 
 	H = (low << 4) | high;
 
@@ -3620,10 +3541,8 @@ u8 CPU::SWAP_H()
 
 u8 CPU::SWAP_L()
 {
-	static u8 low;
-	static u8 high;
-	low = L & 0b00001111;
-	high = L >> 4;
+	u8 low = L & 0b00001111;
+	u8 high = L >> 4;
 
 	L = (low << 4) | high;
 
@@ -3637,13 +3556,10 @@ u8 CPU::SWAP_L()
 
 u8 CPU::SWAP_aHL()
 {
-	static u8 data;
-	data = Read(HL);
+	u8 data = Read(HL);
 
-	static u8 low;
-	static u8 high;
-	low = data & 0b00001111;
-	high = data >> 4;
+	u8 low = data & 0b00001111;
+	u8 high = data >> 4;
 
 	Write(HL, (low << 4) | high);
 
@@ -3657,10 +3573,8 @@ u8 CPU::SWAP_aHL()
 
 u8 CPU::SWAP_A()
 {
-	static u8 low;
-	static u8 high;
-	low = A & 0b00001111;
-	high = A >> 4;
+	u8 low = A & 0b00001111;
+	u8 high = A >> 4;
 
 	A = (low << 4) | high;
 
@@ -3674,8 +3588,7 @@ u8 CPU::SWAP_A()
 
 u8 CPU::SRL_B()
 {
-	static bool bit0;
-	bit0 = B & 0b00000001;
+	bool bit0 = B & 0b00000001;
 
 	B >>= 1;
 
@@ -3689,8 +3602,7 @@ u8 CPU::SRL_B()
 
 u8 CPU::SRL_C()
 {
-	static bool bit0;
-	bit0 = C & 0b00000001;
+	bool bit0 = C & 0b00000001;
 
 	C >>= 1;
 
@@ -3704,8 +3616,7 @@ u8 CPU::SRL_C()
 
 u8 CPU::SRL_D()
 {
-	static bool bit0;
-	bit0 = D & 0b00000001;
+	bool bit0 = D & 0b00000001;
 
 	D >>= 1;
 
@@ -3719,8 +3630,7 @@ u8 CPU::SRL_D()
 
 u8 CPU::SRL_E()
 {
-	static bool bit0;
-	bit0 = E & 0b00000001;
+	bool bit0 = E & 0b00000001;
 
 	E >>= 1;
 
@@ -3734,8 +3644,7 @@ u8 CPU::SRL_E()
 
 u8 CPU::SRL_H()
 {
-	static bool bit0;
-	bit0 = H & 0b00000001;
+	bool bit0 = H & 0b00000001;
 
 	H >>= 1;
 
@@ -3749,8 +3658,7 @@ u8 CPU::SRL_H()
 
 u8 CPU::SRL_L()
 {
-	static bool bit0;
-	bit0 = L & 0b00000001;
+	bool bit0 = L & 0b00000001;
 
 	L >>= 1;
 
@@ -3764,10 +3672,8 @@ u8 CPU::SRL_L()
 
 u8 CPU::SRL_aHL()
 {
-	static u8 data;
-	static bool bit0;
-	data = Read(HL);
-	bit0 = data & 0b00000001;
+	u8 data = Read(HL);
+	bool bit0 = data & 0b00000001;
 
 	Write(HL, data >> 1);
 
@@ -3781,8 +3687,7 @@ u8 CPU::SRL_aHL()
 
 u8 CPU::SRL_A()
 {
-	static bool bit0;
-	bit0 = A & 0b00000001;
+	bool bit0 = A & 0b00000001;
 
 	A >>= 1;
 
@@ -3796,7 +3701,6 @@ u8 CPU::SRL_A()
 
 u8 CPU::BIT_0_B()
 {
-
 	BIT(B, 0);
 
 	return 0;
@@ -3839,8 +3743,7 @@ u8 CPU::BIT_0_L()
 
 u8 CPU::BIT_0_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 0);
 
 	return 0;
@@ -3897,8 +3800,7 @@ u8 CPU::BIT_1_L()
 
 u8 CPU::BIT_1_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 1);
 
 	return 0;
@@ -3955,8 +3857,7 @@ u8 CPU::BIT_2_L()
 
 u8 CPU::BIT_2_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 2);
 
 	return 0;
@@ -4013,8 +3914,7 @@ u8 CPU::BIT_3_L()
 
 u8 CPU::BIT_3_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 3);
 
 	return 0;
@@ -4071,8 +3971,7 @@ u8 CPU::BIT_4_L()
 
 u8 CPU::BIT_4_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 4);
 
 	return 0;
@@ -4129,8 +4028,7 @@ u8 CPU::BIT_5_L()
 
 u8 CPU::BIT_5_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 5);
 
 	return 0;
@@ -4187,8 +4085,7 @@ u8 CPU::BIT_6_L()
 
 u8 CPU::BIT_6_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 6);
 
 	return 0;
@@ -4245,8 +4142,7 @@ u8 CPU::BIT_7_L()
 
 u8 CPU::BIT_7_aHL()
 {
-	static u8 data = 0;
-	data = Read(HL);
+	u8 data = Read(HL);
 	BIT(data, 7);
 
 	return 0;
