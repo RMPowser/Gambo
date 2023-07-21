@@ -175,7 +175,7 @@ u8 GamboCore::Read(u16 addr)
 {
 	if (IsBootRomAddress(addr))
 	{
-		return boot->Read(addr);
+		return boot->Read((u8)addr);
 	}
 	else if (IsCartridgeAddress(addr))
 	{
