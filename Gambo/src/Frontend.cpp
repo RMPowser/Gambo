@@ -349,7 +349,7 @@ void Frontend::DrawDebugInfoWindow()
 	);
 	{
 		auto state = gambo->GetState();
-		ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+		//ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 		ImGui::TextColored(WHITE, "FLAGS: ");
 		ImGui::SameLine(); ImGui::TextColored(state.flags.Z ? GREEN : RED, "Z");
 		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.N ? GREEN : RED, "N");
