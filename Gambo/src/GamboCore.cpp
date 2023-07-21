@@ -68,11 +68,6 @@ void GamboCore::Run()
 		while (!vblank)
 		{
 			int cycles = cpu->RunFor(1);
-			//if (cpu->PC == 0xC000)
-			//{
-			//	running = false;
-			//	goto BREAK;
-			//}
 			vblank = ppu->Tick(cycles);
 
 			totalCycles += cycles;
@@ -83,16 +78,8 @@ void GamboCore::Run()
 		step = false;
 		disassemble = true;
 	}
-	else if (step)
-	{
-		int cycles = cpu->RunFor(1);
-		BREAK:
-		ppu->Tick(cycles);
-		
-		step = false;
-		disassemble = true;
-	}
 
+	// limit fps
 	std::this_thread::sleep_until(timePoint - 1ms);
 	while (clock::now() <= timePoint)
 	{
@@ -205,6 +192,10 @@ void GamboCore::InsertCartridge(std::filesystem::path filePath)
 void GamboCore::SetUseBootRom(bool b)
 {
 	useBootRom = b;
+	if (!running)
+	{
+		Reset();
+	}
 }
 
 bool GamboCore::IsUseBootRom()
