@@ -14,10 +14,13 @@ enum class CPUFlags : u8
 
 class CPU
 {
+	CPU() = delete;
+	bool operator==(const CPU& other) const = delete;
+
 public:	
 	CPU(GamboCore* c);
 	~CPU();
-
+	
 	u8 RunFor(u8 ticks);
 	void Reset();
 
