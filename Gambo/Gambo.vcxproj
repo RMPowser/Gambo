@@ -13,6 +13,9 @@
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\bootroms\BootRomDMG.h" />
+    <ClInclude Include="src\bootroms\BootRom.h" />
+    <ClInclude Include="src\RAM.h" />
     <ClInclude Include="src\mappers\MBC1.h" />
     <ClInclude Include="src\mappers\BaseMapper.h" />
     <ClInclude Include="src\Cartridge.h" />
@@ -25,6 +28,8 @@
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="src\ClearColor.h" />
+    <ClCompile Include="src\bootroms\BootRomDMG.cpp" />
+    <ClCompile Include="src\RAM.cpp" />
     <ClCompile Include="src\mappers\MBC1.cpp" />
     <ClCompile Include="src\Cartridge.cpp" />
     <ClCompile Include="imgui\backends\imgui_impl_sdl2.cpp" />
@@ -98,7 +103,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_AMD64_;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\mappers;$(ProjectDir)imgui;$(ProjectDir)imgui\backends;$(ProjectDir)include\imgui;$(SDL2_DIR)\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\mappers;$(ProjectDir)src\bootroms;$(ProjectDir)imgui;$(ProjectDir)imgui\backends;$(ProjectDir)include\imgui;$(SDL2_DIR)\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <FloatingPointModel>Fast</FloatingPointModel>
@@ -123,7 +128,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\mappers;$(ProjectDir)imgui;$(ProjectDir)imgui\backends;$(ProjectDir)include\imgui\backends;$(ProjectDir)include\imgui;$(SDL2_DIR)\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\mappers;$(ProjectDir)src\bootroms;$(ProjectDir)imgui;$(ProjectDir)imgui\backends;$(ProjectDir)include\imgui\backends;$(ProjectDir)include\imgui;$(SDL2_DIR)\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>MaxSpeed</Optimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <FloatingPointModel>Fast</FloatingPointModel>

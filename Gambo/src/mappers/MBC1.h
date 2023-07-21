@@ -6,6 +6,7 @@ class Cartridge;
 class MBC1 :
     public BaseMapper
 {
+    MBC1() = delete;
 public:
 
     MBC1(Cartridge* cart);

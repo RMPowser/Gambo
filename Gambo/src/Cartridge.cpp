@@ -297,10 +297,22 @@ const std::map<std::string, std::string> new_publisher_info =
 
 #pragma warning(push)
 #pragma warning(disable : 26495)
-Cartridge::Cartridge(std::wstring filePath)
-	: mapperNotSupported(false)
+Cartridge::Cartridge()
 {
-	std::ifstream input(filePath, std::ios::binary | std::ios::ate);
+	Reset();
+}
+#pragma warning(pop)
+
+Cartridge::~Cartridge()
+{
+	SAFE_DELETE(mapper);
+}
+
+void Cartridge::Load(std::filesystem::path path)
+{
+	Reset();
+
+	std::ifstream input(path, std::ios::binary | std::ios::ate);
 	if (input.is_open())
 	{
 		input.seekg(0, std::ios::beg);
@@ -324,15 +336,11 @@ Cartridge::Cartridge(std::wstring filePath)
 		rom.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 		input.close();
 
+		isLoaded = true;
+		
 		// init the mapper
 		InitializeMapper();
 	}
-}
-#pragma warning(pop)
-
-Cartridge::~Cartridge()
-{
-	SAFE_DELETE(mapper);
 }
 
 u8 Cartridge::Read(u16 addr) const
@@ -357,8 +365,20 @@ void Cartridge::Write(u16 addr, u8 data)
 	}
 }
 
+void Cartridge::Reset()
+{
+	mapper = nullptr;
+	rom.clear();
+	ram.clear();
+	mapperSupported = false;
+	isLoaded = false;
+}
+
 std::string Cartridge::GetTitle() const
 {
+	if (!isLoaded)
+		return "";
+
 	std::stringstream ss;
 	for (auto c : header.title)
 	{
@@ -373,16 +393,25 @@ std::string Cartridge::GetTitle() const
 
 std::string Cartridge::GetManufacturerCode() const
 {
+	if (!isLoaded)
+		return "";
+
 	return std::string(header.manufacturer_code.begin(), header.manufacturer_code.end());
 }
 
 u8 Cartridge::GetCGBFlag() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return header.cgb_flag;
 }
 
 std::string Cartridge::GetPublisher() const
 {
+	if (!isLoaded)
+		return "";
+
 	if (header.old_publisher_code != 0x33)
 	{
 		return old_publisher_info.at(header.old_publisher_code);
@@ -403,16 +432,25 @@ std::string Cartridge::GetPublisher() const
 
 u8 Cartridge::GetSGBFlag() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return header.sgb_flag;
 }
 
 MapperType Cartridge::GetMapperType() const
 {
+	if (!isLoaded)
+		return MapperType::ROM_ONLY;
+
 	return header.type;
 }
 
 std::string Cartridge::GetMapperTypeAsString() const
 {
+	if (!isLoaded)
+		return "";
+
 	if (MapperTypeToString.contains(header.type))
 		return MapperTypeToString.at(header.type);
 	else
@@ -421,42 +459,66 @@ std::string Cartridge::GetMapperTypeAsString() const
 
 u64 Cartridge::GetRomSize() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return rom_info[header.rom_size].size;
 }
 
 u16 Cartridge::GetRomBanks() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return rom_info[header.rom_size].banks;
 }
 
 u64 Cartridge::GetRamSize() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return ram_info[header.ram_size].size;
 }
 
 u8 Cartridge::GetRamBanks() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return ram_info[header.ram_size].banks;
 }
 
 u8 Cartridge::GetRegionCode() const
 {
+	if (!isLoaded)
+		return 0;
+
 	// 0x00 is japan, 0x01 is everywhere else
 	return header.region_code;
 }
 
 u8 Cartridge::GetRomVersionNumber() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return header.rom_version_number;
 }
 
 u8 Cartridge::GetHeaderChecksum() const
 {
+	if (!isLoaded)
+		return 0;
+
 	return header.header_checksum;
 }
 
 u16 Cartridge::GetGlobalChecksum() const
 {
+	if (!isLoaded)
+		return 0;
+
 	// checksum is big endian
 	u16 checksum = header.global_checksum[0] << 7 | header.global_checksum[1];
 	return checksum;
@@ -464,12 +526,23 @@ u16 Cartridge::GetGlobalChecksum() const
 
 const BaseMapper* Cartridge::GetMapper() const
 {
+	if (!isLoaded)
+		return nullptr;
+
 	return mapper;
 }
 
-bool Cartridge::IsMapperNotSupported() const
+bool Cartridge::IsMapperSupported() const
 {
-	return mapperNotSupported;
+	if (!isLoaded)
+		return false;
+
+	return mapperSupported;
+}
+
+bool Cartridge::IsLoaded() const
+{
+	return isLoaded;
 }
 
 void Cartridge::DeserializeHeader()
@@ -500,6 +573,8 @@ void Cartridge::DeserializeHeader()
 
 void Cartridge::InitializeMapper()
 {
+	mapperSupported = true;
+
 	switch (GetMapperType())
 	{
 		case MapperType::ROM_ONLY:
@@ -514,7 +589,7 @@ void Cartridge::InitializeMapper()
 
 		default:
 			mapper = nullptr;
-			mapperNotSupported = true;
+			mapperSupported = false;
 			break;
 	}
 }

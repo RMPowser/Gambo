@@ -43,13 +43,14 @@ class Cartridge
 	friend class MBC1;
 
 public:
-	Cartridge(std::wstring filePath);
+	Cartridge();
 	~Cartridge();
-
-	Cartridge() = delete;
 	
+	void		Load(std::filesystem::path path);
+
 	u8			Read(u16 addr) const;
 	void		Write(u16 addr, u8 data);
+	void		Reset();
 
 	std::string GetTitle() const;
 	std::string	GetManufacturerCode() const;
@@ -68,7 +69,8 @@ public:
 	u16			GetGlobalChecksum() const;
 
 	const BaseMapper* GetMapper() const;
-	bool IsMapperNotSupported() const;
+	bool IsMapperSupported() const;
+	bool IsLoaded() const;
 
 private:
 	void DeserializeHeader();
@@ -76,9 +78,10 @@ private:
 
 	
 	BaseMapper* mapper;
-	bool mapperNotSupported;
+	bool mapperSupported;
 	std::vector<u8> rom;
 	std::vector<u8> ram;
+	bool isLoaded;
 
 	struct
 	{

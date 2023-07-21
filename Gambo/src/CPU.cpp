@@ -1,6 +1,45 @@
 #include "CPU.h"
 #include "GamboCore.h"
 #include "PPU.h"
+#include "RAM.h"
+
+const u8 OpCodeTiming8Bit[256] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 3, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
+	1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0
+};
+
+const u8 OpCodeTiming16Bit[256] = {
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0,
+	0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0
+};
 
 CPU::CPU(GamboCore* c)
 	: core(c)
@@ -44,6 +83,11 @@ void CPU::Write(u16 addr, u8 data)
 	{
 		core->ppu->SetDoDMATransfer(true);
 	}
+}
+
+u8& CPU::Get(u16 addr)
+{
+	return core->ram->Get(addr);
 }
 
 u8 CPU::RunFor(u8 ticks)
@@ -141,6 +185,8 @@ u8 CPU::RunFor(u8 ticks)
 	return cycles;
 }
 
+#pragma warning(push)
+#pragma warning(disable: 26813)
 void CPU::RequestInterrupt(InterruptFlags f)
 {
 	Write(HWAddr::IF, Read(HWAddr::IF) | f);
@@ -150,14 +196,14 @@ void CPU::RequestInterrupt(InterruptFlags f)
 		vblankInterruptCycles = 4;
 	}
 }
-
+#pragma warning(pop);
 
 bool CPU::HandleInterrupt(InterruptFlags f)
 {
 	if (f == InterruptFlags::None)
 		return false;
 	
-	u8& IF = core->ram[HWAddr::IF];
+	u8& IF = Get(HWAddr::IF);
 
 	IME = false;
 
@@ -202,11 +248,11 @@ void CPU::UpdateTimers(u8 ticks)
 	if ((DIVCounter += ticks) >= 256)
 	{
 		DIVCounter -= 256;
-		core->ram[HWAddr::DIV]++; // set directly to prevent reset from Write() logic
+		Get(HWAddr::DIV)++; // set directly to prevent reset from Write() logic
 	}
 
 	// if TIMA is enabled
-	u8& TAC = core->ram[HWAddr::TAC];
+	u8& TAC = Get(HWAddr::TAC);
 	if (TAC & 0b100)
 	{
 		int TIMAFreq = 0;
@@ -230,7 +276,7 @@ void CPU::UpdateTimers(u8 ticks)
 				break;
 		}
 
-		u8& TIMA = core->ram[HWAddr::TIMA];
+		u8& TIMA = Get(HWAddr::TIMA);
 		TIMACounter += ticks;
 		while (TIMACounter >= TIMAFreq)
 		{
@@ -238,9 +284,8 @@ void CPU::UpdateTimers(u8 ticks)
 			if (TIMA == 0xFF)
 			{
 				// TIMA resets to TMA register value
-				TIMA = core->Read(HWAddr::TMA);
-				// request timer interrupt
-				core->ram[HWAddr::IF] |= InterruptFlags::Timer;
+				TIMA = Read(HWAddr::TMA);
+				RequestInterrupt(InterruptFlags::Timer);
 			}
 			else
 				TIMA++;
@@ -250,15 +295,15 @@ void CPU::UpdateTimers(u8 ticks)
 
 bool CPU::InterruptPending()
 {
-	u8 IE = core->Read(HWAddr::IE);
-	u8 IF = core->Read(HWAddr::IF);
+	u8 IE = Read(HWAddr::IE);
+	u8 IF = Read(HWAddr::IF);
 	return (IE & IF & 0b11111) != 0;
 }
 
 InterruptFlags CPU::GetPendingInterrupt()
 {
-	u8 IF = core->ram[HWAddr::IF];
-	u8 IE = core->ram[HWAddr::IE];
+	u8 IE = Read(HWAddr::IE);
+	u8 IF = Read(HWAddr::IF);
 	u8 IE_IF = IE & IF;
 
 	if (IE_IF & InterruptFlags::VBlank)

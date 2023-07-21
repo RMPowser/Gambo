@@ -187,11 +187,10 @@ void Frontend::OpenGameFromFile(std::filesystem::path filePath)
 {
 	if (filePath.extension() == ".gb")
 	{
-		gambo = std::make_unique<GamboCore>();
 		gambo->InsertCartridge(filePath);
 
 		auto& cart = gambo->GetCartridge();
-		if (cart.IsMapperNotSupported())
+		if (!cart.IsMapperSupported())
 		{
 			std::stringstream ss;
 			ss << "Gambo does not yet implement mapper " << cart.GetMapperTypeAsString() << ".";

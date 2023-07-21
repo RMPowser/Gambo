@@ -2,6 +2,7 @@
 #include "GamboDefine.h"
 #include "GamboCore.h"
 #include "CPU.h"
+#include "RAM.h"
 #include <random>
 
 
@@ -25,11 +26,16 @@ void PPU::Write(u16 addr, u8 data)
 	core->Write(addr, data);
 }
 
+u8& PPU::Get(u16 addr)
+{
+	return core->ram->Get(addr);
+}
+
 bool PPU::Tick(u8 cycles)
 {
-	const u8& LCDC = core->Read(HWAddr::LCDC);
-	const u8& DMA	= core->ram[HWAddr::DMA];
-	u8& STAT		= core->ram[HWAddr::STAT];
+	const u8& LCDC	= Get(HWAddr::LCDC);
+	const u8& DMA	= Get(HWAddr::DMA);
+	u8& STAT		= Get(HWAddr::STAT);
 
 	bool vblank = false;
 
@@ -43,10 +49,9 @@ bool PPU::Tick(u8 cycles)
 		doDMATransfer = false;
 
 		u16 startAddr = DMA << 8;
-		u8 data;
 		for (u16 currAddr = startAddr; currAddr < startAddr + 160; currAddr++)
 		{
-			data = core->Read(currAddr);
+			u8 data = Read(currAddr);
 			Write(HWAddr::OAM + (currAddr - startAddr), data);
 		}
 	}
@@ -165,8 +170,8 @@ bool PPU::Tick(u8 cycles)
 		}
 
 		// write mode to STAT and update LY
-		core->ram[HWAddr::STAT] = (STAT & 0b11111100) | ((u8)mode & 0b11);
-		core->ram[HWAddr::LY] = LY;
+		core->ram->Get(HWAddr::STAT) = (STAT & 0b11111100) | ((u8)mode & 0b11);
+		core->ram->Get(HWAddr::LY) = LY;
 		CheckForLYCStatInterrupt();
 	}
 	else // lcd and ppu are disabled
@@ -187,7 +192,7 @@ bool PPU::Tick(u8 cycles)
 				pixelCounter = 0;
 				tileCycleCounter = 0;
 				
-				core->ram[HWAddr::LY] = LY;
+				core->ram->Get(HWAddr::LY) = LY;
 
 				if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
 					core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
@@ -241,10 +246,10 @@ void PPU::Disable()
 	isEnabled = false;
 	
 	LY = 0;
-	core->ram[HWAddr::LY] = LY;
+	Write(HWAddr::LY, LY);
 
 	mode = PPUMode::HBlank;
-	core->ram[HWAddr::STAT] = (core->ram[HWAddr::STAT] & 0b11111100) | ((u8)mode & 0b11);
+	Write(HWAddr::STAT, (Read(HWAddr::STAT) & 0b11111100) | ((u8)mode & 0b11));
 
 	modeCounter = 0;
 	modeCounterForVBlank = 0;
@@ -258,7 +263,7 @@ bool PPU::IsEnabled() const
 
 void PPU::ResetWindowLine()
 {
-	if (windowLine == 0 && LY < 144 && LY > core->ram[HWAddr::WY])
+	if (windowLine == 0 && LY < 144 && LY > Read(HWAddr::WY))
 		windowLine = 144;
 }
 
@@ -276,8 +281,8 @@ void PPU::CheckForLYCStatInterrupt()
 {
 	if (isEnabled)
 	{
-		const u8& LYC = core->ram[HWAddr::LYC];
-		u8& STAT = core->ram[HWAddr::STAT];
+		const u8& LYC = Read(HWAddr::LYC);
+		u8& STAT = core->ram->Get(HWAddr::STAT);
 
 		if (LY == LYC)
 		{
@@ -294,12 +299,12 @@ void PPU::CheckForLYCStatInterrupt()
 
 void PPU::DrawBG()
 {
-	const u8& LCDC = core->ram[HWAddr::LCDC];
-	const u8& SCY = core->ram[HWAddr::SCY];	// viewport y position
-	const u8& SCX = core->ram[HWAddr::SCX];	// viewport x position
-	const u8& BGP = core->ram[HWAddr::BGP];	// BG pallette data
-	const u8& WY = core->ram[HWAddr::WY];	// window Y position
-	const u8& WX = core->ram[HWAddr::WX];	// window X position + 7
+	const u8 LCDC = Read(HWAddr::LCDC);
+	const u8 SCY = Read(HWAddr::SCY);	// viewport y position
+	const u8 SCX = Read(HWAddr::SCX);	// viewport x position
+	const u8 BGP = Read(HWAddr::BGP);	// BG pallette data
+	const u8 WY = Read(HWAddr::WY);	// window Y position
+	const u8 WX = Read(HWAddr::WX);	// window X position + 7
 
 	const int lineWidth = (LY * GamboScreenWidth);
 
