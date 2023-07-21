@@ -74,6 +74,8 @@ bool PPU::Tick(u8 cycles)
 						if (GetBits(STAT, (u8)STATBits::Mode1StatInterruptEnable, 0b1))
 							core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 
+						vblank = true;
+
 						windowLine = 0;
 					}
 					else
