@@ -196,7 +196,7 @@ void CPU::RequestInterrupt(InterruptFlags f)
 		vblankInterruptCycles = 4;
 	}
 }
-#pragma warning(pop);
+#pragma warning(pop)
 
 bool CPU::HandleInterrupt(InterruptFlags f)
 {
