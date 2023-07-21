@@ -209,10 +209,17 @@ void PPU::Reset()
 {
 	mode = PPUMode::VBlank;
 	doDMATransfer = false;
-	blankFrame = false;
+	blankFrame = true;
 	isEnabled = true;
 	modeCounter = 0;
 	modeCounterForVBlank = 0;
+	lineNumberDuringVBlank = 0;
+	windowLine = 0;
+	pixelCounter = 0;
+	tileCycleCounter = 0;
+	scanlineComplete = false;
+	LY = 0; 
+	screenEnableDelayCycles = 244;
 	screen.fill({ 0, 0, 0, 255 });
 }
 
