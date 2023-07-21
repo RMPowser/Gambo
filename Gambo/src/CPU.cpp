@@ -316,9 +316,13 @@ void CPU::BIT(u8& reg, int bit)
 
 void CPU::Reset()
 {
-	IME = false;
 	stopMode = false;
 	isHalted = false;
+	haltBug = false;
+	unhaltCycles = 0;
+	currentCycles = 0;
+	vblankInterruptCycles = 0;
+	IME = false;
 	IMEcycles = false;
 	DIVCounter = 0;
 	TIMACounter = 0;
@@ -338,7 +342,6 @@ void CPU::Reset()
 		L = 0x00;
 		PC = 0x0000;
 		SP = 0xFFFE;
-		
 	}
 	else
 	{
