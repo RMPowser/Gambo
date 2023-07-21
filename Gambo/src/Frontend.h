@@ -22,6 +22,7 @@ private:
 
 	std::unique_ptr<GamboCore> gambo;
 	SDL_Texture* gamboScreen = nullptr;
+	SDL_Texture* gamboVramView = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 

@@ -69,6 +69,9 @@
     <ClCompile Include="src\bootroms\BootRomDMG.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\VramViewer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ClearColor.h">
@@ -132,6 +135,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\bootroms\BootRomDMG.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VramViewer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

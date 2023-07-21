@@ -4,6 +4,7 @@
 #include "RAM.h"
 #include "Cartridge.h"
 #include "BootRomDMG.h"
+#include "VramViewer.h"
 
 #include <fstream>
 #include <random>
@@ -17,6 +18,7 @@ GamboCore::GamboCore()
 	, ram(new RAM(this))
 	, boot(new BootRomDMG())
 	, cart(new Cartridge())
+	, vram(new VramViewer(ram))
 {
 	Reset();
 }
@@ -67,6 +69,11 @@ void GamboCore::Run()
 const void* GamboCore::GetScreen() const
 {
 	return (void*)ppu->GetScreen().data();
+}
+
+const void* GamboCore::GetVramView() const
+{
+	return (void*)vram->GetView(0x8000).data();
 }
 
 float GamboCore::GetScreenWidth() const

@@ -13,6 +13,7 @@
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\VramViewer.cpp" />
     <ClInclude Include="src\bootroms\BootRomDMG.h" />
     <ClInclude Include="src\bootroms\BootRom.h" />
     <ClInclude Include="src\RAM.h" />
@@ -52,6 +53,7 @@
     <ClInclude Include="src\PPU.h" />
     <ClCompile Include="src\PPU.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClInclude Include="src\VramViewer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

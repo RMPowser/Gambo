@@ -6,6 +6,7 @@ class PPU;
 class RAM;
 class Cartridge;
 class BootRom;
+class VramViewer;
 
 struct GamboState
 {
@@ -48,6 +49,7 @@ public:
 	void Reset();
 
 	const void* GetScreen() const;
+	const void* GetVramView() const;
 	float GetScreenWidth() const;
 	float GetScreenHeight() const;
 	GamboState GetState() const;
@@ -81,6 +83,7 @@ private:
 	RAM* ram;
 	BootRom* boot;
 	Cartridge* cart;
+	VramViewer* vram;
 	
 	float screenWidth = GamboScreenWidth;
 	float screenHeight = GamboScreenHeight;

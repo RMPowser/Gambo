@@ -49,6 +49,9 @@ Frontend::Frontend()
 	gamboScreen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, GamboScreenWidth, GamboScreenHeight);
 	SDL_assert_release(gamboScreen);
 
+	gamboVramView = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 256, 256);
+	SDL_assert_release(gamboScreen);
+
 	clear_color = { 0.45f, 0.55f, 0.60f, 1.00f };
 
 
@@ -215,6 +218,13 @@ void Frontend::DrawGamboWindow()
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 	auto viewport = ImGui::GetMainViewport();
+
+	ImGui::Begin("Vram Viewer");
+	{
+		SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramView(), 256 * BytesPerPixel);
+		ImGui::Image(gamboVramView, { 256, 256 });
+	}
+	ImGui::End();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 	ImGui::SetNextWindowSize({ viewport->Size.x - DebugWindowWidth, viewport->Size.y });
