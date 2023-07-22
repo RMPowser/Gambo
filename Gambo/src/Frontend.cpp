@@ -144,6 +144,7 @@ void Frontend::BeginFrame()
 
 void Frontend::UpdateUI()
 {
+	DrawVramViewer();
 	DrawGamboWindow();
 	DrawDebugInfoWindow();
 	//ImGui::ShowDemoWindow();
@@ -219,140 +220,6 @@ void Frontend::DrawGamboWindow()
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 	auto viewport = ImGui::GetMainViewport();
-
-	static bool show_grid = true;
-	static bool show_screen = true;
-
-	ImGui::Begin("Vram Viewer");
-	{
-		int spacing = 8;
-		int size = 256;
-		int scale = 1;
-
-		ImGui::Checkbox("Show Grid##grid_bg", &show_grid);
-		ImGui::SameLine(); ImGui::Checkbox("Show Screen Rect", &show_screen);
-
-		ImGui::Columns(2, "bg", false);
-		ImGui::SetColumnOffset(1, size + 10.0f);
-
-		ImVec2 p = ImGui::GetCursorScreenPos();
-		ImDrawList* draw_list = ImGui::GetWindowDrawList();
-		ImGuiIO& io = ImGui::GetIO();
-
-		SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramView(), 256 * BytesPerPixel);
-		ImGui::Image(gamboVramView, { 256, 256 });
-
-		if (show_grid)
-		{
-			float x = p.x;
-			for (int n = 0; n <= 32; n++)
-			{
-				draw_list->AddLine(ImVec2(x, p.y), ImVec2(x, p.y + size), ImColor(VERY_DARK_GREY), 1.0f);
-				x += spacing;
-			}
-
-			float y = p.y;
-			for (int n = 0; n <= 32; n++)
-			{
-				draw_list->AddLine(ImVec2(p.x, y), ImVec2(p.x + size, y), ImColor(VERY_DARK_GREY), 1.0f);
-				y += spacing;
-			}
-		}
-
-		if (show_screen)
-		{
-			u8 scroll_x = gambo->Read(0xFF43);
-			u8 scroll_y = gambo->Read(0xFF42);
-
-			float grid_x_max = p.x + size;
-			float grid_y_max = p.y + size;
-
-			float rect_x_min = p.x + (scroll_x * scale);
-			float rect_y_min = p.y + (scroll_y * scale);
-			float rect_x_max = p.x + ((scroll_x + GamboScreenWidth) * scale);
-			float rect_y_max = p.y + ((scroll_y + GamboScreenHeight) * scale);
-
-			float x_overflow = 0.0f;
-			float y_overflow = 0.0f;
-
-			if (rect_x_max > grid_x_max)
-				x_overflow = rect_x_max - grid_x_max;
-			if (rect_y_max > grid_y_max)
-				y_overflow = rect_y_max - grid_y_max;
-
-			ImColor color(MAGENTA);
-			float lineThickness = 2;
-
-			draw_list->AddLine(ImVec2(rect_x_min, rect_y_min), ImVec2(fminf(rect_x_max, grid_x_max), rect_y_min), color, lineThickness);
-			if (x_overflow > 0.0f)
-				draw_list->AddLine(ImVec2(p.x, rect_y_min), ImVec2(p.x + x_overflow, rect_y_min), color, lineThickness);
-
-			draw_list->AddLine(ImVec2(rect_x_min, rect_y_min), ImVec2(rect_x_min, fminf(rect_y_max, grid_y_max)), color, lineThickness);
-			if (y_overflow > 0.0f)
-				draw_list->AddLine(ImVec2(rect_x_min, p.y), ImVec2(rect_x_min, p.y + y_overflow), color, lineThickness);
-
-			draw_list->AddLine(ImVec2(rect_x_min, (y_overflow > 0.0f) ? p.y + y_overflow : rect_y_max), ImVec2(fminf(rect_x_max, grid_x_max), (y_overflow > 0.0f) ? p.y + y_overflow : rect_y_max), color, lineThickness);
-			if (x_overflow > 0.0f)
-				draw_list->AddLine(ImVec2(p.x, (y_overflow > 0.0f) ? p.y + y_overflow : rect_y_max), ImVec2(p.x + x_overflow, (y_overflow > 0.0f) ? p.y + y_overflow : rect_y_max), color, lineThickness);
-
-			draw_list->AddLine(ImVec2((x_overflow > 0.0f) ? p.x + x_overflow : rect_x_max, rect_y_min), ImVec2((x_overflow > 0.0f) ? p.x + x_overflow : rect_x_max, fminf(rect_y_max, grid_y_max)), color, lineThickness);
-			if (y_overflow > 0.0f)
-				draw_list->AddLine(ImVec2((x_overflow > 0.0f) ? p.x + x_overflow : rect_x_max, p.y), ImVec2((x_overflow > 0.0f) ? p.x + x_overflow : rect_x_max, p.y + y_overflow), color, lineThickness);
-		}
-
-		float mouse_x = io.MousePos.x - p.x;
-		float mouse_y = io.MousePos.y - p.y;
-
-		int tile_x = -1;
-		int tile_y = -1;
-
-		if ((mouse_x >= 0.0f) && (mouse_x < size) && (mouse_y >= 0.0f) && (mouse_y < size))
-		{
-			tile_x = (int)mouse_x / spacing;
-			tile_y = (int)mouse_y / spacing;
-
-			draw_list->AddRect(ImVec2(p.x + (tile_x * spacing), p.y + (tile_y * spacing)), ImVec2(p.x + ((tile_x + 1) * spacing), p.y + ((tile_y + 1) * spacing)), ImColor(GREEN), 2.0f, 15, 2.0f);
-
-			ImGui::NextColumn();
-
-			ImGui::Image((void*)(intptr_t)gamboVramView, ImVec2(128.0f, 128.0f), ImVec2((1.0f / 32.0f) * tile_x, (1.0f / 32.0f) * tile_y), ImVec2((1.0f / 32.0f) * (tile_x + 1), (1.0f / 32.0f) * (tile_y + 1)));
-
-			ImGui::TextColored(GREEN, " X:"); ImGui::SameLine();
-			ImGui::Text("$%02X", tile_x); ImGui::SameLine();
-			ImGui::TextColored(GREEN, "   Y:"); ImGui::SameLine();
-			ImGui::Text("$%02X", tile_y);
-
-			u8 LCDC = gambo->Read(0xFF40);
-
-			bool usingWindow = false;
-
-			auto tileMapBitSelect = usingWindow ? LCDCBits::WindowTileMapArea : LCDCBits::BGTileMapArea;
-			int map_start_addr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
-			u16 tile_start_addr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
-			u16 map_addr = map_start_addr + (32 * tile_y) + tile_x;
-
-			ImGui::TextColored(CYAN, " Map Addr: "); ImGui::SameLine();
-			ImGui::Text("$%04X", map_addr);
-
-			int map_tile = 0;
-
-			if (tile_start_addr == 0x8800)
-			{
-				map_tile = static_cast<s8> (gambo->Read(map_addr));
-				map_tile += 128;
-			}
-			else
-			{
-				map_tile = gambo->Read(map_addr);
-			}
-
-			ImGui::TextColored(CYAN, " Tile Addr:"); ImGui::SameLine();
-			ImGui::Text("$%04X", tile_start_addr + (map_tile << 4));
-			ImGui::TextColored(CYAN, " Tile Number:"); ImGui::SameLine();
-			ImGui::Text("$%02X", map_tile);
-		}
-	}
-	ImGui::End();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 	ImGui::SetNextWindowSize({ viewport->Size.x - DebugWindowWidth, viewport->Size.y });
@@ -515,6 +382,144 @@ void Frontend::DrawDebugInfoWindow()
 	}
 	ImGui::End();
 	ImGui::PopStyleVar(1);
+}
+
+void Frontend::DrawVramViewer()
+{
+	static bool showGrid = true;
+	static bool showScreen = true;
+
+	ImGui::Begin("Vram Viewer");
+	{
+		int gridSpacing = 8;
+		int vramViewWidth = 256;
+		int pixelScale = 1;
+
+		ImGui::Checkbox("Show Grid##grid_bg", &showGrid);
+		ImGui::SameLine(); ImGui::Checkbox("Show Screen Rect", &showScreen);
+
+		ImGui::Columns(2, "bg", true);
+		ImGui::SetColumnOffset(1, vramViewWidth + 10.0f);
+
+		ImVec2 imguiCursorPos = ImGui::GetCursorScreenPos();
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		ImGuiIO& io = ImGui::GetIO();
+
+		SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramView(), 256 * BytesPerPixel);
+		ImGui::Image(gamboVramView, { 256, 256 });
+
+		if (showGrid)
+		{
+			float x = imguiCursorPos.x;
+			for (int n = 0; n <= 32; n++)
+			{
+				drawList->AddLine(ImVec2(x, imguiCursorPos.y), ImVec2(x, imguiCursorPos.y + vramViewWidth), ImColor(VERY_DARK_GREY), 1.0f);
+				x += gridSpacing;
+			}
+
+			float y = imguiCursorPos.y;
+			for (int n = 0; n <= 32; n++)
+			{
+				drawList->AddLine(ImVec2(imguiCursorPos.x, y), ImVec2(imguiCursorPos.x + vramViewWidth, y), ImColor(VERY_DARK_GREY), 1.0f);
+				y += gridSpacing;
+			}
+		}
+
+		if (showScreen)
+		{
+			u8 SCX = gambo->Read(HWAddr::SCX);
+			u8 SCY = gambo->Read(HWAddr::SCY);
+
+			float gridMaxX = imguiCursorPos.x + vramViewWidth;
+			float gridMaxY = imguiCursorPos.y + vramViewWidth;
+
+			float rectMinX = imguiCursorPos.x + (SCX * pixelScale);
+			float rectMinY = imguiCursorPos.y + (SCY * pixelScale);
+			float rectMaxX = imguiCursorPos.x + ((SCX + GamboScreenWidth) * pixelScale);
+			float rectMaxY = imguiCursorPos.y + ((SCY + GamboScreenHeight) * pixelScale);
+
+			float overflowX = 0.0f;
+			float overflowY = 0.0f;
+
+			if (rectMaxX > gridMaxX)
+				overflowX = rectMaxX - gridMaxX;
+			if (rectMaxY > gridMaxY)
+				overflowY = rectMaxY - gridMaxY;
+
+			ImColor color(MAGENTA);
+			float lineThickness = 2;
+
+			drawList->AddLine(ImVec2(rectMinX, rectMinY), ImVec2(fminf(rectMaxX, gridMaxX), rectMinY), color, lineThickness);
+			if (overflowX > 0.0f)
+				drawList->AddLine(ImVec2(imguiCursorPos.x, rectMinY), ImVec2(imguiCursorPos.x + overflowX, rectMinY), color, lineThickness);
+
+			drawList->AddLine(ImVec2(rectMinX, rectMinY), ImVec2(rectMinX, fminf(rectMaxY, gridMaxY)), color, lineThickness);
+			if (overflowY > 0.0f)
+				drawList->AddLine(ImVec2(rectMinX, imguiCursorPos.y), ImVec2(rectMinX, imguiCursorPos.y + overflowY), color, lineThickness);
+
+			drawList->AddLine(ImVec2(rectMinX, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), ImVec2(fminf(rectMaxX, gridMaxX), (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), color, lineThickness);
+			if (overflowX > 0.0f)
+				drawList->AddLine(ImVec2(imguiCursorPos.x, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), ImVec2(imguiCursorPos.x + overflowX, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), color, lineThickness);
+
+			drawList->AddLine(ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, rectMinY), ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, fminf(rectMaxY, gridMaxY)), color, lineThickness);
+			if (overflowY > 0.0f)
+				drawList->AddLine(ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, imguiCursorPos.y), ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, imguiCursorPos.y + overflowY), color, lineThickness);
+		}
+
+		float mouseX = io.MousePos.x - imguiCursorPos.x;
+		float mouseY = io.MousePos.y - imguiCursorPos.y;
+
+		int tileX = -1;
+		int tileY = -1;
+
+		if ((mouseX >= 0.0f) && (mouseX < vramViewWidth) && (mouseY >= 0.0f) && (mouseY < vramViewWidth))
+		{
+			tileX = (int)mouseX / gridSpacing;
+			tileY = (int)mouseY / gridSpacing;
+
+			drawList->AddRect(ImVec2(imguiCursorPos.x + (tileX * gridSpacing), imguiCursorPos.y + (tileY * gridSpacing)), ImVec2(imguiCursorPos.x + ((tileX + 1) * gridSpacing), imguiCursorPos.y + ((tileY + 1) * gridSpacing)), ImColor(GREEN), 2.0f, 15, 2.0f);
+
+			ImGui::NextColumn();
+
+			ImGui::Image((void*)(intptr_t)gamboVramView, ImVec2(128.0f, 128.0f), ImVec2((1.0f / 32.0f) * tileX, (1.0f / 32.0f) * tileY), ImVec2((1.0f / 32.0f) * (tileX + 1), (1.0f / 32.0f) * (tileY + 1)));
+
+			ImGui::TextColored(GREEN, "X:"); 
+			ImGui::SameLine(); ImGui::Text("$%02X", tileX); 
+			ImGui::SameLine(); ImGui::TextColored(GREEN, "Y:"); 
+			ImGui::SameLine(); ImGui::Text("$%02X", tileY);
+
+			u8 LCDC = gambo->Read(HWAddr::LCDC);
+
+			bool usingWindow = false;
+
+			auto tileMapBitSelect = usingWindow ? LCDCBits::WindowTileMapArea : LCDCBits::BGTileMapArea;
+			int tileMapBaseAddr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
+			u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
+			u16 mapAddr = tileMapBaseAddr + (32 * tileY) + tileX;
+
+			ImGui::TextColored(CYAN, "Map Addr: "); ImGui::SameLine();
+			ImGui::Text("$%04X", mapAddr);
+
+			int tileIndex = 0;
+
+			if (tileDataBaseAddr == 0x8800)
+			{
+				tileIndex = static_cast<s8> (gambo->Read(mapAddr));
+				tileIndex += 128;
+			}
+			else
+			{
+				tileIndex = gambo->Read(mapAddr);
+			}
+
+			ImGui::TextColored(CYAN, "Tile Addr:"); 
+			ImGui::SameLine(); ImGui::Text("$%04X", tileDataBaseAddr + (tileIndex << 4));
+
+			ImGui::TextColored(CYAN, "Tile Number:"); 
+			ImGui::SameLine(); ImGui::Text("$%02X", tileIndex);
+		}
+	}
+	ImGui::End();
 }
 
 void Frontend::SetGamboRunning()

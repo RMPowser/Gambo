@@ -33,6 +33,7 @@ private:
 	// helpers
 	void DrawGamboWindow();
 	void DrawDebugInfoWindow();
+	void DrawVramViewer();
 	void SetGamboRunning();
 	void SetGamboStep();
 };
