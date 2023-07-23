@@ -326,6 +326,7 @@ void Cartridge::Load(std::filesystem::path path)
 			input >> std::noskipws >> rom[i];
 		}
 		DeserializeHeader();
+		isLoaded = true;
 
 		// set rom and ram sizes according to the header
 		rom.resize(GetRomSize());
@@ -336,7 +337,6 @@ void Cartridge::Load(std::filesystem::path path)
 		rom.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 		input.close();
 
-		isLoaded = true;
 		
 		// init the mapper
 		InitializeMapper();
