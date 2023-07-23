@@ -1,5 +1,4 @@
 #include "Frontend.h"
-#include "GamboCore.h"
 
 int main(int argc, char* argv[])
 {
