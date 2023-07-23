@@ -27,9 +27,6 @@
     <ClCompile Include="src\FileDialogs_Windows.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ClearColor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Frontend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -74,9 +71,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\ClearColor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\CPU.h">
       <Filter>Header Files</Filter>
     </ClInclude>

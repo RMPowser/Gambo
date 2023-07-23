@@ -1,12 +1,19 @@
 #include "Frontend.h"
 #include "GamboDefine.h"
 #include "Cartridge.h"
-#include "ClearColor.h"
+//#include "ClearColor.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include <sstream>
 #include <exception>
 #include "PPU.h"
+
+ImVec4 clear_color;
+constexpr auto MainWindowTitle = "Gambo";
+constexpr auto GamboWindowTitle = "Gambo Window";
+constexpr auto CPUInfoWindowTitle = "Debug Info";
+constexpr auto VramViewerWindowTitle = "Vram Viewer";
+bool debugMode = false;
 
 Frontend::Frontend()
 {
@@ -28,19 +35,21 @@ Frontend::Frontend()
 	style.WindowBorderSize = 0;
 	style.WindowPadding = { 10, 10 };
 	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
+	clear_color = BLACK;
 
 
 	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) == 0);
 
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
-	float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (DebugWindowWidth);
-	float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2) + 13;
-	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, (int)windowW, (int)windowH, window_flags);
+	int menuBarHeight = ImGui::GetFontSize() + (style.FramePadding.y * 2);
+	int windowSizeX = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
+	int windowSizeY = (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight + 13; // pls dont ask where the extra 13 pixels comes from...
+	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, window_flags);
 	SDL_assert_release(window);
 	
-	windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1) + (DebugWindowWidth);
-	windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + (ImGui::GetFontSize() + (style.FramePadding.y * 2) + 13);
-	SDL_SetWindowMinimumSize(window, (int)windowW, (int)windowH);
+	windowSizeX = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1);
+	windowSizeY = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + menuBarHeight + 13;
+	SDL_SetWindowMinimumSize(window, windowSizeX, windowSizeY);
 
 	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
 
@@ -53,7 +62,6 @@ Frontend::Frontend()
 	gamboVramView = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 256, 256);
 	SDL_assert_release(gamboScreen);
 
-	clear_color = { 0.45f, 0.55f, 0.60f, 1.00f };
 
 
 	// Setup Platform/Renderer backends
@@ -140,18 +148,25 @@ void Frontend::BeginFrame()
 	ImGui_ImplSDLRenderer2_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
 	ImGui::NewFrame();
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 }
 
 void Frontend::UpdateUI()
 {
-	DrawVramViewer();
 	DrawGamboWindow();
-	DrawDebugInfoWindow();
+	if (debugMode)
+	{
+		DrawCPUInfoWindow();
+		DrawVramViewer();
+	}
 	//ImGui::ShowDemoWindow();
 }
 
 void Frontend::EndFrame()
 {
+	ImGui::PopStyleVar(1);
+	
 	auto& io = ImGui::GetIO();
 
 	// Rendering
@@ -221,11 +236,20 @@ void Frontend::DrawGamboWindow()
 	auto& style = ImGui::GetStyle();
 	auto viewport = ImGui::GetMainViewport();
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-	ImGui::SetNextWindowSize({ viewport->Size.x - DebugWindowWidth, viewport->Size.y });
-	ImGui::SetNextWindowPos({ 0, 0 });
-	ImGui::Begin(GamboWindowTitle, 0,
+	auto gamboWindowFlags = debugMode
+		?
 		ImGuiWindowFlags_AlwaysAutoResize |
+		//ImGuiWindowFlags_NoBackground |
+		ImGuiWindowFlags_NoResize |
+		//ImGuiWindowFlags_NoTitleBar |
+		//ImGuiWindowFlags_NoDecoration |
+		//ImGuiWindowFlags_NoCollapse |
+		//ImGuiWindowFlags_NoMove |
+		//ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_MenuBar
+		//ImGuiWindowFlags_NoBringToFrontOnFocus
+		:
+		//ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoTitleBar |
@@ -235,8 +259,13 @@ void Frontend::DrawGamboWindow()
 		ImGuiWindowFlags_NoSavedSettings |
 		ImGuiWindowFlags_MenuBar |
 		ImGuiWindowFlags_NoBringToFrontOnFocus
-	);
+		;
+
+	ImGui::Begin(GamboWindowTitle, 0, gamboWindowFlags);
 	{
+		static auto windowSize = ImGui::GetWindowSize();
+		int menuBarHeight = ImGui::GetFontSize() + (style.FramePadding.y * 2);
+		int titleBarHeight = menuBarHeight;
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -264,9 +293,13 @@ void Frontend::DrawGamboWindow()
 
 			if (ImGui::BeginMenu("Options"))
 			{
+				ImGui::Separator();
+				
 				static bool useBootRom = gambo->IsUseBootRom();
 				if (ImGui::MenuItem("Use Boot Rom", nullptr, &useBootRom))
 					gambo->SetUseBootRom(useBootRom);
+
+				ImGui::Separator();
 
 				ImGui::MenuItem("IntegerScale", nullptr, &integerScale);
 				maintainAspectRatio = integerScale ? true : maintainAspectRatio;
@@ -288,69 +321,83 @@ void Frontend::DrawGamboWindow()
 						if (ImGui::MenuItem(ss.str().c_str(), nullptr, &scale[i]))
 						{
 							PixelScale = i + 1;
-							float windowW = (style.WindowPadding.x * 2) + (GamboScreenWidth * PixelScale) + (DebugWindowWidth);
-							float windowH = (style.WindowPadding.y * 2) + (GamboScreenHeight * PixelScale) + (ImGui::GetFontSize() + style.FramePadding.y * 2);
-							SDL_RestoreWindow(window);
-							SDL_SetWindowSize(window, (int)windowW, (int)windowH);
+							windowSize.x = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
+							windowSize.y = !debugMode
+								? (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight
+								: (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight + titleBarHeight + 13;
+							ImGui::SetWindowSize(windowSize);
+
+							if (!debugMode)
+							{
+								SDL_RestoreWindow(window);
+								SDL_SetWindowSize(window, windowSize.x, windowSize.y);
+							}
 						}
 					}
 					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
 			}
+
+			if (ImGui::Checkbox("Debug Mode", &debugMode))
+			{
+				SDL_MaximizeWindow(window);
+			}
+
 			ImGui::EndMenuBar();
 		}
 
-		// maintain aspect ratio during scaling
-		ImVec2 gamboSize = { viewport->Size.x - DebugWindowWidth - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - (ImGui::GetFontSize() + style.FramePadding.y * 2) };
+		ImVec2 gamboScreenSize = !debugMode 
+			? ImVec2(viewport->Size.x - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - menuBarHeight)
+			: ImVec2(windowSize.x - (style.WindowPadding.x * 2), windowSize.y - (style.WindowPadding.y * 2) - menuBarHeight - titleBarHeight);
 
 		if (integerScale)
 		{
-			gamboSize.x -= int(gamboSize.x) % GamboScreenWidth;
-			gamboSize.y -= int(gamboSize.y) % GamboScreenHeight;
+			gamboScreenSize.x -= (int)gamboScreenSize.x % GamboScreenWidth;
+			gamboScreenSize.y -= (int)gamboScreenSize.y % GamboScreenHeight;
 		}
 
 		if (maintainAspectRatio)
 		{
-			float aspect = gamboSize.x / gamboSize.y;
+			float aspect = gamboScreenSize.x / gamboScreenSize.y;
 			if (aspect > GamboAspectRatio)
-				gamboSize.x = gamboSize.y * GamboAspectRatio;
+				gamboScreenSize.x = gamboScreenSize.y * GamboAspectRatio;
 			else if (aspect < GamboAspectRatio)
-				gamboSize.y = gamboSize.x * (1 / GamboAspectRatio);
+				gamboScreenSize.y = gamboScreenSize.x * (1 / GamboAspectRatio);
 		}
+		
 
-		PixelScale = std::max((int)gamboSize.x / GamboScreenWidth, 1);
-		PixelScale = std::min(PixelScale, PixelScaleMax);
-
-		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboSize) * 0.5f);
+		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboScreenSize) * 0.5f);
 		SDL_UpdateTexture(gamboScreen, NULL, gambo->GetScreen(), GamboScreenWidth * BytesPerPixel);
-		ImGui::Image(gamboScreen, gamboSize);
+		ImGui::Image(gamboScreen, gamboScreenSize);
+
+		if (!debugMode)
+		{
+			// update PixelScale if the window was resized
+			PixelScale = std::max((int)gamboScreenSize.x / GamboScreenWidth, 1);
+			PixelScale = std::min(PixelScale, PixelScaleMax);
+
+			// set the window size to match gambo screen
+			windowSize = { gamboScreenSize.x + (style.WindowPadding.x * 2), gamboScreenSize.y + (style.WindowPadding.y * 2) + menuBarHeight };
+			ImGui::SetWindowSize(viewport->Size);
+			ImGui::SetWindowPos({ 0, 0 });
+		}
 	}
+
+
+	//auto windowPos = ImGui::GetWindowPos();
+	//auto windowSize = ImGui::GetCurrentWindow()->DC.CursorMaxPos - windowPos + (style.WindowPadding * 2);
+
 	ImGui::End();
-	ImGui::PopStyleVar(1);
 }
 
-void Frontend::DrawDebugInfoWindow()
+void Frontend::DrawCPUInfoWindow()
 {
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 	auto viewport = ImGui::GetMainViewport();
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
-	ImGui::SetNextWindowSize({ DebugWindowWidth, viewport->Size.y });
-	ImGui::SetNextWindowPos({ viewport->Size.x - DebugWindowWidth, 0 });
-	ImGui::Begin(DebugInfoWindowTitle, 0,
-		//ImGuiWindowFlags_AlwaysAutoResize |
-		//ImGuiWindowFlags_NoBackground |
-		ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_NoCollapse |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoSavedSettings |
-		//ImGuiWindowFlags_MenuBar |
-		ImGuiWindowFlags_NoBringToFrontOnFocus
-	);
+	ImGui::Begin(CPUInfoWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
 	{
 		auto state = gambo->GetState();
 		//ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
@@ -359,7 +406,6 @@ void Frontend::DrawDebugInfoWindow()
 		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.N ? GREEN : RED, "N");
 		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.H ? GREEN : RED, "H");
 		ImGui::SameLine(0, 1); ImGui::TextColored(state.flags.C ? GREEN : RED, "C");
-		ImGui::Text("");
 		ImGui::TextColored(WHITE, "AF: 0x%.2X%.2X", state.registers.A, state.registers.F);
 		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "LCDC: 0x%.2X", state.LCDC);
 		ImGui::TextColored(WHITE, "BC: 0x%.2X%.2X", state.registers.B, state.registers.C);
@@ -372,7 +418,8 @@ void Frontend::DrawDebugInfoWindow()
 		ImGui::SameLine(0, 35); ImGui::TextColored(WHITE, "IF:   0x%.2X", state.IF);
 		ImGui::TextColored(CYAN, "PC: 0x%.4X", state.PC);
 
-		ImGui::Text("");
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
 		bool first = true;
 		for (auto& line : state.mapAsm)
 		{
@@ -380,108 +427,118 @@ void Frontend::DrawDebugInfoWindow()
 			first = false;
 		}
 	}
+
 	ImGui::End();
-	ImGui::PopStyleVar(1);
 }
 
 void Frontend::DrawVramViewer()
 {
+	auto& io = ImGui::GetIO();
+	auto& style = ImGui::GetStyle();
+	auto viewport = ImGui::GetMainViewport();
+	
 	static bool showGrid = true;
 	static bool showScreen = true;
-
-	ImGui::Begin("Vram Viewer");
+	ImGui::Begin(VramViewerWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
 	{
 		int gridSpacing = 8;
-		int vramViewWidth = 256;
+		float vramViewWidth = 256;
 		int pixelScale = 1;
 
-		ImGui::Checkbox("Show Grid##grid_bg", &showGrid);
+		ImGui::Checkbox("Show Grid", &showGrid);
 		ImGui::SameLine(); ImGui::Checkbox("Show Screen Rect", &showScreen);
 
-		ImGui::Columns(2, "bg", true);
-		ImGui::SetColumnOffset(1, vramViewWidth + 10.0f);
-
-		ImVec2 imguiCursorPos = ImGui::GetCursorScreenPos();
-		ImDrawList* drawList = ImGui::GetWindowDrawList();
-		ImGuiIO& io = ImGui::GetIO();
-
-		SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramView(), 256 * BytesPerPixel);
-		ImGui::Image(gamboVramView, { 256, 256 });
-
-		if (showGrid)
+		if (ImGui::BeginTable("table1", 2))
 		{
-			float x = imguiCursorPos.x;
-			for (int n = 0; n <= 32; n++)
+			ImGui::TableSetupColumn("col0", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("col1", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+
+			ImVec2 imguiCursorPos = ImGui::GetCursorScreenPos();
+			ImDrawList* drawList = ImGui::GetWindowDrawList();
+			ImGuiIO& io = ImGui::GetIO();
+
+			SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramView(), vramViewWidth * BytesPerPixel);
+			ImGui::Image(gamboVramView, { vramViewWidth, vramViewWidth });
+
+			if (showGrid)
 			{
-				drawList->AddLine(ImVec2(x, imguiCursorPos.y), ImVec2(x, imguiCursorPos.y + vramViewWidth), ImColor(VERY_DARK_GREY), 1.0f);
-				x += gridSpacing;
+				float x = imguiCursorPos.x;
+				for (int n = 0; n <= 32; n++)
+				{
+					drawList->AddLine(ImVec2(x, imguiCursorPos.y), ImVec2(x, imguiCursorPos.y + vramViewWidth), ImColor(VERY_DARK_GREY), 1.0f);
+					x += gridSpacing;
+				}
+
+				float y = imguiCursorPos.y;
+				for (int n = 0; n <= 32; n++)
+				{
+					drawList->AddLine(ImVec2(imguiCursorPos.x, y), ImVec2(imguiCursorPos.x + vramViewWidth, y), ImColor(VERY_DARK_GREY), 1.0f);
+					y += gridSpacing;
+				}
 			}
 
-			float y = imguiCursorPos.y;
-			for (int n = 0; n <= 32; n++)
+			if (showScreen)
 			{
-				drawList->AddLine(ImVec2(imguiCursorPos.x, y), ImVec2(imguiCursorPos.x + vramViewWidth, y), ImColor(VERY_DARK_GREY), 1.0f);
-				y += gridSpacing;
+				u8 SCX = gambo->Read(HWAddr::SCX);
+				u8 SCY = gambo->Read(HWAddr::SCY);
+
+				float gridMaxX = imguiCursorPos.x + vramViewWidth;
+				float gridMaxY = imguiCursorPos.y + vramViewWidth;
+
+				float rectMinX = imguiCursorPos.x + (SCX * pixelScale);
+				float rectMinY = imguiCursorPos.y + (SCY * pixelScale);
+				float rectMaxX = imguiCursorPos.x + ((SCX + GamboScreenWidth) * pixelScale);
+				float rectMaxY = imguiCursorPos.y + ((SCY + GamboScreenHeight) * pixelScale);
+
+				float overflowX = 0.0f;
+				float overflowY = 0.0f;
+
+				if (rectMaxX > gridMaxX)
+					overflowX = rectMaxX - gridMaxX;
+				if (rectMaxY > gridMaxY)
+					overflowY = rectMaxY - gridMaxY;
+
+				ImColor color(MAGENTA);
+				float lineThickness = 2;
+
+				drawList->AddLine(ImVec2(rectMinX, rectMinY), ImVec2(fminf(rectMaxX, gridMaxX), rectMinY), color, lineThickness);
+				if (overflowX > 0.0f)
+					drawList->AddLine(ImVec2(imguiCursorPos.x, rectMinY), ImVec2(imguiCursorPos.x + overflowX, rectMinY), color, lineThickness);
+
+				drawList->AddLine(ImVec2(rectMinX, rectMinY), ImVec2(rectMinX, fminf(rectMaxY, gridMaxY)), color, lineThickness);
+				if (overflowY > 0.0f)
+					drawList->AddLine(ImVec2(rectMinX, imguiCursorPos.y), ImVec2(rectMinX, imguiCursorPos.y + overflowY), color, lineThickness);
+
+				drawList->AddLine(ImVec2(rectMinX, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), ImVec2(fminf(rectMaxX, gridMaxX), (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), color, lineThickness);
+				if (overflowX > 0.0f)
+					drawList->AddLine(ImVec2(imguiCursorPos.x, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), ImVec2(imguiCursorPos.x + overflowX, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), color, lineThickness);
+
+				drawList->AddLine(ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, rectMinY), ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, fminf(rectMaxY, gridMaxY)), color, lineThickness);
+				if (overflowY > 0.0f)
+					drawList->AddLine(ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, imguiCursorPos.y), ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, imguiCursorPos.y + overflowY), color, lineThickness);
 			}
-		}
 
-		if (showScreen)
-		{
-			u8 SCX = gambo->Read(HWAddr::SCX);
-			u8 SCY = gambo->Read(HWAddr::SCY);
+			float mouseX = io.MousePos.x - imguiCursorPos.x;
+			float mouseY = io.MousePos.y - imguiCursorPos.y;
 
-			float gridMaxX = imguiCursorPos.x + vramViewWidth;
-			float gridMaxY = imguiCursorPos.y + vramViewWidth;
+			static int tileX = 0;
+			static int tileY = 0;
 
-			float rectMinX = imguiCursorPos.x + (SCX * pixelScale);
-			float rectMinY = imguiCursorPos.y + (SCY * pixelScale);
-			float rectMaxX = imguiCursorPos.x + ((SCX + GamboScreenWidth) * pixelScale);
-			float rectMaxY = imguiCursorPos.y + ((SCY + GamboScreenHeight) * pixelScale);
+			if ((mouseX >= 0.0f) && (mouseX < vramViewWidth) && (mouseY >= 0.0f) && (mouseY < vramViewWidth))
+			{
+				tileX = mouseX / gridSpacing;
+				tileY = mouseY / gridSpacing;
+				drawList->AddRect(ImVec2(imguiCursorPos.x + (tileX * gridSpacing), imguiCursorPos.y + (tileY * gridSpacing)), ImVec2(imguiCursorPos.x + ((tileX + 1) * gridSpacing), imguiCursorPos.y + ((tileY + 1) * gridSpacing)), ImColor(GREEN), 2.0f, 0, 2.0f);
+			}
 
-			float overflowX = 0.0f;
-			float overflowY = 0.0f;
 
-			if (rectMaxX > gridMaxX)
-				overflowX = rectMaxX - gridMaxX;
-			if (rectMaxY > gridMaxY)
-				overflowY = rectMaxY - gridMaxY;
+			ImGui::TableNextColumn();
 
-			ImColor color(MAGENTA);
-			float lineThickness = 2;
-
-			drawList->AddLine(ImVec2(rectMinX, rectMinY), ImVec2(fminf(rectMaxX, gridMaxX), rectMinY), color, lineThickness);
-			if (overflowX > 0.0f)
-				drawList->AddLine(ImVec2(imguiCursorPos.x, rectMinY), ImVec2(imguiCursorPos.x + overflowX, rectMinY), color, lineThickness);
-
-			drawList->AddLine(ImVec2(rectMinX, rectMinY), ImVec2(rectMinX, fminf(rectMaxY, gridMaxY)), color, lineThickness);
-			if (overflowY > 0.0f)
-				drawList->AddLine(ImVec2(rectMinX, imguiCursorPos.y), ImVec2(rectMinX, imguiCursorPos.y + overflowY), color, lineThickness);
-
-			drawList->AddLine(ImVec2(rectMinX, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), ImVec2(fminf(rectMaxX, gridMaxX), (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), color, lineThickness);
-			if (overflowX > 0.0f)
-				drawList->AddLine(ImVec2(imguiCursorPos.x, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), ImVec2(imguiCursorPos.x + overflowX, (overflowY > 0.0f) ? imguiCursorPos.y + overflowY : rectMaxY), color, lineThickness);
-
-			drawList->AddLine(ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, rectMinY), ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, fminf(rectMaxY, gridMaxY)), color, lineThickness);
-			if (overflowY > 0.0f)
-				drawList->AddLine(ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, imguiCursorPos.y), ImVec2((overflowX > 0.0f) ? imguiCursorPos.x + overflowX : rectMaxX, imguiCursorPos.y + overflowY), color, lineThickness);
-		}
-
-		float mouseX = io.MousePos.x - imguiCursorPos.x;
-		float mouseY = io.MousePos.y - imguiCursorPos.y;
-
-		int tileX = -1;
-		int tileY = -1;
-
-		if ((mouseX >= 0.0f) && (mouseX < vramViewWidth) && (mouseY >= 0.0f) && (mouseY < vramViewWidth))
-		{
-			tileX = (int)mouseX / gridSpacing;
-			tileY = (int)mouseY / gridSpacing;
-
-			drawList->AddRect(ImVec2(imguiCursorPos.x + (tileX * gridSpacing), imguiCursorPos.y + (tileY * gridSpacing)), ImVec2(imguiCursorPos.x + ((tileX + 1) * gridSpacing), imguiCursorPos.y + ((tileY + 1) * gridSpacing)), ImColor(GREEN), 2.0f, 15, 2.0f);
-
-			ImGui::NextColumn();
-
+			// use UV coordinates to zoomed in view of tile we hovered over
 			ImGui::Image((void*)(intptr_t)gamboVramView, ImVec2(128.0f, 128.0f), ImVec2((1.0f / 32.0f) * tileX, (1.0f / 32.0f) * tileY), ImVec2((1.0f / 32.0f) * (tileX + 1), (1.0f / 32.0f) * (tileY + 1)));
+
 
 			ImGui::TextColored(GREEN, "X:"); 
 			ImGui::SameLine(); ImGui::Text("$%02X", tileX); 
@@ -517,8 +574,13 @@ void Frontend::DrawVramViewer()
 
 			ImGui::TextColored(CYAN, "Tile Number:"); 
 			ImGui::SameLine(); ImGui::Text("$%02X", tileIndex);
+
+			ImGui::EndTable();
+
 		}
 	}
+
+
 	ImGui::End();
 }
 

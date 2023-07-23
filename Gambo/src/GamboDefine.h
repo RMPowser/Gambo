@@ -105,10 +105,6 @@ namespace HWAddr
 	static constexpr unsigned short IE    = 0xFFFF;
 }
 
-static constexpr auto MainWindowTitle = "Gambo";
-inline constexpr auto GamboWindowTitle = "Gambo Window";
-inline constexpr auto DebugInfoWindowTitle = "Debug Info";
-inline constexpr auto DebugWindowWidth = 200;
 inline constexpr auto GamboScreenWidth = 160;
 inline constexpr auto GamboScreenHeight = 144;
 inline constexpr auto GamboScreenSize = GamboScreenWidth * GamboScreenHeight;

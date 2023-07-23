@@ -28,7 +28,6 @@
     <ClInclude Include="imgui\imstb_rectpack.h" />
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
-    <ClInclude Include="src\ClearColor.h" />
     <ClCompile Include="src\bootroms\BootRomDMG.cpp" />
     <ClCompile Include="src\RAM.cpp" />
     <ClCompile Include="src\mappers\MBC1.cpp" />
@@ -40,7 +39,6 @@
     <ClCompile Include="imgui\imgui_draw.cpp" />
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
-    <ClCompile Include="src\ClearColor.cpp" />
     <ClInclude Include="src\CPU.h" />
     <ClCompile Include="src\CPU.cpp" />
     <ClInclude Include="src\FileDialogs.h" />
@@ -113,6 +111,7 @@
       <UseStandardPreprocessor>true</UseStandardPreprocessor>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <FunctionLevelLinking>true</FunctionLevelLinking>
+      <DisableSpecificWarnings>4244;</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -141,6 +140,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <UseStandardPreprocessor>true</UseStandardPreprocessor>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <DisableSpecificWarnings>4244;</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

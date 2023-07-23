@@ -32,7 +32,7 @@ private:
 
 	// helpers
 	void DrawGamboWindow();
-	void DrawDebugInfoWindow();
+	void DrawCPUInfoWindow();
 	void DrawVramViewer();
 	void SetGamboRunning();
 	void SetGamboStep();
