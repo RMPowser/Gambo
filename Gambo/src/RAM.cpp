@@ -88,6 +88,11 @@ void RAM::Reset()
 {
 	ram.fill(0x00);
 
+	// fill vram with 0xFF
+	for (size_t i = 0x8000; i < 0xC000; i++)
+		ram[i] = 0xFF;
+
+	// fill IO/control registers with 0xFF
 	for (size_t i = 0xFF00; i < 0x10000; i++)
 		ram[i] = 0xFF;
 	
