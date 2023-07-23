@@ -216,9 +216,12 @@ void GamboCore::Write(u16 addr, u8 data)
 	{
 		return;
 	}
-	else if (IsCartridgeAddress(addr) && cart != nullptr)
+	else if (IsCartridgeAddress(addr))
 	{
-		cart->Write(addr, data);
+		if (cart->IsLoaded())
+			cart->Write(addr, data);
+		else
+			return;
 	}
 	else
 	{
@@ -256,7 +259,6 @@ bool GamboCore::IsBootRomAddress(u16 addr)
 bool GamboCore::IsCartridgeAddress(u16 addr)
 {
 	return
-		!IsBootRomAddress(addr) &&
-		(0x0000 <= addr && addr <= 0x7FFF && addr < cart->GetRomSize()) ||	// rom
-		(0xA000 <= addr && addr <= 0xBFFF && addr < cart->GetRamSize());	// ram
+		(0x0000 <= addr && addr <= 0x7FFF) ||	// rom
+		(0xA000 <= addr && addr <= 0xBFFF);		// ram
 }
