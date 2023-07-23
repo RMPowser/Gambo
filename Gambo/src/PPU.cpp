@@ -215,7 +215,7 @@ void PPU::Reset()
 	mode = PPUMode::VBlank;
 	doDMATransfer = false;
 	blankFrame = true;
-	isEnabled = true;
+	isEnabled = false;
 	modeCounter = 0;
 	modeCounterForVBlank = 0;
 	lineNumberDuringVBlank = 0;
