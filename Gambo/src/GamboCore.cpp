@@ -39,7 +39,7 @@ void GamboCore::Run()
 	using framerate = duration<int, std::ratio<1, DesiredFPS>>;
 	auto timePoint = clock::now() + framerate{1};
 
-	if (running || step)
+	if (running)
 	{
 		bool vblank = false;
 		int totalCycles = 0;
@@ -51,7 +51,20 @@ void GamboCore::Run()
 			totalCycles += cycles;
 			if (totalCycles > 702240)
 				vblank = true;
+
+			//if (cpu->GetPC() == 0x00A4)
+			//{
+			//	running = false;
+			//	break;
+			//}
 		}
+		
+		disassemble = true;
+	}
+	else if (step)
+	{
+		int cycles = cpu->RunFor(1);
+		ppu->Tick(cycles);
 
 		step = false;
 		disassemble = true;
