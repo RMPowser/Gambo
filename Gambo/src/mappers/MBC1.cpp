@@ -105,7 +105,10 @@ void MBC1::Write(u16 addr, u8 data)
 	{
 		// writing exactly 0xA in the bottom nybble enables ram. anything else
 		// disables ram.
-		ramEnabled = (data & 0x0A) == 0x0A;
+		if (cart->GetRamSize() > 0)
+			ramEnabled = (data & 0x0A) == 0x0A;
+		else
+			ramEnabled = false;
 	}
 	else if (0x2000 <= addr && addr <= 0x3FFF)
 	{
