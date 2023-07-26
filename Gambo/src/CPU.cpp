@@ -97,12 +97,11 @@ u8 CPU::RunFor(u8 ticks)
 
 	while (cycles < ticks)
 	{
-		currentCycles = 0;
-
 		if (isHalted)
 		{
 			// count cycles as if NOP during halt
 			currentCycles += 4;
+			cycles += 4;
 
 			//if (unhaltCycles > 0)
 			//{
@@ -130,25 +129,62 @@ u8 CPU::RunFor(u8 ticks)
 			}
 			else
 			{
-				u8 opcode = Read(PC++);
-
-				if (haltBug)
+				if (opcodeTimingDelay < 0)
 				{
-					haltBug = false;
-					PC--;
-				}
-
-				const std::vector<CPUInstruction>* opcodeTable;
-				if (opcode == 0xCB)
-				{
-					// read the next byte because its a 16 bit opcode
+					opcodeTimingDelay = 0;
+					currentCycles = 0;
 					opcode = Read(PC++);
+					isCB = opcode == 0xCB;
 
-					// halt bug applies to both bytes
 					if (haltBug)
 					{
 						haltBug = false;
 						PC--;
+					}
+
+					if (opcode == 0x36
+						|| opcode == 0xE0
+						|| opcode == 0xF0)
+					{
+						opcodeTimingDelay = 1;
+					}
+
+					if (opcode == 0xEA
+						|| opcode == 0xFA)
+					{
+						opcodeTimingDelay = 2;
+					}
+				}
+				
+
+				
+				if (isCB)
+				{
+					// only read the next byte and check for halt bug if current opcode == 0xCB
+					// otherwise, we just set the opcodeTable and leave.
+					if (opcode == 0xCB)
+					{
+						opcode = Read(PC++);
+
+						// halt bug applies to both bytes
+						if (haltBug)
+						{
+							haltBug = false;
+							PC--;
+						}
+
+						// timing for CB instructinos
+						if (opcode == 0x46
+							|| opcode == 0x4E
+							|| opcode == 0x56
+							|| opcode == 0x5E
+							|| opcode == 0x66
+							|| opcode == 0x6E
+							|| opcode == 0x76
+							|| opcode == 0x7E)
+						{
+							opcodeTimingDelay = 1;
+						}
 					}
 
 					opcodeTable = &instructions16bit;
@@ -158,11 +194,39 @@ u8 CPU::RunFor(u8 ticks)
 					opcodeTable = &instructions8bit;
 				}
 
-				// lookup the initial number of clock cycles this instruction takes
-				currentCycles = (*opcodeTable)[opcode].cycles;
+				switch (opcodeTimingDelay)
+				{
+					// using the default case allows us to delay by any arbitrary amount
+					default:
+					{
+						// early out if the delay is negative somehow. this should never happen
+						// but better safe than sorry.
+						if (opcodeTimingDelay < 0)
+						{
+							opcodeTimingDelay = 0;
+							break;
+						}
 
-				// execute the instruction and see if we require additional clock cycles
-				currentCycles += (this->*(*opcodeTable)[opcode].Execute)();
+						// add one m-cycle and set delay to the next lowest state
+						cycles += 4;
+						currentCycles += 4;
+						opcodeTimingDelay--;
+						break;
+					}
+					case 0:
+					{
+						// figure out the cycles remaining. for any opcode that is NOT delayed, 
+						// this should be equal to whatever is in the opcode table
+						currentCycles = (*opcodeTable)[opcode].cycles - currentCycles;
+
+						// execute the instruction and see if we require additional clock cycles
+						currentCycles += (this->*(*opcodeTable)[opcode].Execute)();
+
+						cycles += currentCycles;
+						opcodeTimingDelay--;
+						break;
+					}
+				}
 			}
 		}
 
@@ -179,8 +243,6 @@ u8 CPU::RunFor(u8 ticks)
 				IME = true;
 			}
 		}
-
-		cycles += currentCycles;
 	}
 
 	UpdateTimers(cycles);
@@ -369,6 +431,11 @@ void CPU::Reset()
 	unhaltCycles = 0;
 	currentCycles = 0;
 	vblankInterruptCycles = 0;
+	opcodeTimingDelay = 0;
+	opcode = 0;
+	isCB = false;
+	instructionComplete = true;
+	opcodeTable = &instructions8bit;
 	IME = false;
 	IMEcycles = false;
 	DIVCounter = 0;

@@ -12,8 +12,17 @@ enum class CPUFlags : u8
 	Z = (1 << 7), // zero
 };
 
+
 class CPU
 {
+	struct CPUInstruction
+	{
+		std::string mnemonic;
+		u8 bytes = 0;
+		u8 cycles = 0;
+		u8(CPU::* Execute)(void);
+	};
+
 	CPU() = delete;
 	bool operator==(const CPU& other) const = delete;
 
@@ -75,6 +84,11 @@ private:
 	int unhaltCycles;				
 	int currentCycles;
 	int vblankInterruptCycles;
+	int opcodeTimingDelay;
+	int opcode;
+	bool isCB;
+	bool instructionComplete;
+	const std::vector<CPUInstruction>* opcodeTable;
 	bool IME;						// interrupt master enable flag
 	int IMEcycles;					// used to delay the enabling of IME by one instruction
 	int DIVCounter;
@@ -86,13 +100,6 @@ private:
 	void BIT(u8& reg, int bit);
 
 #pragma region Instructions
-	struct CPUInstruction
-	{
-		std::string mnemonic;
-		u8 bytes = 0;
-		u8 cycles = 0;
-		u8(CPU::* Execute)(void);
-	};
 	const std::vector<CPUInstruction> instructions8bit =
 	{
 		{"NOP"       ,1,4 ,&CPU::NOP     }, {"LD BC, {}" ,3,12,&CPU::LD_BC_d16 }, {"LD (BC), A"  ,1,8 ,&CPU::LD_aBC_A   }, {"INC BC"    ,1,8 ,&CPU::INC_BC  }, {"INC B"       ,1,4 ,&CPU::INC_B      }, {"DEC B"     ,1,4 ,&CPU::DEC_B   }, {"LD B, {}"   ,2,8 ,&CPU::LD_B_d8  }, {"RLCA"      ,1,4 ,&CPU::RLCA    }, {"LD ({}), SP" ,3,20,&CPU::LD_a16_SP     }, {"ADD HL, BC",1,8 ,&CPU::ADD_HL_BC}, {"LD A, (BC)"  ,1,8 ,&CPU::LD_A_aBC   }, {"DEC BC"  ,1,8 ,&CPU::DEC_BC }, {"INC C"      ,1,4 ,&CPU::INC_C     }, {"DEC C"   ,1,4 ,&CPU::DEC_C   }, {"LD C, {}"   ,2,8 ,&CPU::LD_C_d8  }, {"RRCA"    ,1,4 ,&CPU::RRCA   },
