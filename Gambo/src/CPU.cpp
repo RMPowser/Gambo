@@ -2,6 +2,7 @@
 #include "GamboCore.h"
 #include "PPU.h"
 #include "RAM.h"
+#include "spdlog/spdlog.h"
 
 const std::array<u8, 256> OpcodeTiming8Bit = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -44,6 +45,7 @@ const std::array<u8, 256> OpcodeTiming16Bit = {
 CPU::CPU(GamboCore* c)
 	: core(c)
 {
+	spdlog::enable_backtrace(50);
 	Reset();
 }
 
@@ -138,6 +140,52 @@ u8 CPU::RunFor(u8 ticks)
 					currentCycles = 0;
 					opcode = Read(PC++);
 					isCB = opcode == 0xCB;
+
+					std::string s = "$" + hex(PC - 1, 4) + ": ";
+					if (opcode == 0xCB)
+					{
+						u8 cbOpcode = Read(PC);
+						s += instructions16bit[cbOpcode].mnemonic;
+					}
+					else
+					{
+						auto& instruction = instructions8bit[opcode];
+						switch (instruction.bytes)
+						{
+							case 0:
+							case 1:
+							{
+								s += instruction.mnemonic;
+								break;
+							}
+							case 2:
+							{
+								u8 data = Read(PC);
+								std::string firstTwoChar(instruction.mnemonic.begin(), instruction.mnemonic.begin() + 2);
+								if (firstTwoChar == "JR")
+								{
+									s16 sdata = (s8)data;
+									sdata += PC + 1;
+									s += std::vformat(instruction.mnemonic, std::make_format_args(hex(sdata, 4)));
+									break;
+								}
+								s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
+								break;
+							}
+							case 3:
+							{
+								u16 lo = Read(PC);
+								u16 hi = Read(PC + 1);
+								u16 data = (hi << 8) | lo;
+								s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
+								break;
+							}
+							default:
+								throw("opcode has more than 3 bytes");
+						}
+					}
+					spdlog::debug(s);
+
 
 					if (haltBug)
 					{
@@ -645,6 +693,7 @@ void CPU::Pop(std::same_as<u16> auto& reg)
 // catch all non existing instructions
 u8 CPU::XXX()
 {
+	spdlog::dump_backtrace();
 	throw;
 }
 
