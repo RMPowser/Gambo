@@ -126,6 +126,9 @@ u8 CPU::RunFor(u8 ticks)
 			if (IME && InterruptPending())
 			{
 				handledInterrupt = HandleInterrupt(GetPendingInterrupt());
+
+				// it takes 5 m-cycles just to dispatch the interrupt
+				cycles += 20;
 			}
 			else
 			{
@@ -230,11 +233,6 @@ u8 CPU::RunFor(u8 ticks)
 			}
 		}
 
-		if (!handledInterrupt && vblankInterruptCycles > 0)
-		{
-			vblankInterruptCycles = 0;
-		}
-
 		if (!handledInterrupt && IMEcycles > 0)
 		{
 			if ((IMEcycles -= currentCycles) <= 0)
@@ -254,32 +252,26 @@ u8 CPU::RunFor(u8 ticks)
 void CPU::RequestInterrupt(InterruptFlags f)
 {
 	Write(HWAddr::IF, Read(HWAddr::IF) | f);
-
-	if (f == (u8)InterruptFlags::VBlank)
-	{
-		vblankInterruptCycles = 4;
-	}
 }
 #pragma warning(pop)
 
 bool CPU::HandleInterrupt(InterruptFlags f)
-{
-	if (f == InterruptFlags::None)
-		return false;
-	
-	u8& IF = Get(HWAddr::IF);
+{	
 
+	// disable interrupts
 	IME = false;
 
-	// acknowledge the interrupt
-	IF &= ~(f);
+	// acknowledge the interrupt by clearing its flag
+	Get(HWAddr::IF) &= ~(f);
 
+	// push the program counter so we can get back to 
+	// where we left off
 	Push(PC);
 
+	// jump to the corresponding address
 	switch (f)
 	{
 		case VBlank:
-			vblankInterruptCycles = 0;
 			PC = 0x0040;
 			break;
 
@@ -430,7 +422,6 @@ void CPU::Reset()
 	haltBug = false;
 	unhaltCycles = 0;
 	currentCycles = 0;
-	vblankInterruptCycles = 0;
 	opcodeTimingDelay = 0;
 	opcode = 0;
 	isCB = false;

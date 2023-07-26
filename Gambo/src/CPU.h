@@ -83,7 +83,6 @@ private:
 	bool haltBug;
 	int unhaltCycles;				
 	int currentCycles;
-	int vblankInterruptCycles;
 	int opcodeTimingDelay;
 	int opcode;
 	bool isCB;
