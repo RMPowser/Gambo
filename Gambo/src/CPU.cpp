@@ -239,13 +239,9 @@ u8 CPU::RunFor(u8 ticks)
 					// using the default case allows us to delay by any arbitrary amount
 					default:
 					{
-						// early out if the delay is negative somehow. this should never happen
-						// but better safe than sorry.
+						// throw if the delay is negative somehow. this should never happen
 						if (opcodeTimingDelay < 0)
-						{
-							opcodeTimingDelay = 0;
-							break;
-						}
+							throw;
 
 						// add one m-cycle and set delay to the next lowest state
 						cycles += 4;
