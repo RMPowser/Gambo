@@ -115,7 +115,7 @@ u8 CPU::RunFor(u8 ticks)
 
 		if (!isHalted)
 		{
-			if (IME && InterruptPending())
+			if (IME && InterruptPending() && opcodeTimingDelay < 0)
 			{
 				handledInterrupt = HandleInterrupt(GetPendingInterrupt());
 
