@@ -102,7 +102,6 @@ u8 CPU::RunFor(u8 ticks)
 		if (isHalted)
 		{
 			// count cycles as if NOP during halt
-			currentCycles += 4;
 			cycles += 4;
 
 			if (isHalted && InterruptPending())
