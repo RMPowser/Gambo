@@ -130,6 +130,7 @@ u8 CPU::RunFor(u8 ticks)
 					opcode = Read(PC++);
 					isCB = opcode == 0xCB;
 
+#if defined(_DEBUG)
 					std::string s = "$" + hex(PC - 1, 4) + ": ";
 					if (opcode == 0xCB)
 					{
@@ -174,7 +175,7 @@ u8 CPU::RunFor(u8 ticks)
 						}
 					}
 					spdlog::debug(s);
-
+#endif
 
 					if (haltBug)
 					{
