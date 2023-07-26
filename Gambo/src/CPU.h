@@ -83,7 +83,7 @@ private:
 	bool haltBug;
 	int unhaltCycles;				
 	int currentCycles;
-	int opcodeTimingDelay;
+	int opcodeTimingDelay;			// if this value is less than 0, we have finished an instruction
 	int opcode;
 	bool isCB;
 	bool instructionComplete;
