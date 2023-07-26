@@ -183,6 +183,7 @@ u8 CPU::RunFor(u8 ticks)
 						PC--;
 					}
 
+					// timing for non cb instructions
 					if (opcode == 0x36
 						|| opcode == 0xE0
 						|| opcode == 0xF0)
@@ -201,8 +202,6 @@ u8 CPU::RunFor(u8 ticks)
 				
 				if (isCB)
 				{
-					// only read the next byte and check for halt bug if current opcode == 0xCB
-					// otherwise, we just set the opcodeTable and leave.
 					if (opcode == 0xCB)
 					{
 						opcode = Read(PC++);
