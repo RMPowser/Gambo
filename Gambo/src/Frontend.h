@@ -36,4 +36,5 @@ private:
 	void DrawVramViewer();
 	void SetGamboRunning();
 	void SetGamboStep();
+	void SetGamboStepFrame();
 };

@@ -60,6 +60,8 @@ public:
 	void SetRunning(bool b);
 	bool GetStep();
 	void SetStep(bool b);
+	bool GetStepFrame();
+	void SetStepFrame(bool b);
 
 	const Cartridge& GetCartridge() const;
 	void InsertCartridge(std::filesystem::path filePath);
@@ -77,6 +79,7 @@ private:
 	std::atomic<bool> done;
 	std::atomic<bool> running;
 	std::atomic<bool> step;
+	std::atomic<bool> stepFrame;
 
 	CPU* cpu;
 	PPU* ppu;

@@ -193,21 +193,18 @@ void Frontend::HandleKeyboardShortcuts()
 	}
 	
 	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_P))
-	{
 		SetGamboRunning();
-	}
 
 	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_R))
-	{
 		gambo->Reset();
-	}
 
 	if (debugMode)
 	{
 		if (ImGui::IsKeyPressed(ImGuiKey_F7))
-		{
 			SetGamboStep();
-		}
+
+		if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_F7))
+			SetGamboStepFrame();
 	}
 }
 
@@ -302,6 +299,11 @@ void Frontend::DrawGamboWindow()
 					if (ImGui::MenuItem("Step", "F7"))
 					{
 						SetGamboStep();
+					}
+
+					if (ImGui::MenuItem("Step Frame", "Ctrl+F7"))
+					{
+						SetGamboStepFrame();
 					}
 				}
 				ImGui::EndMenu();
@@ -611,4 +613,10 @@ void Frontend::SetGamboStep()
 {
 	gambo->SetRunning(false);
 	gambo->SetStep(true);
+}
+
+void Frontend::SetGamboStepFrame()
+{
+	gambo->SetRunning(false);
+	gambo->SetStepFrame(true);
 }

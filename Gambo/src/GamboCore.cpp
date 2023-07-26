@@ -69,6 +69,29 @@ void GamboCore::Run()
 		step = false;
 		disassemble = true;
 	}
+	else if (stepFrame)
+	{
+		bool vblank = false;
+		int totalCycles = 0;
+		while (!vblank)
+		{
+			int cycles = cpu->RunFor(1);
+			vblank = ppu->Tick(cycles);
+
+			totalCycles += cycles;
+			if (totalCycles > 702240)
+				vblank = true;
+
+			//if (cpu->GetPC() == 0x00A4)
+			//{
+			//	running = false;
+			//	break;
+			//}
+		}
+
+		stepFrame = false;
+		disassemble = true;
+	}
 
 	// limit fps
 	std::this_thread::sleep_until(timePoint - 1ms);
@@ -160,6 +183,16 @@ bool GamboCore::GetStep()
 void GamboCore::SetStep(bool b)
 {
 	step = b;
+}
+
+bool GamboCore::GetStepFrame()
+{
+	return stepFrame;
+}
+
+void GamboCore::SetStepFrame(bool b)
+{
+	stepFrame = b;
 }
 
 const Cartridge& GamboCore::GetCartridge() const
