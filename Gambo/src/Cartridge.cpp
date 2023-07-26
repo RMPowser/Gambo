@@ -359,10 +359,6 @@ void Cartridge::Write(u16 addr, u8 data)
 	{
 		mapper->Write(addr, data);
 	}
-	else
-	{
-		rom[addr] = data;
-	}
 }
 
 void Cartridge::Reset()

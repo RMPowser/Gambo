@@ -48,6 +48,13 @@ void RAM::Write(u16 addr, u8 data)
 		return;
 	}
 
+	// these addresses are read only
+	if ((0x0000 <= addr && addr <= 0x7FFF) ||
+		(0xFEA0 <= addr && addr <= 0xFEFF))
+	{
+		return;
+	}
+
 	if (addr == HWAddr::LCDC)
 	{
 		u8 curr = ram[addr];
@@ -82,6 +89,11 @@ void RAM::Write(u16 addr, u8 data)
 u8& RAM::Get(u16 addr)
 {
 	return ram[addr];
+}
+
+void RAM::Set(u16 addr, u8 data)
+{
+	ram[addr] = data;
 }
 
 void RAM::Reset()

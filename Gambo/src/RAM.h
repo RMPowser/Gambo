@@ -29,6 +29,7 @@ public:
 
 	// Used only when i need to ignore memory rules
 	u8& Get(u16 addr);
+	void Set(u16 addr, u8 data);
 
 	void Reset();
 
