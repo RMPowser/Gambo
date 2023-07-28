@@ -61,7 +61,7 @@ u8 CPU::Read(u16 addr)
 			(core->ppu->GetMode() == PPUMode::Draw && ((0xFE00 <= addr && addr <= 0xFE9F) || (0x8000 <= addr && addr <= 0x9FFF)))	// accessing oam or vram during drawing
 		)) 
 	{
-		return 0x00;
+		return 0xFF;
 	}
 	else
 	{
