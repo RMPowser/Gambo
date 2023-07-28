@@ -186,9 +186,3 @@ constexpr u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask)
 {
 	return (reg & (bitMask << bitIndex)) >> bitIndex;
 }
-
-#if defined NDEBUG
-	#define DebugLog( format, ... )
-#else
-	#define DebugLog( format, ... )   printf( "%s::%s(%d) " format "\n", __FILE__, __FUNCTION__,  __LINE__, __VA_ARGS__ )
-#endif
