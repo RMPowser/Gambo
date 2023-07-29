@@ -104,10 +104,23 @@ void Frontend::Run()
 
 	while (!done)
 	{
+		using namespace std::chrono;
+		using clock = high_resolution_clock;
+		using framerate = duration<int, std::ratio<1, DesiredFPS>>;
+		auto timePoint = clock::now() + framerate{1};
+
 		gambo->Run();
 		BeginFrame();
 		UpdateUI();
 		EndFrame();
+
+		// limit fps
+		std::this_thread::sleep_until(timePoint - 1ms);
+		while (clock::now() <= timePoint)
+		{
+			// wait
+		}
+		timePoint += framerate{1};
 	}
 
 	//gamboThread.join();
@@ -361,6 +374,8 @@ void Frontend::DrawGamboWindow()
 			{
 				SDL_MaximizeWindow(window);
 			}
+
+			ImGui::TextColored(WHITE, "%.3f ms (%.3f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
 			ImGui::EndMenuBar();
 		}

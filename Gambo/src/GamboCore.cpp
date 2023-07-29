@@ -9,7 +9,6 @@
 #include <fstream>
 #include <random>
 #include <format>
-#include <chrono>
 #include <iostream>
 
 GamboCore::GamboCore()
@@ -34,11 +33,6 @@ GamboCore::~GamboCore()
 
 void GamboCore::Run()
 {
-	using namespace std::chrono;
-	using clock = high_resolution_clock;
-	using framerate = duration<int, std::ratio<1, DesiredFPS>>;
-	auto timePoint = clock::now() + framerate{1};
-
 	if (running)
 	{
 		bool vblank = false;
@@ -92,14 +86,6 @@ void GamboCore::Run()
 		stepFrame = false;
 		disassemble = true;
 	}
-
-	// limit fps
-	std::this_thread::sleep_until(timePoint - 1ms);
-	while (clock::now() <= timePoint)
-	{
-		// wait
-	}
-	timePoint += framerate{1};
 }
 
 const void* GamboCore::GetScreen() const
