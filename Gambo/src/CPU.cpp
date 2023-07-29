@@ -128,8 +128,8 @@ u8 CPU::RunFor(u8 ticks)
 					currentCycles = 0;
 					opcode = Read(PC++);
 					isCB = opcode == 0xCB;
-
-#if defined(_DEBUG)
+					
+#if defined(_DEBUG) && 0
 					std::string s = "$" + hex(PC - 1, 4) + ": ";
 					if (opcode == 0xCB)
 					{
