@@ -106,7 +106,7 @@ void Frontend::Run()
 	{
 		using namespace std::chrono;
 		using clock = high_resolution_clock;
-		using framerate = duration<int, std::ratio<1, DesiredFPS>>;
+		using framerate = duration<int, std::ratio<100, 5973>>;
 		auto timePoint = clock::now() + framerate{1};
 
 		gambo->Run();
@@ -115,12 +115,12 @@ void Frontend::Run()
 		EndFrame();
 
 		// limit fps
-		std::this_thread::sleep_until(timePoint - 1ms);
+		std::this_thread::sleep_until(timePoint - 5ms);
 		while (clock::now() <= timePoint)
 		{
 			// wait
 		}
-		timePoint += framerate{1};
+		timePoint += framerate{100};
 	}
 
 	//gamboThread.join();
