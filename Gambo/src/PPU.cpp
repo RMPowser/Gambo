@@ -5,6 +5,7 @@
 #include "RAM.h"
 #include <random>
 
+SDL_Color blankingColor = { 255, 255, 255, 255 };
 
 PPU::PPU(GamboCore* c)
 	: core(c)
@@ -38,7 +39,7 @@ bool PPU::Tick(u8 cycles)
 
 	bool vblank = false;
 
-	modeCounter += cycles;
+	cyclesCounter += cycles;
 
 	//STAT bit 7 is always 1
 	STAT |= 0b10000000;
@@ -61,9 +62,9 @@ bool PPU::Tick(u8 cycles)
 		{
 			case PPUMode::HBlank:
 			{
-				if (modeCounter >= 204)
+				if (cyclesCounter >= 204)
 				{
-					modeCounter -= 204;
+					cyclesCounter -= 204;
 					mode = PPUMode::OAMScan;
 					LY++;
 
@@ -71,8 +72,7 @@ bool PPU::Tick(u8 cycles)
 					{
 						blankFrame = false;
 						mode = PPUMode::VBlank;
-						lineNumberDuringVBlank = 0;
-						modeCounterForVBlank = modeCounter;
+						modeCounterForVBlank = cyclesCounter;
 						core->cpu->RequestInterrupt(InterruptFlags::VBlank);
 
 						if (GetBits(STAT, (u8)STATBits::Mode1StatInterruptEnable, 0b1))
@@ -96,20 +96,17 @@ bool PPU::Tick(u8 cycles)
 				if (modeCounterForVBlank >= 456)
 				{
 					modeCounterForVBlank -= 456;
-					lineNumberDuringVBlank++;
-
-					if (lineNumberDuringVBlank <= 9)
-						LY++;
+					LY++;
 				}
 
-				if (modeCounter >= 4104 && modeCounterForVBlank >= 4 && LY == 153)
+				if (cyclesCounter >= 4104 && LY >= 154)
 				{
 					LY = 0;
 				}
 
-				if (modeCounter >= 4560)
+				if (cyclesCounter >= 4560)
 				{
-					modeCounter -= 4560;
+					cyclesCounter -= 4560;
 					mode = PPUMode::OAMScan;
 					if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
 						core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
@@ -118,9 +115,9 @@ bool PPU::Tick(u8 cycles)
 			}
 			case PPUMode::OAMScan:
 			{
-				if (modeCounter >= 80)
+				if (cyclesCounter >= 80)
 				{
-					modeCounter -= 80;
+					cyclesCounter -= 80;
 					mode = PPUMode::Draw;
 					scanlineComplete = false;
 				}
@@ -128,38 +125,28 @@ bool PPU::Tick(u8 cycles)
 			}
 			case PPUMode::Draw:
 			{
-				if (pixelCounter < GamboScreenWidth)
+				if (pixelCounter < GamboScreenWidth && LY <= GamboScreenHeight)
 				{
-					tileCycleCounter += cycles;
-					
-					if (isEnabled && GetBits(LCDC, (u8)LCDCBits::LCDEnable, 0b1))
+					for (int i = 0; i < cycles; i++)
 					{
-						while (tileCycleCounter >= 3)
-						{
-							DrawBG();
-							pixelCounter += 4;
-							tileCycleCounter -= 3;
-
-							if (pixelCounter >= GamboScreenWidth)
-							{
-								break;
-							}
-						}
+						DrawBGOrWindowPixel();
+						pixelCounter++;
+						if (pixelCounter >= GamboScreenWidth)
+							break;
 					}
 				}
 
-				if (modeCounter >= 160 && !scanlineComplete)
+				if (cyclesCounter >= GamboScreenWidth && !scanlineComplete)
 				{
 					DrawSL();
 					scanlineComplete = true;
 				}
 
-				if (modeCounter >= 172)
+				if (cyclesCounter >= 172)
 				{
 					pixelCounter = 0;
-					modeCounter -= 172;
+					cyclesCounter -= 172;
 					mode = PPUMode::HBlank;
-					tileCycleCounter = 0;
 
 					if (GetBits(STAT, (u8)STATBits::Mode0StatInterruptEnable, 0b1))
 						core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
@@ -168,63 +155,40 @@ bool PPU::Tick(u8 cycles)
 			}
 		}
 
-		// write mode to STAT and update LY
-		core->ram->Get(HWAddr::STAT) = (STAT & 0b11111100) | ((u8)mode & 0b11);
-		core->ram->Get(HWAddr::LY) = LY;
-		CheckForLYCStatInterrupt();
 	}
 	else // lcd and ppu are disabled
 	{
-		if (screenEnableDelayCycles > 0)
+		if (cyclesCounter >= 70224) // cycles for a full screen
 		{
-			if ((screenEnableDelayCycles -= cycles) <= 0)
-			{
-				screenEnableDelayCycles = 0;
-				isEnabled = true;
-				blankFrame = true;
-				mode = PPUMode::HBlank;
-				modeCounter = 0;
-				modeCounterForVBlank = 0;
-				LY = 0;
-				windowLine = 0;
-				lineNumberDuringVBlank = 0;
-				pixelCounter = 0;
-				tileCycleCounter = 0;
-				
-				core->ram->Get(HWAddr::LY) = LY;
-
-				if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
-					core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
-
-				CheckForLYCStatInterrupt();
-			}
-		}
-		else if (modeCounter >= 70224) // cycles for a full screen
-		{
-			modeCounter -= 70224;
+			cyclesCounter -= 70224;
 			vblank = true;
 		}
 	}
+
+	// write mode to STAT and update LY
+	Get(HWAddr::STAT) = (STAT & 0b11111100) | ((u8)mode & 0b11);
+	Get(HWAddr::LY) = LY;
+	CheckForLYCStatInterrupt();
 
 	return vblank;
 }
 
 void PPU::Reset()
 {
-	mode = PPUMode::VBlank;
+	mode = PPUMode::HBlank;
 	doDMATransfer = false;
 	blankFrame = true;
 	isEnabled = false;
-	modeCounter = 0;
+	cyclesCounter = 0;
 	modeCounterForVBlank = 0;
-	lineNumberDuringVBlank = 0;
 	windowLine = 0;
 	pixelCounter = 0;
-	tileCycleCounter = 0;
 	scanlineComplete = false;
 	LY = 0; 
-	screenEnableDelayCycles = 244;
-	screen.fill({ 0, 0, 0, 255 });
+	screen.fill(blankingColor);
+
+	Get(HWAddr::LY) = LY;
+	Get(HWAddr::STAT) = (Get(HWAddr::STAT) & 0b11111100) | ((u8)mode & 0b11);
 }
 
 const std::array<SDL_Color, GamboScreenSize>& PPU::GetScreen() const
@@ -234,25 +198,16 @@ const std::array<SDL_Color, GamboScreenSize>& PPU::GetScreen() const
 
 void PPU::Enable()
 {
-	if (!isEnabled)
-	{
-		screenEnableDelayCycles = 244;
-	}
+	Reset();
+	isEnabled = true;
+
+	if (GetBits(Get(HWAddr::STAT), (u8)STATBits::Mode2StatInterruptEnable, 0b1))
+		core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 }
 
 void PPU::Disable()
 {
-	isEnabled = false;
-	
-	LY = 0;
-	Write(HWAddr::LY, LY);
-
-	mode = PPUMode::HBlank;
-	Write(HWAddr::STAT, (Read(HWAddr::STAT) & 0b11111100) | ((u8)mode & 0b11));
-
-	modeCounter = 0;
-	modeCounterForVBlank = 0;
-	blankFrame = true;
+	Reset();
 }
 
 bool PPU::IsEnabled() const
@@ -280,10 +235,9 @@ void PPU::CheckForLYCStatInterrupt()
 {
 	if (isEnabled)
 	{
-		const u8& LYC = Read(HWAddr::LYC);
-		u8& STAT = core->ram->Get(HWAddr::STAT);
+		u8& STAT = Get(HWAddr::STAT);
 
-		if (LY == LYC)
+		if (LY == Get(HWAddr::LYC))
 		{
 			STAT |= (1 << (u8)STATBits::LYC_equals_LYFlag);
 			if (GetBits(STAT, (u8)STATBits::LYC_equals_LYStatInterruptEnable, 0b1))
@@ -296,80 +250,78 @@ void PPU::CheckForLYCStatInterrupt()
 	}
 }
 
-void PPU::DrawBG()
+void PPU::DrawBGOrWindowPixel()
 {
-	const u8 LCDC = Read(HWAddr::LCDC);
-	const u8 SCY = Read(HWAddr::SCY);	// viewport y position
-	const u8 SCX = Read(HWAddr::SCX);	// viewport x position
-	const u8 BGP = Read(HWAddr::BGP);	// BG pallette data
-	const u8 WY = Read(HWAddr::WY);	// window Y position
-	const u8 WX = Read(HWAddr::WX);	// window X position + 7
+	const u8& LCDC = Get(HWAddr::LCDC);	// LCD control
+	const u8& SCX = Get(HWAddr::SCX);	// scroll x
+	const u8& SCY = Get(HWAddr::SCY);	// scroll y
+	const u8& WX = Get(HWAddr::WX);		// window X position + 7
+	const u8& WY = Get(HWAddr::WY);		// window Y position
+	const u8& BGP = Get(HWAddr::BGP);	// BG palette data
 
-	const int lineWidth = (LY * GamboScreenWidth);
+	const int pixelIndex = (LY * GamboScreenWidth) + pixelCounter;
 
+	// if background and window are enabled
 	if (GetBits(LCDC, (u8)LCDCBits::BGAndWindowEnable, 0b1))
 	{
-		int pixelsToDraw = 4;
+		// early out if blankFrame
+		if (blankFrame)
+		{
+			screen[pixelIndex] = blankingColor;
+			return;
+		}
 
+		// check if the window is enabled. future behavior depends on this.
 		bool usingWindow = (GetBits(LCDC, (u8)LCDCBits::WindowEnable, 0b1) && WY <= LY);
 
+		// figure out which tile map we're using according to the previous check.
 		auto tileMapBitSelect = usingWindow ? LCDCBits::WindowTileMapArea : LCDCBits::BGTileMapArea;
-		int bgDataAddr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
+		u16 tileMapAddr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
 
-		u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x9000;
-		bool isSigned = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? false : true;
+		// figure out the base address for the tile data we need
+		u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1)	? 0x8000 : 0x9000;
+		bool isSigned = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1)			? false  : true;
 
-		u8 pixelY = usingWindow ? (LY + WY) : (LY + SCY);
-		u8 tileRow = pixelY / 8;
+		// this is the x,y coordinates of the pixel in the 256x256pixel tile map
+		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX) ? pixelCounter - WX : pixelCounter + SCX;
+		u8 pixelMapPosY = usingWindow ? (LY + WY) : (LY + SCY);
+		
+		// this is the x,y indices of the tile within the map
+		u8 tileX = pixelMapPosX / 8;
+		u8 tileY = pixelMapPosY / 8;
 
-		// which of the 8 vertical pixels of the current tile is the scanline on?
-		u8 tilePixelRow = (pixelY % 8) * 2; // each row takes up two bytes of memory
+		// get the tile id number from the tile map. Remember it can be signed or unsigned depending on the tile data base address
+		u16 tileIdAddr = tileMapAddr + ((tileY * 32) + tileX); // there are 32 rows of tiles in the tile map
+		s16 tileId = isSigned ? (s8)core->Read(tileIdAddr) : core->Read(tileIdAddr);
 
-		// time to start drawing the pixels
-		int startingPixel = pixelCounter;
-		for (int pixel = startingPixel; pixel < startingPixel + pixelsToDraw; pixel++)
-		{
-			u8 xPos;
-			if (usingWindow && pixel >= WX)
-				xPos = pixel - WX;
-			else
-				xPos = pixel + SCX;
+		// this is the address of the actual graphic data for the tile
+		u16 tileDataAddr = tileDataBaseAddr + (tileId * 16); // 16 bits per row of pixels within the tile
 
-			u16 tileColumn = (xPos / 8);
+		// this is the position of the pixel data within the tile data
+		u8 tilePixelDataOffset = (pixelMapPosY % 8) * 2; // each row takes up two bytes of memory
 
-			// get the tile id number. Remember it can be signed or unsigned
-			u16 tileIdAddr = bgDataAddr + (tileRow * 32) + tileColumn; // there are 32 rows of tiles in memory
-			int tileId = isSigned ? (s8)core->Read(tileIdAddr) : core->Read(tileIdAddr);
+		// get the two bytes that hold the color data for this pixel
+		u8 data0 = core->Read(tileDataAddr + tilePixelDataOffset);
+		u8 data1 = core->Read(tileDataAddr + tilePixelDataOffset + 1);
 
-			u16 tileDataAddr = tileDataBaseAddr + (tileId * 16); // 16 bits per row of pixels within the tile
+		// pixel 0 in the tile is bit 7 of both data0 and data1. Pixel 1 is bit 6 of both. Pixel 2 is bit 5, etc...
+		u8 colorBitIndex = 7 - (pixelMapPosX % 8);
 
-			// get the two bytes that hold the color data for this pixel
-			u8 data0 = core->Read(tileDataAddr + tilePixelRow);
-			u8 data1 = core->Read(tileDataAddr + tilePixelRow + 1);
+		// combine data0 and data1 to get the color id for this pixel
+		bool colorBit0 = data0 & (1 << colorBitIndex);
+		bool colorBit1 = data1 & (1 << colorBitIndex);
+		u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
 
-			// pixel 0 in the tile is bit 7 of both data0 and data1. Pixel 1 is bit 6 etc..
-			u8 colorBitIndex = 7 - (xPos % 8);
+		// now that we have the color id, get the actual color from the BG palette reg 0xFF47
+		u8 color = GetBits(BGP, colorIndex * 2, 0b11); // each color is a 2bit value
 
-			// combine data0 and data1 to get the color id for this pixel in the tile
-			bool colorBit0 = data0 & (1 << colorBitIndex);
-			bool colorBit1 = data1 & (1 << colorBitIndex);
-			u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
-
-			// now we have the color id, get the actual color from BG palette 0xFF47
-			u8 color = GetBits(BGP, colorIndex * 2, 0b11);
-
-			// we can finally draw a pixel
-			int index = lineWidth + pixel;
-			screen[index] = blankFrame ? SDL_Color{ 255, 255, 255, 255 } : GameBoyColors[color];
-		}
+		// we can finally draw a pixel
+		screen[pixelIndex] = GameBoyColors[color];
 	}
 	else
 	{
-		for (int x = 0; x < 4; x++)
-		{
-			int index = lineWidth + pixelCounter + x;
-			screen[index] = SDL_Color{ 255, 255, 255, 255 };
-		}
+		// if the screen is off, just draw a white pixel
+		screen[pixelIndex] = blankingColor;
 	}
 }
 

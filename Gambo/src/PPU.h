@@ -63,7 +63,7 @@ private:
 	u8& Get(u16 addr);
 
 	void CheckForLYCStatInterrupt();
-	void DrawBG(); // draw background
+	void DrawBGOrWindowPixel(); // draw background
 	void DrawSL(); // draw scanline
 
 	GamboCore* core;
@@ -71,14 +71,11 @@ private:
 	bool doDMATransfer;
 	int blankFrame;
 	bool isEnabled;
-	int modeCounter;
+	int cyclesCounter;
 	int modeCounterForVBlank;
-	int lineNumberDuringVBlank;
 	int windowLine;
-	int pixelCounter;
-	int tileCycleCounter;
+	int pixelCounter;				// keeps track of the pixel on the current scanline. resets every scanline.
 	bool scanlineComplete;
-	int LY; // this is read only which is why we keep a local copy and write it into ram
-	int screenEnableDelayCycles;
+	int LY;							// this is read only which is why we keep a local copy and write it into ram
 	std::array<SDL_Color, GamboScreenSize> screen;
 };
