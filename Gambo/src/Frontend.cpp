@@ -7,6 +7,7 @@
 #include <sstream>
 #include <exception>
 #include "PPU.h"
+#include "VramViewer.h"
 
 ImVec4 clear_color;
 constexpr auto MainWindowTitle = "Gambo";
@@ -492,7 +493,7 @@ void Frontend::DrawVramViewer()
 			ImDrawList* drawList = ImGui::GetWindowDrawList();
 			ImGuiIO& io = ImGui::GetIO();
 
-			SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramView(), vramViewWidth * BytesPerPixel);
+			SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramViewer().GetView().data(), vramViewWidth * BytesPerPixel);
 			ImGui::Image(gamboVramView, { vramViewWidth, vramViewWidth });
 
 			if (showGrid)
@@ -566,10 +567,58 @@ void Frontend::DrawVramViewer()
 				drawList->AddRect(ImVec2(imguiCursorPos.x + (tileX * gridSpacing), imguiCursorPos.y + (tileY * gridSpacing)), ImVec2(imguiCursorPos.x + ((tileX + 1) * gridSpacing), imguiCursorPos.y + ((tileY + 1) * gridSpacing)), ImColor(GREEN), 2.0f, 0, 2.0f);
 			}
 
+			static int mapAddrButton = 0;
+			ImGui::Text("Map Addr: ");
+			ImGui::SameLine(); ImGui::RadioButton("Auto##mapAddr", &mapAddrButton, 0);
+			ImGui::SameLine(); ImGui::RadioButton("$9800", &mapAddrButton, 1);
+			ImGui::SameLine(); ImGui::RadioButton("$9C00", &mapAddrButton, 2);
+
+			static int tileAddrButton = 0;
+			ImGui::Text("Tile Addr:");
+			ImGui::SameLine(); ImGui::RadioButton("Auto##tileAddr", &tileAddrButton, 0);
+			ImGui::SameLine(); ImGui::RadioButton("$8800", &tileAddrButton, 1);
+			ImGui::SameLine(); ImGui::RadioButton("$8000", &tileAddrButton, 2);
+
+			switch (mapAddrButton)
+			{
+				case 0:
+				{
+					gambo->GetVramViewer().SetTileMapBaseAddr(-1);
+				}
+				case 1:
+				{
+					gambo->GetVramViewer().SetTileMapBaseAddr(0x9800);
+					break;
+				}
+				case 2:
+				{
+					gambo->GetVramViewer().SetTileMapBaseAddr(0x9C00);
+					break;
+				}
+			}
+
+			switch (tileAddrButton)
+			{
+				case 0:
+				{
+					gambo->GetVramViewer().SetTileDataBaseAddr(-1);
+					break;
+				}
+				case 1:
+				{
+					gambo->GetVramViewer().SetTileDataBaseAddr(0x9000);
+					break;
+				}
+				case 2:
+				{
+					gambo->GetVramViewer().SetTileDataBaseAddr(0x8000);
+					break;
+				}
+			}
 
 			ImGui::TableNextColumn();
 
-			// use UV coordinates to zoomed in view of tile we hovered over
+			// use UV coordinates to zoom in view of tile we hovered over
 			ImGui::Image((void*)(intptr_t)gamboVramView, ImVec2(128.0f, 128.0f), ImVec2((1.0f / 32.0f) * tileX, (1.0f / 32.0f) * tileY), ImVec2((1.0f / 32.0f) * (tileX + 1), (1.0f / 32.0f) * (tileY + 1)));
 
 
@@ -580,11 +629,9 @@ void Frontend::DrawVramViewer()
 
 			u8 LCDC = gambo->Read(HWAddr::LCDC);
 
-			bool usingWindow = false;
 
-			auto tileMapBitSelect = usingWindow ? LCDCBits::WindowTileMapArea : LCDCBits::BGTileMapArea;
-			int tileMapBaseAddr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
-			u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
+			u16 tileMapBaseAddr = gambo->GetVramViewer().GetTileMapBaseAddr() != -1 ? gambo->GetVramViewer().GetTileMapBaseAddr() :GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0x1) ? 0x9C00 : 0x9800;
+			u16 tileDataBaseAddr = gambo->GetVramViewer().GetTileDataBaseAddr() != -1 ? gambo->GetVramViewer().GetTileDataBaseAddr() : GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
 			u16 mapAddr = tileMapBaseAddr + (32 * tileY) + tileX;
 
 			ImGui::TextColored(CYAN, "Map Addr: "); ImGui::SameLine();

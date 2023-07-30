@@ -97,9 +97,9 @@ const void* GamboCore::GetScreen() const
 	return (void*)ppu->GetScreen().data();
 }
 
-const void* GamboCore::GetVramView() const
+VramViewer& GamboCore::GetVramViewer()
 {
-	return (void*)vram->GetView(0x8000).data();
+	return *vram;
 }
 
 float GamboCore::GetScreenWidth() const

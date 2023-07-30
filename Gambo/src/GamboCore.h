@@ -49,7 +49,7 @@ public:
 	void Reset();
 
 	const void* GetScreen() const;
-	const void* GetVramView() const;
+	VramViewer& GetVramViewer();
 	float GetScreenWidth() const;
 	float GetScreenHeight() const;
 	GamboState GetState() const;

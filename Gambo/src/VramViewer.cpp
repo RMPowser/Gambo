@@ -13,7 +13,7 @@ VramViewer::~VramViewer()
 {
 }
 
-const std::array<SDL_Color, 256 * 256>& VramViewer::GetView(u16 baseAddr)
+const std::array<SDL_Color, 256 * 256>& VramViewer::GetView()
 {
 	const u8 LCDC = Read(HWAddr::LCDC);
 	const u8 SCY = Read(HWAddr::SCY);	// viewport y position
@@ -24,30 +24,28 @@ const std::array<SDL_Color, 256 * 256>& VramViewer::GetView(u16 baseAddr)
 
 	const int lineWidth = 256;
 
-	int pixelsToDraw = 4;
+	u16 tileMapBaseAddr = _tileMapBaseAddr != -1 
+		? _tileMapBaseAddr 
+		: GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0x1) ? 0x9C00 : 0x9800;
 
-	bool usingWindow = false;
+	u16 tileDataBaseAddr = _tileDataBaseAddr != -1
+		? _tileDataBaseAddr
+		: GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x9000;
+	bool isSigned = tileDataBaseAddr == 0x9000;
 
-	auto tileMapBitSelect = usingWindow ? LCDCBits::WindowTileMapArea : LCDCBits::BGTileMapArea;
-	int bgDataAddr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
-
-	u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x9000;
-	bool isSigned = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? false : true;
-
-
-	for (int y = 0; y < 256; y++)
+	for (int y = 0; y < lineWidth; y++)
 	{
 		u8 tileRow = y / 8;
 
 		// which of the 8 vertical pixels of the current tile is the scanline on?
 		u8 tilePixelRow = (y % 8) * 2; // each row takes up two bytes of memory
 
-		for (int x = 0; x < 256; x++)
+		for (int x = 0; x < lineWidth; x++)
 		{
-			u16 tileColumn = (x / 8);
+			u16 tileX = (x / 8);
 
 			// get the tile id number. Remember it can be signed or unsigned
-			u16 tileIdAddr = bgDataAddr + (tileRow * 32) + tileColumn; // there are 32 rows of tiles in memory
+			u16 tileIdAddr = tileMapBaseAddr + (tileRow * 32) + tileX; // there are 32 rows of tiles in memory
 			int tileId = isSigned ? (s8)Read(tileIdAddr) : Read(tileIdAddr);
 
 			u16 tileDataAddr = tileDataBaseAddr + (tileId * 16); // 16 bits per row of pixels within the tile
@@ -74,6 +72,26 @@ const std::array<SDL_Color, 256 * 256>& VramViewer::GetView(u16 baseAddr)
 	}
 
 	return bg0;
+}
+
+void VramViewer::SetTileMapBaseAddr(int addr)
+{
+	_tileMapBaseAddr = addr;
+}
+
+void VramViewer::SetTileDataBaseAddr(int addr)
+{
+	_tileDataBaseAddr = addr;
+}
+
+int VramViewer::GetTileMapBaseAddr()
+{
+	return _tileMapBaseAddr;
+}
+
+int VramViewer::GetTileDataBaseAddr()
+{
+	return _tileDataBaseAddr;
 }
 
 u8 VramViewer::Read(u16 addr)

@@ -280,10 +280,10 @@ void PPU::DrawBGOrWindowPixel()
 
 		// figure out the base address for the tile data we need
 		u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1)	? 0x8000 : 0x9000;
-		bool isSigned = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1)			? false  : true;
+		bool isSigned = tileDataBaseAddr == 0x9000;
 
 		// this is the x,y coordinates of the pixel in the 256x256pixel tile map
-		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX) ? pixelCounter - WX : pixelCounter + SCX;
+		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX) ? pixelCounter - WX + 7: pixelCounter + SCX;
 		u8 pixelMapPosY = usingWindow ? (LY + WY) : (LY + SCY);
 		
 		// this is the x,y indices of the tile within the map
