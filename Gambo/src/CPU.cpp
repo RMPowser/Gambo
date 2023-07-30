@@ -504,7 +504,7 @@ void CPU::Reset()
 	opcodeTable = &instructions8bit;
 	IME = false;
 	IMEcycles = false;
-	DIVCounter = 256;
+	DIVCounter = 0;
 	TIMACounter = 0;
 
 	if (core->IsUseBootRom())
