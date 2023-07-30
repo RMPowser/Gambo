@@ -100,11 +100,7 @@ void RAM::Reset()
 {
 	ram.fill(0x00);
 
-	// fill vram with 0xFF
-	for (size_t i = 0x8000; i < 0xC000; i++)
-		ram[i] = 0xFF;
-
-	// fill WRAM with random bullshit
+	// fill WRAM with random garbage
 	std::random_device rd;
 	for (size_t i = 0xC000; i < 0xE000; i++)
 		ram[i] = rd() % 0x100;
@@ -178,6 +174,8 @@ void RAM::Reset()
 		ram[HWAddr::OCPD]	= 0xFF;
 		ram[HWAddr::SVBK]	= 0xFF;
 		ram[HWAddr::IE]		= 0x00;
+
+		core->ppu->Enable();
 	}
 }
 
