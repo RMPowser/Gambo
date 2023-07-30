@@ -254,7 +254,6 @@ void GamboCore::Write(u16 addr, u8 data)
 
 void GamboCore::Reset()
 {
-	useBootRom;
 	done = false;
 	running = false;
 	step = false;
