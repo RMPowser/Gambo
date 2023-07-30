@@ -4,49 +4,11 @@
 #include "RAM.h"
 #include "spdlog/spdlog.h"
 
-const std::array<u8, 256> OpcodeTiming8Bit = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 12, 12, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0,
-	4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0
-};
-
-const std::array<u8, 256> OpcodeTiming16Bit = {
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0,
-	0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0,
-	0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0,
-	0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0,
-	0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 12, 0
-};
 
 CPU::CPU(GamboCore* c)
 	: core(c)
 {
 	spdlog::enable_backtrace(50);
-	Reset();
 }
 
 CPU::~CPU()
@@ -183,17 +145,23 @@ u8 CPU::RunFor(u8 ticks)
 					}
 
 					// timing for non cb instructions
-					if (opcode == 0x36
-						|| opcode == 0xE0
-						|| opcode == 0xF0)
+					switch (opcode)
 					{
-						opcodeTimingDelay = 1;
-					}
-
-					if (opcode == 0xEA
-						|| opcode == 0xFA)
-					{
-						opcodeTimingDelay = 2;
+						case 0x34:
+						case 0x35:
+						case 0x36:
+						case 0xE0:
+						case 0xF0:
+						{
+							opcodeTimingDelay = 1;
+							break;
+						}
+						case 0xEA:
+						case 0xFA:
+						{
+							opcodeTimingDelay = 2;
+							break;
+						}
 					}
 				}
 				
@@ -213,16 +181,48 @@ u8 CPU::RunFor(u8 ticks)
 						}
 
 						// timing for CB instructinos
-						if (opcode == 0x46
-							|| opcode == 0x4E
-							|| opcode == 0x56
-							|| opcode == 0x5E
-							|| opcode == 0x66
-							|| opcode == 0x6E
-							|| opcode == 0x76
-							|| opcode == 0x7E)
+						switch (opcode)
 						{
-							opcodeTimingDelay = 1;
+							case 0x46:
+							case 0x4E:
+							case 0x56:
+							case 0x5E:
+							case 0x66:
+							case 0x6E:
+							case 0x76:
+							case 0x7E:
+							{
+								opcodeTimingDelay = 1;
+								break;
+							}
+							case 0x06:
+							case 0x0E:
+							case 0x16:
+							case 0x1E:
+							case 0x26:
+							case 0x2E:
+							case 0x36:
+							case 0x3E:
+							case 0x86:
+							case 0x8E:
+							case 0x96:
+							case 0x9E:
+							case 0xA6:
+							case 0xAE:
+							case 0xB6:
+							case 0xBE:
+							case 0xC6:
+							case 0xCE:
+							case 0xD6:
+							case 0xDE:
+							case 0xE6:
+							case 0xEE:
+							case 0xF6:
+							case 0xFE:
+							{
+								opcodeTimingDelay = 2;
+								break;
+							}
 						}
 					}
 
@@ -241,6 +241,49 @@ u8 CPU::RunFor(u8 ticks)
 						// throw if the delay is negative somehow. this should never happen
 						if (opcodeTimingDelay < 0)
 							throw;
+
+						// reads for these happen on the second to last m-cycle cycle. writes 
+						// happen on the last cycle.
+						if (isCB)
+						{
+							if (opcodeTimingDelay == 1 && (
+								opcode == 0x06 || 
+								opcode == 0x0E || 
+								opcode == 0x16 || 
+								opcode == 0x1E || 
+								opcode == 0x26 || 
+								opcode == 0x2E || 
+								opcode == 0x36 || 
+								opcode == 0x3E || 
+								opcode == 0x86 || 
+								opcode == 0x8E || 
+								opcode == 0x96 || 
+								opcode == 0x9E || 
+								opcode == 0xA6 || 
+								opcode == 0xAE || 
+								opcode == 0xB6 || 
+								opcode == 0xBE || 
+								opcode == 0xC6 || 
+								opcode == 0xCE || 
+								opcode == 0xD6 || 
+								opcode == 0xDE || 
+								opcode == 0xE6 || 
+								opcode == 0xEE || 
+								opcode == 0xF6 || 
+								opcode == 0xFE))
+							{
+								(this->*(*opcodeTable)[opcode].Execute)();
+							}
+						}
+						else
+						{
+							if (opcodeTimingDelay == 1 && (
+								opcode == 0x34 ||
+								opcode == 0x35))
+							{
+								(this->*(*opcodeTable)[opcode].Execute)();
+							}
+						}
 
 						// add one m-cycle and set delay to the next lowest state
 						cycles += 4;
@@ -461,7 +504,7 @@ void CPU::Reset()
 	opcodeTable = &instructions8bit;
 	IME = false;
 	IMEcycles = false;
-	DIVCounter = 0;
+	DIVCounter = 256;
 	TIMACounter = 0;
 
 	if (core->IsUseBootRom())
@@ -1918,7 +1961,13 @@ u8 CPU::DEC_L()
 
 u8 CPU::INC_aHL()
 {
-	int prev = Read(HL);
+	static int prev = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		prev = Read(HL);
+		return 0;
+	}
+	
 	Write(HL, prev + 1);
 
 	SetFlag(CPUFlags::Z, Read(HL) == 0);
@@ -1930,7 +1979,13 @@ u8 CPU::INC_aHL()
 
 u8 CPU::DEC_aHL()
 {
-	int data = Read(HL);
+	static int data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+
 	Write(HL, --data);
 
 	SetFlag(CPUFlags::Z, data == 0);
@@ -3010,7 +3065,13 @@ u8 CPU::RLC_L()
 
 u8 CPU::RLC_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+
 	bool bit7 = data & 0b10000000;
 
 	Write(HL, (data << 1) | (u8)bit7);
@@ -3123,7 +3184,13 @@ u8 CPU::RRC_L()
 
 u8 CPU::RRC_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+
 	u8 bit0 = data & 0b00000001;
 
 	Write(HL, (data >> 1) | (bit0 << 7));
@@ -3236,7 +3303,13 @@ u8 CPU::RL_L()
 
 u8 CPU::RL_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = Read(HL);
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+
 	bool bit7 = data & 0b10000000;
 
 	Write(HL, (data << 1) | (u8)GetFlag(CPUFlags::C));
@@ -3349,7 +3422,12 @@ u8 CPU::RR_L()
 
 u8 CPU::RR_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = Read(HL);
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
 	bool bit0 = data & 0b00000001;
 
 	Write(HL, (data >> 1) | (u8)GetFlag(CPUFlags::C) << 7);
@@ -3462,7 +3540,13 @@ u8 CPU::SLA_L()
 
 u8 CPU::SLA_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+
 	bool bit7 = data & 0b10000000;
 
 	Write(HL, data << 1);
@@ -3581,7 +3665,12 @@ u8 CPU::SRA_L()
 
 u8 CPU::SRA_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
 	bool bit0 = data & 0b00000001;
 	bool bit7 = (data & 0b10000000) >> 7;
 
@@ -3702,7 +3791,12 @@ u8 CPU::SWAP_L()
 
 u8 CPU::SWAP_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
 
 	u8 low = data & 0b00001111;
 	u8 high = data >> 4;
@@ -3818,7 +3912,12 @@ u8 CPU::SRL_L()
 
 u8 CPU::SRL_aHL()
 {
-	u8 data = Read(HL);
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
 	bool bit0 = data & 0b00000001;
 
 	Write(HL, data >> 1);
@@ -4339,7 +4438,13 @@ u8 CPU::RES_0_L()
 
 u8 CPU::RES_0_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 0));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 0));
 	return 0;
 }
 
@@ -4387,7 +4492,13 @@ u8 CPU::RES_1_L()
 
 u8 CPU::RES_1_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 1));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 1));
 	return 0;
 }
 
@@ -4435,7 +4546,13 @@ u8 CPU::RES_2_L()
 
 u8 CPU::RES_2_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 2));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 2));
 	return 0;
 }
 
@@ -4483,7 +4600,13 @@ u8 CPU::RES_3_L()
 
 u8 CPU::RES_3_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 3));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 3));
 	return 0;
 }
 
@@ -4531,7 +4654,13 @@ u8 CPU::RES_4_L()
 
 u8 CPU::RES_4_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 4));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 4));
 	return 0;
 }
 
@@ -4579,7 +4708,13 @@ u8 CPU::RES_5_L()
 
 u8 CPU::RES_5_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 5));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 5));
 	return 0;
 }
 
@@ -4627,7 +4762,13 @@ u8 CPU::RES_6_L()
 
 u8 CPU::RES_6_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 6));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 6));
 	return 0;
 }
 
@@ -4675,7 +4816,13 @@ u8 CPU::RES_7_L()
 
 u8 CPU::RES_7_aHL()
 {
-	Write(HL, Read(HL) & ~(1 << 7));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data & ~(1 << 7));
 	return 0;
 }
 
@@ -4723,7 +4870,13 @@ u8 CPU::SET_0_L()
 
 u8 CPU::SET_0_aHL()
 {
-	Write(HL, Read(HL) | (1 << 0));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 0));
 	return 0;
 }
 
@@ -4771,7 +4924,13 @@ u8 CPU::SET_1_L()
 
 u8 CPU::SET_1_aHL()
 {
-	Write(HL, Read(HL) | (1 << 1));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 1));
 	return 0;
 }
 
@@ -4819,7 +4978,13 @@ u8 CPU::SET_2_L()
 
 u8 CPU::SET_2_aHL()
 {
-	Write(HL, Read(HL) | (1 << 2));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 2));
 	return 0;
 }
 
@@ -4867,7 +5032,13 @@ u8 CPU::SET_3_L()
 
 u8 CPU::SET_3_aHL()
 {
-	Write(HL, Read(HL) | (1 << 3));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 3));
 	return 0;
 }
 
@@ -4915,7 +5086,13 @@ u8 CPU::SET_4_L()
 
 u8 CPU::SET_4_aHL()
 {
-	Write(HL, Read(HL) | (1 << 4));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 4));
 	return 0;
 }
 
@@ -4963,7 +5140,13 @@ u8 CPU::SET_5_L()
 
 u8 CPU::SET_5_aHL()
 {
-	Write(HL, Read(HL) | (1 << 5));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 5));
 	return 0;
 }
 
@@ -5011,7 +5194,13 @@ u8 CPU::SET_6_L()
 
 u8 CPU::SET_6_aHL()
 {
-	Write(HL, Read(HL) | (1 << 6));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 6));
 	return 0;
 }
 
@@ -5059,7 +5248,13 @@ u8 CPU::SET_7_L()
 
 u8 CPU::SET_7_aHL()
 {
-	Write(HL, Read(HL) | (1 << 7));
+	static u8 data = 0;
+	if (opcodeTimingDelay == 1)
+	{
+		data = Read(HL);
+		return 0;
+	}
+	Write(HL, data | (1 << 7));
 	return 0;
 }
 
