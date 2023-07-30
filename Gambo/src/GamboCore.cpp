@@ -57,8 +57,11 @@ void GamboCore::Run()
 	}
 	else if (step)
 	{
-		int cycles = cpu->RunFor(1);
-		ppu->Tick(cycles);
+		do
+		{
+			int cycles = cpu->RunFor(1);
+			ppu->Tick(cycles);
+		} while (!cpu->IsCurrentInstructionFinished());
 
 		step = false;
 		disassemble = true;

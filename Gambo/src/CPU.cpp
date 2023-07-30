@@ -588,6 +588,11 @@ bool CPU::GetIME()
 	return IME;
 }
 
+bool CPU::IsCurrentInstructionFinished()
+{
+	return opcodeTimingDelay < 0;
+}
+
 std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
 {
 	u32 addr = startAddr;

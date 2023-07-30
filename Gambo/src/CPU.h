@@ -49,7 +49,7 @@ public:
 	const u16& GetPC() const;
 	bool GetFlag(CPUFlags f);
 	bool GetIME();
-
+	bool IsCurrentInstructionFinished();
 	void RequestInterrupt(InterruptFlags f);
 
 	std::map<u16, std::string> Disassemble(u16 startAddr, int numInstr);
