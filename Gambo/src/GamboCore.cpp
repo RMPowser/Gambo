@@ -12,13 +12,14 @@
 #include <iostream>
 
 GamboCore::GamboCore()
-	: cpu(new CPU(this))
+	: ram(new RAM(this))
+	, cpu(new CPU(this))
 	, ppu(new PPU(this))
-	, ram(new RAM(this))
 	, boot(new BootRomDMG())
 	, cart(new Cartridge())
 	, vram(new VramViewer(ram))
 {
+	cart->Reset();
 	Reset();
 }
 

@@ -28,7 +28,6 @@ const std::array<u8, 256> bootRom = // this is a regular DMG boot rom. not DMG0.
 RAM::RAM(GamboCore* c)
 	: core(c)
 {
-	Reset();
 }
 
 RAM::~RAM()

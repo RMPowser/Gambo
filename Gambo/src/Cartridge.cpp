@@ -299,7 +299,6 @@ const std::map<std::string, std::string> new_publisher_info =
 #pragma warning(disable : 26495)
 Cartridge::Cartridge()
 {
-	Reset();
 }
 #pragma warning(pop)
 

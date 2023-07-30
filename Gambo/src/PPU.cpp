@@ -9,7 +9,6 @@
 PPU::PPU(GamboCore* c)
 	: core(c)
 {
-	Reset();
 }
 
 PPU::~PPU()
