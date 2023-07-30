@@ -63,9 +63,9 @@ void RAM::Write(u16 addr, u8 data)
 		if (!GetBits(curr, (u8)LCDCBits::WindowEnable, 0b1) && GetBits(data, (u8)LCDCBits::WindowEnable, 0b1))
 			core->ppu->ResetWindowLine();
 
-		if (GetBits(data, (u8)LCDCBits::LCDEnable, 0b1))
+		if (GetBits(data, (u8)LCDCBits::LCDEnable, 0b1) && !GetBits(curr, (u8)LCDCBits::LCDEnable, 0b1))
 			core->ppu->Enable();
-		else
+		else if (!GetBits(data, (u8)LCDCBits::LCDEnable, 0b1) && GetBits(curr, (u8)LCDCBits::LCDEnable, 0b1))
 			core->ppu->Disable();
 	}
 
