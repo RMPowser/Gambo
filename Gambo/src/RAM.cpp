@@ -1,6 +1,7 @@
 #include "RAM.h"
 #include "GamboCore.h"
 #include "PPU.h"
+#include <random>
 
 const std::array<u8, 256> bootRom = // this is a regular DMG boot rom. not DMG0.
 {
@@ -103,6 +104,11 @@ void RAM::Reset()
 	for (size_t i = 0x8000; i < 0xC000; i++)
 		ram[i] = 0xFF;
 
+	// fill WRAM with random bullshit
+	std::random_device rd;
+	for (size_t i = 0xC000; i < 0xE000; i++)
+		ram[i] = rd() % 0x100;
+	
 	// fill IO/control registers with 0xFF
 	for (size_t i = 0xFF00; i < 0x10000; i++)
 		ram[i] = 0xFF;
