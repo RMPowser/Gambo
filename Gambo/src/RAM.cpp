@@ -59,10 +59,6 @@ void RAM::Write(u16 addr, u8 data)
 	{
 		u8 curr = ram[addr];
 
-		// if the window will be enabled from being disabled, reset its line
-		if (!GetBits(curr, (u8)LCDCBits::WindowEnable, 0b1) && GetBits(data, (u8)LCDCBits::WindowEnable, 0b1))
-			core->ppu->ResetWindowLine();
-
 		if (GetBits(data, (u8)LCDCBits::LCDEnable, 0b1) && !GetBits(curr, (u8)LCDCBits::LCDEnable, 0b1))
 			core->ppu->Enable();
 		else if (!GetBits(data, (u8)LCDCBits::LCDEnable, 0b1) && GetBits(curr, (u8)LCDCBits::LCDEnable, 0b1))

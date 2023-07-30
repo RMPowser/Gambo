@@ -53,7 +53,6 @@ public:
 	void Enable();
 	void Disable();
 	bool IsEnabled() const;
-	void ResetWindowLine();
 	PPUMode GetMode() const;
 	void SetDoDMATransfer(bool b);
 
@@ -73,9 +72,9 @@ private:
 	bool isEnabled;
 	int cyclesCounter;
 	int modeCounterForVBlank;
-	int windowLine;
 	int pixelCounter;				// keeps track of the pixel on the current scanline. resets every scanline.
 	bool scanlineComplete;
 	int LY;							// this is read only which is why we keep a local copy and write it into ram
+	int windowLY;					// same as LY but for the window. internal only, meaning not accessible to any other components of the game boy.
 	std::array<SDL_Color, GamboScreenSize> screen;
 };

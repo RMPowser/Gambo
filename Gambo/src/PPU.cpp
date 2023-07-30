@@ -80,7 +80,7 @@ bool PPU::Tick(u8 cycles)
 
 						vblank = true;
 
-						windowLine = 0;
+						windowLY = 0;
 					}
 					else
 					{
@@ -181,7 +181,7 @@ void PPU::Reset()
 	isEnabled = false;
 	cyclesCounter = 0;
 	modeCounterForVBlank = 0;
-	windowLine = 0;
+	windowLY = 0;
 	pixelCounter = 0;
 	scanlineComplete = false;
 	LY = 0; 
@@ -213,12 +213,6 @@ void PPU::Disable()
 bool PPU::IsEnabled() const
 {
 	return isEnabled;
-}
-
-void PPU::ResetWindowLine()
-{
-	if (windowLine == 0 && LY < 144 && LY > Read(HWAddr::WY))
-		windowLine = 144;
 }
 
 PPUMode PPU::GetMode() const
@@ -283,8 +277,8 @@ void PPU::DrawBGOrWindowPixel()
 		bool isSigned = tileDataBaseAddr == 0x9000;
 
 		// this is the x,y coordinates of the pixel in the 256x256pixel tile map
-		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX) ? pixelCounter - WX + 7: pixelCounter + SCX;
-		u8 pixelMapPosY = usingWindow ? (LY + WY) : (LY + SCY);
+		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX - 7) ? pixelCounter - WX + 7: pixelCounter + SCX;
+		u8 pixelMapPosY = usingWindow ? (windowLY) : (LY + SCY);
 		
 		// this is the x,y indices of the tile within the map
 		u8 tileX = pixelMapPosX / 8;
@@ -317,6 +311,9 @@ void PPU::DrawBGOrWindowPixel()
 
 		// we can finally draw a pixel
 		screen[pixelIndex] = GameBoyColors[color];
+
+		if (usingWindow && pixelCounter >= GamboScreenWidth -1)
+			windowLY++;
 	}
 	else
 	{
