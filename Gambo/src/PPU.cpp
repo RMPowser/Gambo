@@ -118,6 +118,7 @@ bool PPU::Tick(u8 cycles)
 				if (cyclesCounter >= 80)
 				{
 					cyclesCounter -= 80;
+					SCX = Get(HWAddr::SCX);
 					mode = PPUMode::Draw;
 					scanlineComplete = false;
 				}
@@ -175,16 +176,16 @@ bool PPU::Tick(u8 cycles)
 
 void PPU::Reset()
 {
-	mode = PPUMode::HBlank;
+	mode = PPUMode::VBlank;
 	doDMATransfer = false;
 	blankFrame = true;
 	isEnabled = false;
 	cyclesCounter = 0;
 	modeCounterForVBlank = 0;
-	windowLY = 0;
 	pixelCounter = 0;
 	scanlineComplete = false;
 	LY = 0; 
+	windowLY = 0;
 	screen.fill(blankingColor);
 
 	Get(HWAddr::LY) = LY;
@@ -247,7 +248,6 @@ void PPU::CheckForLYCStatInterrupt()
 void PPU::DrawBGOrWindowPixel()
 {
 	const u8& LCDC = Get(HWAddr::LCDC);	// LCD control
-	const u8& SCX = Get(HWAddr::SCX);	// scroll x
 	const u8& SCY = Get(HWAddr::SCY);	// scroll y
 	const u8& WX = Get(HWAddr::WX);		// window X position + 7
 	const u8& WY = Get(HWAddr::WY);		// window Y position
@@ -276,8 +276,8 @@ void PPU::DrawBGOrWindowPixel()
 		u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1)	? 0x8000 : 0x9000;
 		bool isSigned = tileDataBaseAddr == 0x9000;
 
-		// this is the x,y coordinates of the pixel in the 256x256pixel tile map
-		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX - 7) ? pixelCounter - WX + 7: pixelCounter + SCX;
+		// this is the x,y coordinates of the pixel in the 256x256pixel tile map. also update the top 5 bits of SCX here
+		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX - 7) ? pixelCounter : pixelCounter + (SCX | (Get(HWAddr::SCX) & 0b11111000));
 		u8 pixelMapPosY = usingWindow ? (windowLY) : (LY + SCY);
 		
 		// this is the x,y indices of the tile within the map

@@ -76,5 +76,6 @@ private:
 	bool scanlineComplete;
 	int LY;							// this is read only which is why we keep a local copy and write it into ram
 	int windowLY;					// same as LY but for the window. internal only, meaning not accessible to any other components of the game boy.
+	int SCX;						// this is not read only, but it does have specific behaviour when it comes to reading
 	std::array<SDL_Color, GamboScreenSize> screen;
 };
