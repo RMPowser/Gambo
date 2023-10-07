@@ -186,3 +186,10 @@ constexpr u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask)
 {
 	return (reg & (bitMask << bitIndex)) >> bitIndex;
 }
+
+constexpr void SetBit(u8& reg, u8 bitIndex, bool value)
+{
+	value == true 
+		? reg |= 1 << bitIndex 
+		: reg &= ~(1 << bitIndex);
+}

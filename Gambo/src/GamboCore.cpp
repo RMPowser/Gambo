@@ -2,6 +2,7 @@
 #include "CPU.h"
 #include "PPU.h"
 #include "RAM.h"
+#include "Input.h"
 #include "Cartridge.h"
 #include "BootRomDMG.h"
 #include "VramViewer.h"
@@ -15,6 +16,7 @@ GamboCore::GamboCore()
 	: ram(new RAM(this))
 	, cpu(new CPU(this))
 	, ppu(new PPU(this))
+	, input(new Input(this))
 	, boot(new BootRomDMG())
 	, cart(new Cartridge())
 	, vram(new VramViewer(ram))
@@ -28,6 +30,7 @@ GamboCore::~GamboCore()
 	SAFE_DELETE(cpu);
 	SAFE_DELETE(ppu);
 	SAFE_DELETE(ram);
+	SAFE_DELETE(input);
 	SAFE_DELETE(cart);
 	SAFE_DELETE(boot);
 }
@@ -40,6 +43,7 @@ void GamboCore::Run()
 		int totalCycles = 0;
 		while (!vblank)
 		{
+			input->Check();
 			int cycles = cpu->RunFor(1);
 			vblank = ppu->Tick(cycles);
 

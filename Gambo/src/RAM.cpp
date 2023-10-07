@@ -42,16 +42,21 @@ const u8 RAM::Read(u16 addr) const
 
 void RAM::Write(u16 addr, u8 data)
 {
-	// TODO: remove this after implementing input
-	if (addr == HWAddr::P1)
-	{
-		return;
-	}
-
 	// these addresses are read only
 	if ((0x0000 <= addr && addr <= 0x7FFF) ||
 		(0xFEA0 <= addr && addr <= 0xFEFF))
 	{
+		return;
+	}
+
+	// the bottom half of this register is read only, and bits 6 and 7 are unused
+	if (addr == HWAddr::P1)
+	{
+		auto& P1 = ram[addr];
+		
+		u8 lowBits = P1 & 0b11001111;
+		P1 = data;
+		P1 |= lowBits;
 		return;
 	}
 

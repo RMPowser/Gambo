@@ -13,7 +13,9 @@
   <ItemGroup>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="src\VramViewer.cpp" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="src\bootroms\BootRomDMG.h" />
     <ClInclude Include="src\bootroms\BootRom.h" />
     <ClInclude Include="src\RAM.h" />

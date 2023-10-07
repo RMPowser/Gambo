@@ -37,6 +37,7 @@ class GamboCore
 	friend class CPU;
 	friend class PPU;
 	friend class RAM;
+	friend class Input;
 
 public:
 	GamboCore();
@@ -84,6 +85,7 @@ private:
 	CPU* cpu;
 	PPU* ppu;
 	RAM* ram;
+	Input* input;
 	BootRom* boot;
 	Cartridge* cart;
 	VramViewer* vram;
