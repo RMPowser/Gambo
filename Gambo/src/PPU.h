@@ -63,7 +63,7 @@ private:
 
 	void CheckForLYCStatInterrupt();
 	void DrawBGOrWindowPixel(); // draw background
-	void DrawSL(); // draw scanline
+	void DrawObjPixel(); // draw scanline
 
 	GamboCore* core;
 	PPUMode mode;
@@ -78,4 +78,15 @@ private:
 	int windowLY;					// same as LY but for the window. internal only, meaning not accessible to any other components of the game boy.
 	int SCX;						// this is not read only, but it does have specific behaviour when it comes to reading
 	std::array<SDL_Color, GamboScreenSize> screen;
+
+	struct OAM_entry
+	{
+		u8 ypos;
+		u8 xpos;
+		u8 tileIndex; // from 0x8000 to 0x8FFF
+		u8 flags;
+	};
+
+	std::vector<OAM_entry> objsToDraw;
+	u8 objHeight;
 };

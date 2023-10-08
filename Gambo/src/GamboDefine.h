@@ -113,6 +113,8 @@ inline constexpr auto BytesPerPixel = 4;
 static auto PixelScale = 5;
 inline constexpr auto PixelScaleMax = 8;
 static constexpr auto TabSizeInSpaces = 4;
+inline constexpr auto OAMSize = 0xFEA0 - 0xFE00;
+inline constexpr auto ObjWidth = 8;
 
 #define SAFE_DELETE(ptr) if (ptr) { delete ptr; ptr = nullptr; }
 #define SAFE_DELETE_ARRAY(ptr) if (ptr) { delete[] ptr; ptr = nullptr; }
@@ -177,7 +179,7 @@ static SDL_Color GameBoyColors[5]
 	{ 139, 172, 15, 255 },
 	{ 48, 98, 48, 255 },
 	{ 15, 56, 15, 255 },
-	{ 0, 0, 0, 0 }, // transparent for use in sprites
+	{ 255, 255, 255, 0 }, // transparent for use in sprites
 };
 
 static const auto DesiredFPS = 60;
