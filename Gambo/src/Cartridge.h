@@ -3,6 +3,7 @@
 
 class BaseMapper;
 class MBC1;
+class MBC3;
 
 
 enum class MapperType
@@ -41,6 +42,7 @@ enum class MapperType
 class Cartridge
 {
 	friend class MBC1;
+	friend class MBC3;
 
 public:
 	Cartridge();

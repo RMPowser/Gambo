@@ -1,6 +1,7 @@
 #include "Cartridge.h"
 #include "BaseMapper.h"
 #include "MBC1.h"
+#include "MBC3.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -580,6 +581,12 @@ void Cartridge::InitializeMapper()
 		case MapperType::MBC1_RAM:
 		case MapperType::MBC1_RAM_BATTERY:
 			mapper = new MBC1(this);
+			break;
+
+		case MapperType::MBC3:
+		case MapperType::MBC3_RAM:
+		case MapperType::MBC3_RAM_BATTERY:
+			mapper = new MBC3(this);
 			break;
 
 		default:
