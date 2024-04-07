@@ -8,6 +8,7 @@
 #include <exception>
 #include "PPU.h"
 #include "VramViewer.h"
+#include <thread>
 
 ImVec4 clear_color;
 constexpr auto MainWindowTitle = "Gambo";

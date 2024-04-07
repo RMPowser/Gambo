@@ -1,4 +1,5 @@
 #pragma once
+#define _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING
 #include "SDL.h"
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
