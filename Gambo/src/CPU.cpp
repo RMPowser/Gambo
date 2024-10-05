@@ -636,6 +636,25 @@ bool CPU::IsCurrentInstructionFinished()
 	return opcodeTimingDelay < 0;
 }
 
+std::string CPU::FormatMnemonic(std::string mnemonic, std::string data)
+{
+	std::stringstream ss;
+	
+	for (char& c : mnemonic)
+	{
+		if (c == '{')
+		{
+			ss << data;
+		}
+		else if (c != '}')
+		{
+			ss << c;
+		}
+	}
+
+	return ss.str();
+}
+
 std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
 {
 	u32 addr = startAddr;
@@ -679,10 +698,10 @@ std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
 					{
 						s16 sdata = (s8)data;
 						sdata += addr;
-						s += std::vformat(instruction.mnemonic, std::make_format_args(hex(sdata, 4)));
+						s += FormatMnemonic(instruction.mnemonic, hex(sdata, 4));
 						break;
 					}
-					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
+					s += FormatMnemonic(instruction.mnemonic, hex(data, 2));
 					break;
 				}
 				case 3:
@@ -690,7 +709,7 @@ std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
 					u16 lo = Read(addr++);
 					u16 hi = Read(addr++);
 					u16 data = (hi << 8) | lo;
-					s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
+					s += FormatMnemonic(instruction.mnemonic, hex(data, 4));
 					break;
 				}
 				default:

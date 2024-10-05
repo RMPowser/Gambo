@@ -51,7 +51,8 @@ public:
 	bool GetIME();
 	bool IsCurrentInstructionFinished();
 	void RequestInterrupt(InterruptFlags f);
-
+	
+	std::string FormatMnemonic(std::string mnemonic, std::string data);
 	std::map<u16, std::string> Disassemble(u16 startAddr, int numInstr);
 
 private:
