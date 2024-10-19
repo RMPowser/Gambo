@@ -91,7 +91,7 @@ u8 CPU::RunFor(u8 ticks)
 					opcode = Read(PC++);
 					isCB = opcode == 0xCB;
 					
-#if defined(_DEBUG) && 0
+#if defined(_DEBUG) && 1
 					std::string s = "$" + hex(PC - 1, 4) + ": ";
 					if (opcode == 0xCB)
 					{
@@ -117,10 +117,10 @@ u8 CPU::RunFor(u8 ticks)
 								{
 									s16 sdata = (s8)data;
 									sdata += PC + 1;
-									s += std::vformat(instruction.mnemonic, std::make_format_args(hex(sdata, 4)));
+									s += FormatMnemonic(instruction.mnemonic, hex(sdata, 4));
 									break;
 								}
-								s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 2)));
+								s += FormatMnemonic(instruction.mnemonic, hex(data, 2));
 								break;
 							}
 							case 3:
@@ -128,7 +128,7 @@ u8 CPU::RunFor(u8 ticks)
 								u16 lo = Read(PC);
 								u16 hi = Read(PC + 1);
 								u16 data = (hi << 8) | lo;
-								s += std::vformat(instruction.mnemonic, std::make_format_args(hex(data, 4)));
+								s += FormatMnemonic(instruction.mnemonic, hex(data, 4));
 								break;
 							}
 							default:
