@@ -68,7 +68,7 @@ private:
 	GamboCore* core;
 	PPUMode mode;
 	bool doDMATransfer;
-	int blankFrame;
+	bool isBlankFrame;
 	bool isEnabled;
 	int cyclesCounter;
 	int modeCounterForVBlank;

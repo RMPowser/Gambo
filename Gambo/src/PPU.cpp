@@ -70,7 +70,7 @@ bool PPU::Tick(u8 cycles)
 
 					if (LY == 144)
 					{
-						blankFrame = false;
+						isBlankFrame = false;
 						mode = PPUMode::VBlank;
 						modeCounterForVBlank = cyclesCounter;
 						core->cpu->RequestInterrupt(InterruptFlags::VBlank);
@@ -200,7 +200,7 @@ void PPU::Reset()
 {
 	mode = PPUMode::VBlank;
 	doDMATransfer = false;
-	blankFrame = true;
+	isBlankFrame = true;
 	isEnabled = false;
 	cyclesCounter = 0;
 	modeCounterForVBlank = 0;
@@ -281,7 +281,7 @@ void PPU::DrawBGOrWindowPixel()
 	if (GetBits(LCDC, (u8)LCDCBits::BGAndWindowEnable, 0b1))
 	{
 		// early out if blankFrame
-		if (blankFrame)
+		if (isBlankFrame)
 		{
 			screen[pixelIndex] = blankingColor;
 			return;
@@ -356,7 +356,7 @@ void PPU::DrawObjPixel()
 	if (GetBits(LCDC, (u8)LCDCBits::OBJEnable, 0b1))
 	{
 		// early out if blankFrame
-		if (blankFrame)
+		if (isBlankFrame)
 			return;
 
 		// find the obj we need to draw at this pixel, if any
