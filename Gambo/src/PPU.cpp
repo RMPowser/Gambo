@@ -4,8 +4,9 @@
 #include "CPU.h"
 #include "RAM.h"
 #include <random>
+#include "spdlog/spdlog.h"
 
-SDL_Color blankingColor = { 255, 255, 255, 255 };
+SDL_Color blankingColor = { 220, 220, 15, 255 };
 
 PPU::PPU(GamboCore* c)
 	: core(c)
@@ -136,7 +137,7 @@ bool PPU::Tick(u8 cycles)
 						{
 							objsToDraw.push_back(entry);
 
-							// only draw the first ten entries per scaline
+							// only draw the first ten entries per scanline
 							if (objsToDraw.size() >= 10)
 								break;
 						}
@@ -295,7 +296,7 @@ void PPU::DrawBGOrWindowPixel()
 		u16 tileMapAddr = GetBits(LCDC, (u8)tileMapBitSelect, 0x1) ? 0x9C00 : 0x9800;
 
 		// figure out the base address for the tile data we need
-		u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1)	? 0x8000 : 0x9000;
+		u16 tileDataBaseAddr = GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x9000;
 		bool isSigned = tileDataBaseAddr == 0x9000;
 
 		// this is the x,y coordinates of the pixel in the 256x256pixel tile map. also update the top 5 bits of SCX here
