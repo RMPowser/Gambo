@@ -2,6 +2,7 @@
 #include "BaseMapper.h"
 #include "MBC1.h"
 #include "MBC3.h"
+#include "MBC5.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -293,6 +294,8 @@ const std::map<std::string, std::string> new_publisher_info =
 	{ "97",	"Kaneko" },
 	{ "99",	"Pack in soft" },
 	{ "A4",	"Konami (Yu-Gi-Oh!)" },
+	{ "BL",	"MTO" },
+	{ "DK",	"Kodansha" },
 };
 
 
@@ -586,7 +589,18 @@ void Cartridge::InitializeMapper()
 		case MapperType::MBC3:
 		case MapperType::MBC3_RAM:
 		case MapperType::MBC3_RAM_BATTERY:
+		case MapperType::MBC3_TIMER_BATTERY:
+		case MapperType::MBC3_TIMER_RAM_BATTERY:
 			mapper = new MBC3(this);
+			break;
+
+		case MapperType::MBC5:
+		case MapperType::MBC5_RAM:
+		case MapperType::MBC5_RAM_BATTERY:
+		case MapperType::MBC5_RUMBLE:
+		case MapperType::MBC5_RUMBLE_RAM:
+		case MapperType::MBC5_RUMBLE_RAM_BATTERY:
+			mapper = new MBC5(this);
 			break;
 
 		default:

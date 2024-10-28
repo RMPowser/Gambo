@@ -15,11 +15,13 @@
   <ItemGroup>
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="src\mappers\MBC3.cpp" />
+    <ClCompile Include="src\mappers\MBC5.cpp" />
     <ClCompile Include="src\VramViewer.cpp" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="src\mappers\MBC3.h" />
     <ClInclude Include="src\bootroms\BootRomDMG.h" />
     <ClInclude Include="src\bootroms\BootRom.h" />
+    <ClInclude Include="src\mappers\MBC5.h" />
     <ClInclude Include="src\RAM.h" />
     <ClInclude Include="src\mappers\MBC1.h" />
     <ClInclude Include="src\mappers\BaseMapper.h" />
@@ -105,7 +107,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_AMD64_;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_AMD64_;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\mappers;$(ProjectDir)src\bootroms;$(ProjectDir)imgui;$(ProjectDir)imgui\backends;$(ProjectDir);$(ProjectDir)include\imgui;$(SDL2_DIR)\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -133,7 +135,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_AMD64_;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_AMD64_;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
