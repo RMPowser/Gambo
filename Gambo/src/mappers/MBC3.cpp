@@ -1,24 +1,23 @@
 #include "MBC3.h"
 #include "Cartridge.h"
 
+using namespace std;
+
 MBC3::MBC3(Cartridge* cart)
 	: BaseMapper(cart)
 	, ramAndRTCEnabled(0)
 	, romBankNumber(0)
 	, ramBankNumber(0)
-	, bankingModeSelect(0)
-	, bankNumberBitWidth(0)
+	, mappedRTCRegister(MappedRegister::NONE)
+	, rtcS(0)
+	, rtcM(0)
+	, rtcH(0)
+	, rtcDL(0)
+	, rtcDH(0)
+	, wasZeroWritten(0)
+	, isLatched(false)
+	, isHalted(false)
 {
-	int numberOfBanks = cart->GetRomBanks();
-	while (numberOfBanks > 1)
-	{
-		numberOfBanks >>= 1;
-		bankNumberBitWidth++;
-
-		// max width is 5 bits
-		if (bankNumberBitWidth == 5)
-			break;
-	}
 }
 
 MBC3::~MBC3()
@@ -27,26 +26,13 @@ MBC3::~MBC3()
 
 u8 MBC3::Read(u16 addr)
 {
-	// mbc1 supports up to 2mb rom and/or 32kb ram so we actually only need 21 bits in this u32.
+	// mbc3 supports up to 2mb rom and/or 32kb ram + RTC, so we actually only need 21 bits in this u32.
 	u32 wAddr = 0;
 
-	if (0x0000 <= addr && addr <= 0x3FFF)
+	if (0x0000 <= addr && addr <= 0x3FFF) // just the first 16kb of the rom, nothing fancy.
 	{
-		if (bankingModeSelect == 0)
-		{
-			// bits 0-13 come from gameboy address.
-			// other 7 bits are always 0;
-			wAddr = addr & 0x3FFF;
-		}
-		else
-		{
-			// bits 0-13 come from gameboy address.
-			wAddr = addr & 0x3FFF;
-
-			// bits 14-18 are always 0 and bits 19-20
-			// come from ramBankNumber
-			wAddr |= ramBankNumber << 19;
-		}
+		wAddr = addr;
+		return cart->rom[wAddr];
 	}
 	else if (0x4000 <= addr && addr <= 0x7FFF)
 	{
@@ -54,38 +40,63 @@ u8 MBC3::Read(u16 addr)
 		wAddr = addr & 0x3FFF;
 
 		// bits 14-18 are from the rom bank number
-		if (romBankNumber == 0)
-		{
-			wAddr |= 1 << 14;
-		}
-		else
-		{
-			wAddr |= romBankNumber << 14;
-		}
+		wAddr |= romBankNumber << 14;
 
-		// bits 19-20 come from ramBankNumber
-		wAddr |= ramBankNumber << 19;
+		return cart->rom[wAddr];
 	}
 	else if (0xA000 <= addr && addr <= 0xBFFF)
 	{
 		if (ramAndRTCEnabled)
 		{
-			if (bankingModeSelect == 0)
+			// update rtc registers if not latched or halted.
+			if (!isLatched && !isHalted)
 			{
-				// bits 0-12 come from gameboy address.
-				// bits 13-14 are always 0;
-				wAddr = addr & 0x1FFF;
+				// Get the current time
+				auto now = chrono::system_clock::now();
+
+				// Convert to time_t to get the number of seconds since epoch
+				time_t currentTime = chrono::system_clock::to_time_t(now);
+
+				// Convert to tm structure for local time
+				tm* localTime = localtime(&currentTime);
+
+				// tm_sec includes leap seconds. ie: 0-60 instead of 0-59. need to account for that.
+				rtcS = localTime->tm_sec == 60 ? 59 : localTime->tm_sec;
+				rtcM = localTime->tm_min;
+				rtcH = localTime->tm_hour;
+				rtcDL = localTime->tm_yday & 0xFF;
+				rtcDH = localTime->tm_yday & 0x100;
 			}
-			else
+
+			switch (mappedRTCRegister)
 			{
-				// bits 0-12 come from gameboy address.
-				wAddr = addr & 0x1FFF;
-
-				// bits 13-14 come from ramBankNumber
-				wAddr |= ramBankNumber << 13;
+				case MBC3::MappedRegister::NONE:
+				{
+					// bits 0-14 come from gameboy address.
+					wAddr = addr & 0x1FFF;
+					return cart->ram[wAddr];
+				}
+				case MBC3::MappedRegister::RTC_S:
+				{
+					return rtcS;
+				}
+				case MBC3::MappedRegister::RTC_M:
+				{
+					return rtcM;
+				}
+				case MBC3::MappedRegister::RTC_H:
+				{
+					return rtcH;
+				}
+				case MBC3::MappedRegister::RTC_DL:
+				{
+					return rtcDL;
+				}
+				case MBC3::MappedRegister::RTC_DH:
+				{
+					return rtcDH;
+				}
 			}
-
-			return cart->ram[wAddr];
 		}
 		else
 		{
@@ -96,7 +107,7 @@ u8 MBC3::Read(u16 addr)
 		}
 	}
 
-	return cart->rom[wAddr];
+	throw;
 }
 
 void MBC3::Write(u16 addr, u8 data)
@@ -112,54 +123,92 @@ void MBC3::Write(u16 addr, u8 data)
 	}
 	else if (0x2000 <= addr && addr <= 0x3FFF)
 	{
-		// figure out our bit mask
-		int bitMask = 0;
-		for (size_t i = 0; i < bankNumberBitWidth; i++)
+		// Same as for MBC1, except that the whole 7 bits of the ROM Bank Number are written instead of only 5 bits.
+		
+		// writing 0x00 will select bank 0x01 instead.
+		if (data == 0x00)
 		{
-			bitMask <<= 1;
-			bitMask += 1;
+			romBankNumber = 1;
 		}
-
-		// if the bottom 5 bits of data is 0, set rom bank number to 1, otherwise
-		// rom bank number only uses the bits it needs according to the rom size.
-		// this makes it possible to map bank 0 if the bit width is less than 5,  
-		// meaning the rom is 256k or smaller. You can do this by setting any bits 
-		// above the bit width to 1, causing the comparison to fail, and bank 0 to 
-		// be mapped. example: the bit width is 3 and you write 0b01000. 
-		romBankNumber = (data & 0b1111111) == 0 ? 1 : data & bitMask;
+		else
+		{
+			romBankNumber = (data & 0b1111111);
+		}
 	}
 	else if (0x4000 <= addr && addr <= 0x5FFF)
 	{
-		// ram bank number is always only 2 bits
-		ramBankNumber = data & 0b11;
+		// As for the MBC1s RAM Banking Mode, writing a value in range for 0x00-0x03 
+		// maps the corresponding external RAM Bank(if any) into memory at 0xA000-0xBFFF.
+		// When writing a value of 0x08-0x0C, this will map the corresponding RTC register
+		// into memory at 0xA000-0xBFFF. That register could then be read/written by 
+		// accessing any address in that area, typically that is done by using address 0xA000.
+		
+		if (0x00 <= data && data <= 0x03)
+		{
+			ramBankNumber = data;
+		}
+		else if (0x08 <= data && data <= 0x0C)
+		{
+			mappedRTCRegister = MappedRegister(data);
+		}
 	}
 	else if (0x6000 <= addr && addr <= 0x7FFF)
 	{
-		// banking mode select is a 1 bit register
-		bankingModeSelect = data & 0b1;
+		if (data == 0x00)
+		{
+			wasZeroWritten = true;
+		}
+		if (data == 0x01 && wasZeroWritten)
+		{
+			wasZeroWritten = false;
+			isLatched = !isLatched;
+		}
 	}
 	else if (0xA000 <= addr && addr <= 0xBFFF)
 	{
-		// writing to cartridge ram
+		u32 wAddr = 0;
+
+		// writing to cartridge ram or rtc registers
 		if (ramAndRTCEnabled)
 		{
-			u16 wAddr = 0;
-			if (bankingModeSelect == 0)
-			{
-				// bits 0-12 come from gameboy address.
-				// bits 13-14 are always 0;
-				wAddr = addr & 0x1FFF;
-			}
-			else
-			{
-				// bits 0-12 come from gameboy address.
-				wAddr = addr & 0x1FFF;
 
-				// bits 13-14 come from ramBankNumber
-				wAddr |= ramBankNumber << 12;
+			switch (mappedRTCRegister)
+			{
+				case MBC3::MappedRegister::NONE:
+				{
+					// truncate to 8kb range and then offset by ram bank number times the size of a bank.
+					wAddr = addr & 0x1FFF;
+					wAddr += ramBankNumber * 8KiB;
+					cart->ram[wAddr] = data;
+					break;
+				}
+				case MBC3::MappedRegister::RTC_S:
+				{
+					rtcS = data;
+					break;
+				}
+				case MBC3::MappedRegister::RTC_M:
+				{
+					rtcM = data;
+					break;
+				}
+				case MBC3::MappedRegister::RTC_H:
+				{
+					rtcH = data;
+					break;
+				}
+				case MBC3::MappedRegister::RTC_DL:
+				{
+					rtcDL = data;
+					break;
+				}
+				case MBC3::MappedRegister::RTC_DH:
+				{
+					rtcDH = data;
+					isHalted = GetBits(rtcDH, 6, 0b1);
+					break;
+				}
 			}
-
-			cart->ram[wAddr] = data;
 		}
 		else
 		{
