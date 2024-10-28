@@ -4,7 +4,6 @@
 #include "CPU.h"
 #include "RAM.h"
 #include <random>
-#include "spdlog/spdlog.h"
 
 SDL_Color blankingColor = { 220, 220, 15, 255 };
 

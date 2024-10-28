@@ -2,13 +2,17 @@
 #include "GamboCore.h"
 #include "PPU.h"
 #include "RAM.h"
-#include "spdlog/spdlog.h"
 
+#if defined(_DEBUG_WITH_SPDLOG)
+	#include "spdlog/spdlog.h"
+#endif
 
 CPU::CPU(GamboCore* c)
 	: core(c)
 {
+#if defined(_DEBUG_WITH_SPDLOG)
 	spdlog::enable_backtrace(50);
+#endif
 }
 
 CPU::~CPU()
@@ -91,7 +95,7 @@ u8 CPU::RunFor(u8 ticks)
 					opcode = Read(PC++);
 					isCB = opcode == 0xCB;
 					
-#if defined(_DEBUG) && 1
+#if defined(_DEBUG_WITH_SPDLOG)
 					std::string s = "$" + hex(PC - 1, 4) + ": ";
 					if (opcode == 0xCB)
 					{
@@ -744,7 +748,14 @@ void CPU::Pop(std::same_as<u16> auto& reg)
 // catch all non existing instructions
 u8 CPU::XXX()
 {
+#if defined(_DEBUG_WITH_SPDLOG)
 	spdlog::dump_backtrace();
+#endif
+
+#if defined(_DEBUG) && defined(_WIN32)
+	__debugbreak();
+#endif
+
 	throw;
 }
 
