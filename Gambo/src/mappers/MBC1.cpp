@@ -47,24 +47,29 @@ u8 MBC1::Read(u16 addr)
 			// come from ramBankNumber
 			wAddr |= ramBankNumber << 19;
 		}
+
+		return cart->rom[wAddr];
 	}
 	else if (0x4000 <= addr && addr <= 0x7FFF)
 	{
+		bool addOne = false;
+
+		// If the main 5-bit ROM banking register is 0, it reads 1 bank higher.
+		if ((romBankNumber & 0b11111) == 0)
+		{
+			addOne = true;
+		}
+
 		// bits 0-13 come from gameboy address.
 		wAddr = addr & 0x3FFF;
 
 		// bits 14-18 are from the rom bank number
-		if (romBankNumber == 0)
-		{
-			wAddr |= 1 << 14;
-		}
-		else
-		{
-			wAddr |= romBankNumber << 14;
-		}
+		wAddr |= (addOne ? romBankNumber + 1 : romBankNumber) << 14;
 
 		// bits 19-20 come from ramBankNumber
 		wAddr |= ramBankNumber << 19;
+
+		return cart->rom[wAddr];
 	}
 	else if (0xA000 <= addr && addr <= 0xBFFF)
 	{
@@ -78,11 +83,9 @@ u8 MBC1::Read(u16 addr)
 			}
 			else
 			{
-				// bits 0-12 come from gameboy address.
+				// truncate to 8kb range and then offset by ram bank number times the size of a bank.
 				wAddr = addr & 0x1FFF;
-
-				// bits 13-14 come from ramBankNumber
-				wAddr |= ramBankNumber << 13;
+				wAddr += ramBankNumber * 8KiB;
 			}
 
 			return cart->ram[wAddr];
@@ -96,7 +99,7 @@ u8 MBC1::Read(u16 addr)
 		}
 	}
 
-	return cart->rom[wAddr];
+	throw;
 }
 
 void MBC1::Write(u16 addr, u8 data)
