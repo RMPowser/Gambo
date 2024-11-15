@@ -146,11 +146,11 @@ static const ImVec4
 	BLACK				{ 0, 0, 0, 1 },
 	BLANK				{ 0, 0, 0, 0 };
 
-static inline std::string hex(uint32_t n, uint8_t d)
+static inline std::string hex(uint32_t number, uint8_t characterCount)
 {
-	std::string s(d, '0');
-	for (int i = d - 1; i >= 0; i--, n >>= 4)
-		s[i] = "0123456789ABCDEF"[n & 0xF];
+	std::string s(characterCount, '0');
+	for (int i = characterCount - 1; i >= 0; i--, number >>= 4)
+		s[i] = "0123456789ABCDEF"[number & 0xF];
 	return s;
 };
 
