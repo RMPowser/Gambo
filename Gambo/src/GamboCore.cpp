@@ -257,6 +257,7 @@ void GamboCore::Write(u16 addr, u8 data)
 }
 
 void GamboCore::Reset()
+void GamboCore::Reset(bool removeCartridge)
 {
 	done = false;
 	running = false;
@@ -267,7 +268,10 @@ void GamboCore::Reset()
 	boot->Reset();
 
 	// resetting the cartridge is akin to removing a game from a physical gameboy
-	//cart->Reset();
+	if (removeCartridge)
+	{
+		cart->Reset();
+	}
 }
 
 std::map<u16, std::string> GamboCore::Disassemble(u16 startAddr, int numInstr) const

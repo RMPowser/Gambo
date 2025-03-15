@@ -49,6 +49,7 @@ public:
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
 	void Reset();
+	void Reset(bool removeCartridge = false);
 
 	const void* GetScreen() const;
 	VramViewer& GetVramViewer();
