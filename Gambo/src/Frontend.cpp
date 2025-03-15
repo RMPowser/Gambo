@@ -69,24 +69,6 @@ Frontend::Frontend()
 	// Setup Platform/Renderer backends
 	ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
 	ImGui_ImplSDLRenderer2_Init(renderer);
-
-	// Load Fonts
-	// - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-	// - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-	// - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-	// - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-	// - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-	// - Read 'docs/FONTS.md' for more instructions and details.
-	// - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-	//io.Fonts->AddFontDefault();
-	//io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-	//io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-	//ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-	//IM_ASSERT(font != nullptr);
-
-	gambo = std::make_unique<GamboCore>();
 }
 
 Frontend::~Frontend()
@@ -101,7 +83,7 @@ Frontend::~Frontend()
 
 void Frontend::Run()
 {
-	//std::thread gamboThread([&]() { gambo->Run(); });
+	//std::thread gamboThread([&]() { gambo.Run(); });
 	
 
 	while (!done)
@@ -111,7 +93,7 @@ void Frontend::Run()
 		using framerate = duration<int, std::ratio<100, 5973>>;
 		auto timePoint = clock::now() + framerate{1};
 
-		gambo->Run();
+		gambo.Run();
 		BeginFrame();
 		UpdateUI();
 		EndFrame();
@@ -194,7 +176,7 @@ void Frontend::EndFrame()
 
 	if (done)
 	{
-		gambo->SetDone(true);
+		gambo.SetDone(true);
 	}
 }
 
@@ -211,7 +193,7 @@ void Frontend::HandleKeyboardShortcuts()
 		SetGamboRunning();
 
 	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_R))
-		gambo->Reset();
+		gambo.Reset();
 
 	if (debugMode)
 	{
@@ -227,15 +209,15 @@ void Frontend::OpenGameFromFile(std::filesystem::path filePath)
 {
 	if (filePath.extension() == ".gb")
 	{
-		gambo->InsertCartridge(filePath);
+		gambo.InsertCartridge(filePath);
 
-		auto& cart = gambo->GetCartridge();
+		auto& cart = gambo.GetCartridge();
 		if (!cart.IsMapperSupported())
 		{
 			std::stringstream ss;
 			ss << "Gambo does not yet implement mapper " << cart.GetMapperTypeAsString() << ".";
 			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Mapper not supported!", ss.str().c_str(), window);
-			gambo->Reset(true);
+			gambo.Reset(true);
 		}
 		else
 		{
@@ -299,14 +281,14 @@ void Frontend::DrawGamboWindow()
 
 			if (ImGui::BeginMenu("Gambo"))
 			{
-				if (ImGui::MenuItem(!gambo->GetRunning() ? "Play" : "Pause", "Ctrl+P"))
+				if (ImGui::MenuItem(!gambo.GetRunning() ? "Play" : "Pause", "Ctrl+P"))
 				{
 					SetGamboRunning();
 				}
 
 				if (ImGui::MenuItem("Reset", "Ctrl+R"))
 				{
-					gambo->Reset();
+					gambo.Reset();
 				}
 
 				if (debugMode)
@@ -328,9 +310,9 @@ void Frontend::DrawGamboWindow()
 			{
 				ImGui::Separator();
 				
-				static bool useBootRom = gambo->IsUseBootRom();
+				static bool useBootRom = gambo.IsUseBootRom();
 				if (ImGui::MenuItem("Use Boot Rom", nullptr, &useBootRom))
-					gambo->SetUseBootRom(useBootRom);
+					gambo.SetUseBootRom(useBootRom);
 
 				ImGui::Separator();
 
@@ -403,7 +385,7 @@ void Frontend::DrawGamboWindow()
 		
 
 		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboScreenSize) * 0.5f);
-		SDL_UpdateTexture(gamboScreen, NULL, gambo->GetScreen(), GamboScreenWidth * BytesPerPixel);
+		SDL_UpdateTexture(gamboScreen, NULL, gambo.GetScreen(), GamboScreenWidth * BytesPerPixel);
 		ImGui::Image(gamboScreen, gamboScreenSize);
 
 		if (!debugMode)
@@ -434,7 +416,7 @@ void Frontend::DrawCPUInfoWindow()
 
 	ImGui::Begin(CPUInfoWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
 	{
-		auto state = gambo->GetState();
+		auto state = gambo.GetState();
 		//ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 		ImGui::TextColored(WHITE, "FLAGS: ");
 		ImGui::SameLine(); ImGui::TextColored(state.flags.Z ? GREEN : RED, "Z");
@@ -494,7 +476,7 @@ void Frontend::DrawVramViewer()
 			ImDrawList* drawList = ImGui::GetWindowDrawList();
 			ImGuiIO& io = ImGui::GetIO();
 
-			SDL_UpdateTexture(gamboVramView, NULL, gambo->GetVramViewer().GetView().data(), vramViewWidth * BytesPerPixel);
+			SDL_UpdateTexture(gamboVramView, NULL, gambo.GetVramViewer().GetView().data(), vramViewWidth * BytesPerPixel);
 			ImGui::Image(gamboVramView, { vramViewWidth, vramViewWidth });
 
 			if (showGrid)
@@ -516,8 +498,8 @@ void Frontend::DrawVramViewer()
 
 			if (showScreen)
 			{
-				u8 SCX = gambo->Read(HWAddr::SCX);
-				u8 SCY = gambo->Read(HWAddr::SCY);
+				u8 SCX = gambo.Read(HWAddr::SCX);
+				u8 SCY = gambo.Read(HWAddr::SCY);
 
 				float gridMaxX = imguiCursorPos.x + vramViewWidth;
 				float gridMaxY = imguiCursorPos.y + vramViewWidth;
@@ -584,16 +566,16 @@ void Frontend::DrawVramViewer()
 			{
 				case 0:
 				{
-					gambo->GetVramViewer().SetTileMapBaseAddr(-1);
+					gambo.GetVramViewer().SetTileMapBaseAddr(-1);
 				}
 				case 1:
 				{
-					gambo->GetVramViewer().SetTileMapBaseAddr(0x9800);
+					gambo.GetVramViewer().SetTileMapBaseAddr(0x9800);
 					break;
 				}
 				case 2:
 				{
-					gambo->GetVramViewer().SetTileMapBaseAddr(0x9C00);
+					gambo.GetVramViewer().SetTileMapBaseAddr(0x9C00);
 					break;
 				}
 			}
@@ -602,17 +584,17 @@ void Frontend::DrawVramViewer()
 			{
 				case 0:
 				{
-					gambo->GetVramViewer().SetTileDataBaseAddr(-1);
+					gambo.GetVramViewer().SetTileDataBaseAddr(-1);
 					break;
 				}
 				case 1:
 				{
-					gambo->GetVramViewer().SetTileDataBaseAddr(0x9000);
+					gambo.GetVramViewer().SetTileDataBaseAddr(0x9000);
 					break;
 				}
 				case 2:
 				{
-					gambo->GetVramViewer().SetTileDataBaseAddr(0x8000);
+					gambo.GetVramViewer().SetTileDataBaseAddr(0x8000);
 					break;
 				}
 			}
@@ -628,11 +610,11 @@ void Frontend::DrawVramViewer()
 			ImGui::SameLine(); ImGui::TextColored(GREEN, "Y:"); 
 			ImGui::SameLine(); ImGui::Text("$%02X", tileY);
 
-			u8 LCDC = gambo->Read(HWAddr::LCDC);
+			u8 LCDC = gambo.Read(HWAddr::LCDC);
 
 
-			u16 tileMapBaseAddr = gambo->GetVramViewer().GetTileMapBaseAddr() != -1 ? gambo->GetVramViewer().GetTileMapBaseAddr() :GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0x1) ? 0x9C00 : 0x9800;
-			u16 tileDataBaseAddr = gambo->GetVramViewer().GetTileDataBaseAddr() != -1 ? gambo->GetVramViewer().GetTileDataBaseAddr() : GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
+			u16 tileMapBaseAddr = gambo.GetVramViewer().GetTileMapBaseAddr() != -1 ? gambo.GetVramViewer().GetTileMapBaseAddr() :GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0x1) ? 0x9C00 : 0x9800;
+			u16 tileDataBaseAddr = gambo.GetVramViewer().GetTileDataBaseAddr() != -1 ? gambo.GetVramViewer().GetTileDataBaseAddr() : GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
 			u16 mapAddr = tileMapBaseAddr + (32 * tileY) + tileX;
 
 			ImGui::TextColored(CYAN, "Map Addr: "); ImGui::SameLine();
@@ -642,12 +624,12 @@ void Frontend::DrawVramViewer()
 
 			if (tileDataBaseAddr == 0x8800)
 			{
-				tileIndex = static_cast<s8> (gambo->Read(mapAddr));
+				tileIndex = static_cast<s8> (gambo.Read(mapAddr));
 				tileIndex += 128;
 			}
 			else
 			{
-				tileIndex = gambo->Read(mapAddr);
+				tileIndex = gambo.Read(mapAddr);
 			}
 
 			ImGui::TextColored(CYAN, "Tile Addr:"); 
@@ -667,19 +649,19 @@ void Frontend::DrawVramViewer()
 
 void Frontend::SetGamboRunning()
 {
-	gambo->SetRunning(!gambo->GetRunning());
-	if (gambo->GetRunning())
-		gambo->SetStep(false);
+	gambo.SetRunning(!gambo.GetRunning());
+	if (gambo.GetRunning())
+		gambo.SetStep(false);
 }
 
 void Frontend::SetGamboStep()
 {
-	gambo->SetRunning(false);
-	gambo->SetStep(true);
+	gambo.SetRunning(false);
+	gambo.SetStep(true);
 }
 
 void Frontend::SetGamboStepFrame()
 {
-	gambo->SetRunning(false);
-	gambo->SetStepFrame(true);
+	gambo.SetRunning(false);
+	gambo.SetStepFrame(true);
 }

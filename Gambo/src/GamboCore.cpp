@@ -256,7 +256,6 @@ void GamboCore::Write(u16 addr, u8 data)
 	}
 }
 
-void GamboCore::Reset()
 void GamboCore::Reset(bool removeCartridge)
 {
 	done = false;
