@@ -43,14 +43,14 @@ Frontend::Frontend()
 	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) == 0);
 
 	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
-	int menuBarHeight = ImGui::GetFontSize() + (style.FramePadding.y * 2);
+	int menuBarHeight = 13 + (style.FramePadding.y * 2);
 	int windowSizeX = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
-	int windowSizeY = (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight + 13; // pls dont ask where the extra 13 pixels comes from...
+	int windowSizeY = (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight;
 	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, window_flags);
 	SDL_assert_release(window);
 	
 	windowSizeX = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1);
-	windowSizeY = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + menuBarHeight + 13;
+	windowSizeY = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + menuBarHeight;
 	SDL_SetWindowMinimumSize(window, windowSizeX, windowSizeY);
 
 	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
