@@ -35,7 +35,7 @@ Frontend::Frontend()
 
 	auto& style = ImGui::GetStyle();
 	style.WindowBorderSize = 0;
-	style.WindowPadding = { 10, 10 };
+	style.WindowPadding = { 0, 0 };
 	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
 	clear_color = BLACK;
 
@@ -145,8 +145,6 @@ void Frontend::BeginFrame()
 	ImGui_ImplSDLRenderer2_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
 	ImGui::NewFrame();
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 }
 
 void Frontend::UpdateUI()
@@ -162,8 +160,6 @@ void Frontend::UpdateUI()
 
 void Frontend::EndFrame()
 {
-	ImGui::PopStyleVar(1);
-	
 	auto& io = ImGui::GetIO();
 
 	// Rendering
@@ -265,9 +261,12 @@ void Frontend::DrawGamboWindow()
 
 	ImGui::Begin(GamboWindowTitle, 0, gamboWindowFlags);
 	{
-		static auto windowSize = ImGui::GetWindowSize();
+		auto windowSize = ImGui::GetWindowSize();
 		int menuBarHeight = ImGui::GetFontSize() + (style.FramePadding.y * 2);
 		int titleBarHeight = menuBarHeight;
+		
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -335,6 +334,8 @@ void Frontend::DrawGamboWindow()
 						ss << i + 1 << "x";
 						if (ImGui::MenuItem(ss.str().c_str(), nullptr, &scale[i]))
 						{
+							ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+
 							PixelScale = i + 1;
 							windowSize.x = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
 							windowSize.y = !debugMode
@@ -347,6 +348,8 @@ void Frontend::DrawGamboWindow()
 								SDL_RestoreWindow(window);
 								SDL_SetWindowSize(window, windowSize.x, windowSize.y);
 							}
+
+							ImGui::PopStyleVar(1);
 						}
 					}
 					ImGui::EndMenu();
@@ -364,9 +367,12 @@ void Frontend::DrawGamboWindow()
 			ImGui::EndMenuBar();
 		}
 
+		ImGui::PopStyleVar(1);
+
 		ImVec2 gamboScreenSize = !debugMode 
 			? ImVec2(viewport->Size.x - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - menuBarHeight)
 			: ImVec2(windowSize.x - (style.WindowPadding.x * 2), windowSize.y - (style.WindowPadding.y * 2) - menuBarHeight - titleBarHeight);
+
 
 		if (integerScale)
 		{
@@ -394,9 +400,8 @@ void Frontend::DrawGamboWindow()
 			PixelScale = std::max((int)gamboScreenSize.x / GamboScreenWidth, 1);
 			PixelScale = std::min(PixelScale, PixelScaleMax);
 
-			// set the window size to match gambo screen
-			windowSize = { gamboScreenSize.x + (style.WindowPadding.x * 2), gamboScreenSize.y + (style.WindowPadding.y * 2) + menuBarHeight };
-			ImGui::SetWindowSize(viewport->Size);
+			// set the imgui window size to match gambo screen
+			ImGui::SetWindowSize(viewport->WorkSize);
 			ImGui::SetWindowPos({ 0, 0 });
 		}
 	}
@@ -413,6 +418,8 @@ void Frontend::DrawCPUInfoWindow()
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 	auto viewport = ImGui::GetMainViewport();
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
 	ImGui::Begin(CPUInfoWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
 	{
@@ -445,6 +452,8 @@ void Frontend::DrawCPUInfoWindow()
 		}
 	}
 
+	ImGui::PopStyleVar(1);
+
 	ImGui::End();
 }
 
@@ -456,6 +465,9 @@ void Frontend::DrawVramViewer()
 	
 	static bool showGrid = true;
 	static bool showScreen = true;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+
 	ImGui::Begin(VramViewerWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
 	{
 		int gridSpacing = 8;
@@ -643,6 +655,7 @@ void Frontend::DrawVramViewer()
 		}
 	}
 
+	ImGui::PopStyleVar(1);
 
 	ImGui::End();
 }
