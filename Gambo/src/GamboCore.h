@@ -4,6 +4,7 @@
 class CPU;
 class PPU;
 class RAM;
+class Input;
 class Cartridge;
 class BootRom;
 class VramViewer;
