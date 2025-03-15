@@ -26,6 +26,7 @@ private:
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 
+	bool fps60 = true;
 	bool done = false;
 	bool integerScale = true;
 	bool maintainAspectRatio = true;

@@ -90,8 +90,10 @@ void Frontend::Run()
 	{
 		using namespace std::chrono;
 		using clock = high_resolution_clock;
-		using framerate = duration<int, std::ratio<100, 5973>>;
-		auto timePoint = clock::now() + framerate{1};
+		using framerateGSync = duration<int, std::ratio<100, 5973>>;
+		using framerateVSync = duration<int, std::ratio<100, 6000>>;
+		
+		time_point t = fps60 ? clock::now() + framerateVSync{1} : clock::now() + framerateGSync{1};
 
 		gambo.Run();
 		BeginFrame();
@@ -99,12 +101,8 @@ void Frontend::Run()
 		EndFrame();
 
 		// limit fps
-		std::this_thread::sleep_until(timePoint - 5ms);
-		while (clock::now() <= timePoint)
-		{
-			// wait
-		}
-		timePoint += framerate{100};
+		std::this_thread::sleep_until(t - 5ms);
+		while (clock::now() <= t) { /* wait	*/ }
 	}
 
 	//gamboThread.join();
@@ -361,6 +359,8 @@ void Frontend::DrawGamboWindow()
 			{
 				SDL_MaximizeWindow(window);
 			}
+
+			ImGui::Checkbox("60 fps", &fps60);
 
 			ImGui::TextColored(WHITE, "%.3f ms (%.3f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
