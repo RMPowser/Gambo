@@ -1,3 +1,6 @@
-[submodule "Gambo/imgui"]
-	path = Gambo/imgui
+[submodule "imgui"]
+	path = imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "SDL3"]
+	path = SDL3
+	url = https://github.com/libsdl-org/SDL.git

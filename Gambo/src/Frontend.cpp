@@ -2,8 +2,8 @@
 #include "GamboDefine.h"
 #include "Cartridge.h"
 //#include "ClearColor.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlrenderer3.h"
 #include <sstream>
 #include <exception>
 #include "PPU.h"
@@ -19,56 +19,61 @@ bool debugMode = false;
 
 Frontend::Frontend()
 {
-	// Setup Dear ImGui context
+	// Setup SDL
+	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD));
+
+	// initially create the window as hidden. we will show it when its the correct size
+	// after imgui is initialzed
+	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
+	window = SDL_CreateWindow(MainWindowTitle, 1280, 720, window_flags);
+	SDL_assert_release(window);
+
+	// init sdl renderer with vsync on
+	renderer = SDL_CreateRenderer(window, nullptr);
+	SDL_SetRenderVSync(renderer, 1);
+	SDL_assert_release(renderer);
+
+	// Setup ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-	io.IniFilename = NULL;
-
-	// Setup Dear ImGui style
+	// Setup ImGui style
 	ImGui::StyleColorsDark();
 	//ImGui::StyleColorsLight();
-
 	auto& style = ImGui::GetStyle();
 	style.WindowBorderSize = 0;
-	style.WindowPadding = { 0, 0 };
+	style.WindowPadding = { 0, 0 }; // window padding will be handled manually
 	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
 	clear_color = BLACK;
 
+	// Setup Platform/Renderer backends in imgui
+	ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+	ImGui_ImplSDLRenderer3_Init(renderer);
 
-	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) == 0);
-
-	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
+	// now we can set the window size properly
 	int menuBarHeight = 13 + (style.FramePadding.y * 2);
 	int windowSizeX = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
 	int windowSizeY = (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight;
-	window = SDL_CreateWindow(MainWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, window_flags);
-	SDL_assert_release(window);
-	
+	SDL_SetWindowSize(window, windowSizeX, windowSizeY);
+
+	// we can also set minimum window size
 	windowSizeX = (style.WindowPadding.x * 2) + (GamboScreenWidth * 1);
 	windowSizeY = (style.WindowPadding.y * 2) + (GamboScreenHeight * 1) + menuBarHeight;
 	SDL_SetWindowMinimumSize(window, windowSizeX, windowSizeY);
 
-	SDL_assert_release(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
+	// and center the window on the screen 
+	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
-	renderer = SDL_GetRenderer(window);
-	SDL_assert_release(renderer);
+	// gambo generates a texture per frame, and thats what we render
+	gamboTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, GamboScreenWidth, GamboScreenHeight);
+	SDL_assert_release(gamboTexture);
 
-	gamboScreen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, GamboScreenWidth, GamboScreenHeight);
-	SDL_assert_release(gamboScreen);
-
+	// the vram view uses its own texture
 	gamboVramView = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 256, 256);
-	SDL_assert_release(gamboScreen);
+	SDL_assert_release(gamboVramView);
 
-
-
-	// Setup Platform/Renderer backends
-	ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-	ImGui_ImplSDLRenderer2_Init(renderer);
+	// if everything else is ok, we can finally show the window
+	SDL_ShowWindow(window);
 }
 
 Frontend::~Frontend()
@@ -83,9 +88,6 @@ Frontend::~Frontend()
 
 void Frontend::Run()
 {
-	//std::thread gamboThread([&]() { gambo.Run(); });
-	
-
 	while (!done)
 	{
 		using namespace std::chrono;
@@ -118,30 +120,38 @@ void Frontend::BeginFrame()
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
-		ImGui_ImplSDL2_ProcessEvent(&event);
+		ImGui_ImplSDL3_ProcessEvent(&event);
 
-		if (event.type == SDL_DROPFILE)
+		switch (event.type)
 		{
-			OpenGameFromFile(event.drop.file);
-			SDL_free(event.drop.file);
-		}
-		
-		if (event.type == SDL_QUIT)
-		{
-			done = true;
-		}
+			case SDL_EVENT_DROP_FILE:
+			{
+				OpenGameFromFile(event.drop.data);
+				break;
+			}
 
-		if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
-		{
-			done = true;
+			case SDL_EVENT_QUIT:
+			{
+				done = true;
+				break;
+			}
+
+			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			{
+				if (event.window.windowID == SDL_GetWindowID(window))
+				{
+					done = true;
+				}
+				break;
+			}
 		}
 	}
 
 	HandleKeyboardShortcuts();
 
-	// Start the Dear ImGui frame
-	ImGui_ImplSDLRenderer2_NewFrame();
-	ImGui_ImplSDL2_NewFrame();
+	// Start the ImGui frame
+	ImGui_ImplSDLRenderer3_NewFrame();
+	ImGui_ImplSDL3_NewFrame();
 	ImGui::NewFrame();
 }
 
@@ -162,10 +172,10 @@ void Frontend::EndFrame()
 
 	// Rendering
 	ImGui::Render();
-	SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+	SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
 	SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
 	SDL_RenderClear(renderer);
-	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 	SDL_RenderPresent(renderer);
 
 	if (done)
@@ -391,8 +401,8 @@ void Frontend::DrawGamboWindow()
 		
 
 		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboScreenSize) * 0.5f);
-		SDL_UpdateTexture(gamboScreen, NULL, gambo.GetScreen(), GamboScreenWidth * BytesPerPixel);
-		ImGui::Image(gamboScreen, gamboScreenSize);
+		SDL_UpdateTexture(gamboTexture, NULL, gambo.GetScreen(), GamboScreenWidth * BytesPerPixel);
+		ImGui::Image((ImTextureID)gamboTexture, gamboScreenSize);
 
 		if (!debugMode)
 		{
@@ -489,7 +499,7 @@ void Frontend::DrawVramViewer()
 			ImGuiIO& io = ImGui::GetIO();
 
 			SDL_UpdateTexture(gamboVramView, NULL, gambo.GetVramViewer().GetView().data(), vramViewWidth * BytesPerPixel);
-			ImGui::Image(gamboVramView, { vramViewWidth, vramViewWidth });
+			ImGui::Image((ImTextureID)gamboVramView, { vramViewWidth, vramViewWidth });
 
 			if (showGrid)
 			{
@@ -614,7 +624,7 @@ void Frontend::DrawVramViewer()
 			ImGui::TableNextColumn();
 
 			// use UV coordinates to zoom in view of tile we hovered over
-			ImGui::Image((void*)(intptr_t)gamboVramView, ImVec2(128.0f, 128.0f), ImVec2((1.0f / 32.0f) * tileX, (1.0f / 32.0f) * tileY), ImVec2((1.0f / 32.0f) * (tileX + 1), (1.0f / 32.0f) * (tileY + 1)));
+			ImGui::Image((ImTextureID)gamboVramView, ImVec2(128.0f, 128.0f), ImVec2((1.0f / 32.0f) * tileX, (1.0f / 32.0f) * tileY), ImVec2((1.0f / 32.0f) * (tileX + 1), (1.0f / 32.0f) * (tileY + 1)));
 
 
 			ImGui::TextColored(GREEN, "X:"); 

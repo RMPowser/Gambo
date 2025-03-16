@@ -1,6 +1,6 @@
 #pragma once
 #include <atomic>
-#include "SDL.h"
+#include <SDL3/SDL.h>
 #include "GamboCore.h"
 #include "FileDialogs.h"
 #include <filesystem>
@@ -21,7 +21,7 @@ private:
 	void OpenGameFromFile(std::filesystem::path filePath = FileDialogs::OpenFile(L"Game Boy Rom\0*.gb"));
 
 	GamboCore gambo;
-	SDL_Texture* gamboScreen = nullptr;
+	SDL_Texture* gamboTexture = nullptr;
 	SDL_Texture* gamboVramView = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;

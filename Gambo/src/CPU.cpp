@@ -3,16 +3,10 @@
 #include "PPU.h"
 #include "RAM.h"
 
-#if defined(_DEBUG_WITH_SPDLOG)
-	#include "spdlog/spdlog.h"
-#endif
 
 CPU::CPU(GamboCore* c)
 	: core(c)
 {
-#if defined(_DEBUG_WITH_SPDLOG)
-	spdlog::enable_backtrace(50);
-#endif
 }
 
 CPU::~CPU()
@@ -94,53 +88,6 @@ u8 CPU::RunFor(u8 ticks)
 					currentCycles = 0;
 					opcode = Read(PC++);
 					isCB = opcode == 0xCB;
-					
-#if defined(_DEBUG_WITH_SPDLOG)
-					std::string s = "$" + hex(PC - 1, 4) + ": ";
-					if (opcode == 0xCB)
-					{
-						u8 cbOpcode = Read(PC);
-						s += instructions16bit[cbOpcode].mnemonic;
-					}
-					else
-					{
-						auto& instruction = instructions8bit[opcode];
-						switch (instruction.bytes)
-						{
-							case 0:
-							case 1:
-							{
-								s += instruction.mnemonic;
-								break;
-							}
-							case 2:
-							{
-								u8 data = Read(PC);
-								std::string firstTwoChar(instruction.mnemonic.begin(), instruction.mnemonic.begin() + 2);
-								if (firstTwoChar == "JR")
-								{
-									s16 sdata = (s8)data;
-									sdata += PC + 1;
-									s += FormatMnemonic(instruction.mnemonic, hex(sdata, 4));
-									break;
-								}
-								s += FormatMnemonic(instruction.mnemonic, hex(data, 2));
-								break;
-							}
-							case 3:
-							{
-								u16 lo = Read(PC);
-								u16 hi = Read(PC + 1);
-								u16 data = (hi << 8) | lo;
-								s += FormatMnemonic(instruction.mnemonic, hex(data, 4));
-								break;
-							}
-							default:
-								throw("opcode has more than 3 bytes");
-						}
-					}
-					spdlog::debug(s);
-#endif
 
 					if (haltBug)
 					{
