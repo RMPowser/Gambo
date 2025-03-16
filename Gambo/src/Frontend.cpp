@@ -67,10 +67,12 @@ Frontend::Frontend()
 	// gambo generates a texture per frame, and thats what we render
 	gamboTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, GamboScreenWidth, GamboScreenHeight);
 	SDL_assert_release(gamboTexture);
+	SDL_SetTextureScaleMode(gamboTexture, SDL_SCALEMODE_NEAREST);
 
 	// the vram view uses its own texture
 	gamboVramView = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, 256, 256);
 	SDL_assert_release(gamboVramView);
+	SDL_SetTextureScaleMode(gamboVramView, SDL_SCALEMODE_NEAREST);
 
 	// if everything else is ok, we can finally show the window
 	SDL_ShowWindow(window);
@@ -401,7 +403,11 @@ void Frontend::DrawGamboWindow()
 		
 
 		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboScreenSize) * 0.5f);
-		SDL_UpdateTexture(gamboTexture, NULL, gambo.GetScreen(), GamboScreenWidth * BytesPerPixel);
+		void* pixels = nullptr;
+		int pitch = 0;
+		SDL_LockTexture(gamboTexture, NULL, &pixels, &pitch);
+		memcpy(pixels, gambo.GetScreen(), GamboScreenWidth * GamboScreenHeight * BytesPerPixel);
+		SDL_UnlockTexture(gamboTexture);
 		ImGui::Image((ImTextureID)gamboTexture, gamboScreenSize);
 
 		if (!debugMode)
