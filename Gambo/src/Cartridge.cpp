@@ -4,6 +4,7 @@
 #include "MBC3.h"
 #include "MBC5.h"
 #include <iostream>
+#include <iterator>
 #include <fstream>
 #include <sstream>
 
@@ -299,15 +300,41 @@ const std::map<std::string, std::string> new_publisher_info =
 };
 
 
-#pragma warning(push)
-#pragma warning(disable : 26495)
 Cartridge::Cartridge()
+	: mapper(nullptr)
+	, mapperSupported(false)
+	, rom()
+	, ram()
+	, isLoaded(false)
+	, filePath("")
+	, savePath("")
+	, saveFile()
+	, header
+	{
+		.title = {},
+		.manufacturer_code = {},
+		.cgb_flag = 0,
+		.new_publisher_code = {},
+		.sgb_flag = 0,
+		.type = MapperType::ROM_ONLY,
+		.rom_size = 0,
+		.ram_size = 0,
+		.region_code = 0,
+		.old_publisher_code = 0,
+		.rom_version_number = 0,
+		.header_checksum = 0,
+		.global_checksum = {},
+	}
 {
 }
-#pragma warning(pop)
 
 Cartridge::~Cartridge()
 {
+	if (GetRamSize() > 0)
+	{
+		Save();
+	}
+
 	SAFE_DELETE(mapper);
 }
 
@@ -340,6 +367,9 @@ void Cartridge::Load(std::filesystem::path path)
 		rom.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
 		input.close();
 
+		// set paths
+		filePath = path;
+		savePath = path.replace_extension(".sav"); // use the same extension everyone else uses
 		
 		// init the mapper
 		InitializeMapper();
@@ -371,6 +401,8 @@ void Cartridge::Reset()
 	ram.clear();
 	mapperSupported = false;
 	isLoaded = false;
+	filePath.clear();
+	savePath.clear();
 }
 
 std::string Cartridge::GetTitle() const
@@ -608,4 +640,43 @@ void Cartridge::InitializeMapper()
 			mapperSupported = false;
 			break;
 	}
+
+	if (GetRamSize() > 0)
+	{
+		LoadSave();
+	}
+}
+
+void Cartridge::LoadSave()
+{
+	if (!std::filesystem::exists(savePath))
+	{
+		// create save file
+		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
+		saveFile.close();
+	}
+
+	if (!saveFile.is_open())
+	{
+		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary);
+	}
+
+	ram.clear();
+	ram.resize(GetRamSize());
+
+	saveFile.read((char*)ram.data(), GetRamSize());
+	
+	saveFile.close();
+}
+
+void Cartridge::Save()
+{
+	if (!saveFile.is_open())
+	{
+		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
+	}
+
+	saveFile.write((const char*)ram.data(), GetRamSize());
+
+	saveFile.close();
 }

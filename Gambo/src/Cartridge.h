@@ -1,5 +1,7 @@
 #pragma once
 #include "GamboDefine.h"
+#include <filesystem>
+#include <fstream>
 
 class BaseMapper;
 class MBC1;
@@ -79,6 +81,8 @@ public:
 private:
 	void DeserializeHeader();
 	void InitializeMapper();
+	void LoadSave();
+	void Save();
 
 	
 	BaseMapper* mapper;
@@ -86,6 +90,9 @@ private:
 	std::vector<u8> rom;
 	std::vector<u8> ram;
 	bool isLoaded;
+	std::filesystem::path filePath;
+	std::filesystem::path savePath;
+	std::fstream saveFile;
 
 	struct
 	{
