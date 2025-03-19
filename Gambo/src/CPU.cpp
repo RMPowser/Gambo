@@ -41,10 +41,6 @@ void CPU::Write(u16 addr, u8 data)
 	}
 
     core->Write(addr, data);
-	if (addr == HWAddr::DMA)
-	{
-		core->ppu->SetDoDMATransfer(true);
-	}
 }
 
 u8& CPU::Get(u16 addr)

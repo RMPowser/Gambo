@@ -71,6 +71,17 @@ void RAM::Write(u16 addr, u8 data)
 	}
 
 	ram[addr] = data;
+	
+	if (addr == HWAddr::DMA)
+	{
+		// do oam dma transfer
+		u16 startAddr = data << 8;
+		for (u16 currAddr = startAddr; currAddr < startAddr + 160; currAddr++)
+		{
+			u8 data = Read(currAddr);
+			Write(HWAddr::OAM + (currAddr - startAddr), data);
+		}
+	}
 
 	// this is the implementation for echo ram
 	if (addr >= 0xE000 && addr <= 0xFDFF)

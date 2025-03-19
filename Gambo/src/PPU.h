@@ -54,7 +54,6 @@ public:
 	void Disable();
 	bool IsEnabled() const;
 	PPUMode GetMode() const;
-	void SetDoDMATransfer(bool b);
 
 private:
 	u8 Read(u16 addr);
@@ -67,7 +66,6 @@ private:
 
 	GamboCore* core;
 	PPUMode mode;
-	bool doDMATransfer;
 	bool isBlankFrame;
 	bool isEnabled;
 	int cyclesCounter;

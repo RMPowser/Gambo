@@ -34,7 +34,6 @@ u8& PPU::Get(u16 addr)
 bool PPU::Tick(u8 cycles)
 {
 	const u8& LCDC	= Get(HWAddr::LCDC);
-	const u8& DMA	= Get(HWAddr::DMA);
 	u8& STAT		= Get(HWAddr::STAT);
 
 	bool vblank = false;
@@ -43,18 +42,6 @@ bool PPU::Tick(u8 cycles)
 
 	//STAT bit 7 is always 1
 	STAT |= 0b10000000;
-
-	if (doDMATransfer)
-	{
-		doDMATransfer = false;
-
-		u16 startAddr = DMA << 8;
-		for (u16 currAddr = startAddr; currAddr < startAddr + 160; currAddr++)
-		{
-			u8 data = Read(currAddr);
-			Write(HWAddr::OAM + (currAddr - startAddr), data);
-		}
-	}
 
 	if (isEnabled)
 	{
@@ -199,7 +186,6 @@ bool PPU::Tick(u8 cycles)
 void PPU::Reset()
 {
 	mode = PPUMode::VBlank;
-	doDMATransfer = false;
 	isBlankFrame = true;
 	isEnabled = false;
 	cyclesCounter = 0;
@@ -241,11 +227,6 @@ bool PPU::IsEnabled() const
 PPUMode PPU::GetMode() const
 {
 	return mode;
-}
-
-void PPU::SetDoDMATransfer(bool b)
-{
-	doDMATransfer = true;
 }
 
 void PPU::CheckForLYCStatInterrupt()
