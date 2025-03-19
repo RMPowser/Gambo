@@ -367,9 +367,9 @@ void PPU::DrawObjPixel()
 			{
 				// early out if BG is over Obj
 				if (GetBits(obj.flags, 7, 0b1) && (
-					*reinterpret_cast<u32*>(&screen[pixelIndex]) == *reinterpret_cast<u32*>(&GameBoyColors[1]) ||
-					*reinterpret_cast<u32*>(&screen[pixelIndex]) == *reinterpret_cast<u32*>(&GameBoyColors[2]) ||
-					*reinterpret_cast<u32*>(&screen[pixelIndex]) == *reinterpret_cast<u32*>(&GameBoyColors[3])))
+					reinterpret_cast<u32&>(screen[pixelIndex]) == reinterpret_cast<u32&>(GameBoyColors[1]) ||
+					reinterpret_cast<u32&>(screen[pixelIndex]) == reinterpret_cast<u32&>(GameBoyColors[2]) ||
+					reinterpret_cast<u32&>(screen[pixelIndex]) == reinterpret_cast<u32&>(GameBoyColors[3])))
 				{
 					continue;
 				}
