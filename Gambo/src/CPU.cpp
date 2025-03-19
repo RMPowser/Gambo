@@ -269,13 +269,10 @@ u8 CPU::RunFor(u8 ticks)
 	return cycles;
 }
 
-#pragma warning(push)
-#pragma warning(disable: 26813)
 void CPU::RequestInterrupt(InterruptFlags f)
 {
 	Write(HWAddr::IF, Read(HWAddr::IF) | f);
 }
-#pragma warning(pop)
 
 bool CPU::HandleInterrupt(InterruptFlags f)
 {	
