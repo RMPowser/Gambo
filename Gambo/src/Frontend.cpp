@@ -24,7 +24,7 @@ Frontend::Frontend()
 
 	// initially create the window as hidden. we will show it when its the correct size
 	// after imgui is initialzed
-	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
+	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 	window = SDL_CreateWindow(MainWindowTitle, 1280, 720, window_flags);
 	SDL_assert_release(window);
 
