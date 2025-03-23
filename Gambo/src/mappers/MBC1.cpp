@@ -85,7 +85,7 @@ u8 MBC1::Read(u16 addr)
 			{
 				// truncate to 8kb range and then offset by ram bank number times the size of a bank.
 				wAddr = addr & 0x1FFF;
-				wAddr += ramBankNumber * 8KiB;
+				wAddr += ramBankNumber * 8_KB;
 			}
 
 			return cart->ram[wAddr];

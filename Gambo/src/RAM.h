@@ -35,7 +35,7 @@ public:
 
 private:
 	GamboCore* core;
-	std::array<u8, 64KiB> ram;
+	std::array<u8, 64_KB> ram;
 	u16 lastRead;
 	u16 lastWrite;
 };

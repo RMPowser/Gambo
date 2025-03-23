@@ -201,7 +201,7 @@ void GamboCore::InsertCartridge(std::filesystem::path filePath)
 	cart->Load(filePath);
 
 	// copy the first 2 rom banks of the cartridge data into ram
-	for (u16 i = 0; i < 32KiB; i++)
+	for (u16 i = 0; i < 32_KB; i++)
 		ram->Set(i, cart->Read(i));
 }
 

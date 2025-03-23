@@ -22,18 +22,16 @@ typedef  int16_t s16;
 typedef uint8_t u8;
 typedef  int8_t s8;
 
-#pragma warning(push)
-#pragma warning(disable: 4455)
-constexpr unsigned long long operator""KiB(unsigned long long const x)
+
+consteval u64 operator""_KB(u64 const x)
 {
-	return 1024L * x;
+	return 1024ULL * x;
 }
 
-constexpr unsigned long long operator""MiB(unsigned long long const x)
+consteval u64 operator""_MB(u64 const x)
 {
-	return 1024L * 1024L * x;
+	return 1024ULL * 1024ULL * x;
 }
-#pragma warning(pop)
 
 // addresses of hardware registers
 namespace HWAddr 

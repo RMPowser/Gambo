@@ -48,15 +48,15 @@ struct ROM_info
 
 const ROM_info rom_info[] =
 {
-	{	 32KiB,   2 },
-	{	 64KiB,   4 },
-	{	128KiB,   8 },
-	{	256KiB,  16 },
-	{	512KiB,  32 },
-	{	  1MiB,  64 },
-	{	  2MiB, 128 },
-	{	  4MiB, 256 },
-	{	  8MiB, 512 },
+	{	 32_KB,   2 },
+	{	 64_KB,   4 },
+	{	128_KB,   8 },
+	{	256_KB,  16 },
+	{	512_KB,  32 },
+	{	  1_MB,  64 },
+	{	  2_MB, 128 },
+	{	  4_MB, 256 },
+	{	  8_MB, 512 },
 };
 
 
@@ -70,10 +70,10 @@ const RAM_info ram_info[] =
 {
 	{		 0,  0 },
 	{		 0,  0 },
-	{	  8KiB,  1 },
-	{	 32KiB,  4 },
-	{	128KiB, 16 },
-	{	 64KiB,  8 },
+	{	  8_KB,  1 },
+	{	 32_KB,  4 },
+	{	128_KB, 16 },
+	{	 64_KB,  8 },
 
 	// Index 2 in this list is listed in various unofficial docs as 2 KiB
 	// in size. However, a 2 KiB RAM chip was never used in a cartridge. 

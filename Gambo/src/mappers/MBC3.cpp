@@ -14,9 +14,9 @@ MBC3::MBC3(Cartridge* cart)
 	, rtcH(0)
 	, rtcDL(0)
 	, rtcDH(0)
+	, isHalted(false)
 	, wasZeroWritten(0)
 	, isLatched(false)
-	, isHalted(false)
 {
 }
 
@@ -178,7 +178,7 @@ void MBC3::Write(u16 addr, u8 data)
 				{
 					// truncate to 8kb range and then offset by ram bank number times the size of a bank.
 					wAddr = addr & 0x1FFF;
-					wAddr += ramBankNumber * 8KiB;
+					wAddr += ramBankNumber * 8_KB;
 					cart->ram[wAddr] = data;
 					break;
 				}
