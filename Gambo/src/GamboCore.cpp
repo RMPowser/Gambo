@@ -13,9 +13,9 @@
 #include <iostream>
 
 GamboCore::GamboCore()
-	: ram(new RAM(this))
-	, cpu(new CPU(this))
+	: cpu(new CPU(this))
 	, ppu(new PPU(this))
+	, ram(new RAM(this))
 	, input(new Input(this))
 	, boot(new BootRomDMG())
 	, cart(new Cartridge())
@@ -289,5 +289,5 @@ bool GamboCore::IsCartridgeAddress(u16 addr)
 {
 	return
 		(0x0000 <= addr && addr <= 0x7FFF) ||	// rom
-		(0xA000 <= addr && addr <= 0xBFFF) && cart->GetRamSize() > 0;		// ram
+		((0xA000 <= addr && addr <= 0xBFFF) && cart->GetRamSize() > 0);		// ram
 }

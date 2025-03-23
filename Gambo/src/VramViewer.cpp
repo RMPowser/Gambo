@@ -1,5 +1,5 @@
 #include "VramViewer.h"
-#include "Ram.h"
+#include "RAM.h"
 #include "PPU.h"
 
 VramViewer::VramViewer(RAM* r)
@@ -16,11 +16,7 @@ VramViewer::~VramViewer()
 const std::array<SDL_Color, 256 * 256>& VramViewer::GetView()
 {
 	const u8 LCDC = Read(HWAddr::LCDC);
-	const u8 SCY = Read(HWAddr::SCY);	// viewport y position
-	const u8 SCX = Read(HWAddr::SCX);	// viewport x position
 	const u8 BGP = Read(HWAddr::BGP);	// BG pallette data
-	const u8 WY = Read(HWAddr::WY);	// window Y position
-	const u8 WX = Read(HWAddr::WX);	// window X position + 7
 
 	const int lineWidth = 256;
 

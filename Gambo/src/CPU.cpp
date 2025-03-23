@@ -602,7 +602,6 @@ std::string CPU::FormatMnemonic(std::string mnemonic, std::string data)
 std::map<u16, std::string> CPU::Disassemble(u16 startAddr, int numInstr)
 {
 	u32 addr = startAddr;
-	u8 value = 0x00, lo = 0x00, hi = 0x00;
 	u16 lineAddr = 0;
 
 	std::map<u16, std::string> mapAsm;
@@ -2240,7 +2239,7 @@ u8 CPU::SUB_A_A()
 {
 	SetFlag(CPUFlags::N, 1);
 	SetFlag(CPUFlags::H, (A & 0xF) < (A & 0xF));
-	SetFlag(CPUFlags::C, A < A);
+	SetFlag(CPUFlags::C, false);
 
 	A -= A;
 	SetFlag(CPUFlags::Z, A == 0);
@@ -2675,7 +2674,7 @@ u8 CPU::CP_A_A()
 	SetFlag(CPUFlags::Z, result == 0);
 	SetFlag(CPUFlags::N, 1);
 	SetFlag(CPUFlags::H, (A & 0xF) < (A & 0xF));
-	SetFlag(CPUFlags::C, A < A);
+	SetFlag(CPUFlags::C, false);
 
 	return 0;
 }

@@ -431,10 +431,6 @@ void Frontend::DrawGamboWindow()
 
 void Frontend::DrawCPUInfoWindow()
 {
-	auto& io = ImGui::GetIO();
-	auto& style = ImGui::GetStyle();
-	auto viewport = ImGui::GetMainViewport();
-
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
 	ImGui::Begin(CPUInfoWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
@@ -463,7 +459,7 @@ void Frontend::DrawCPUInfoWindow()
 		bool first = true;
 		for (auto& line : state.mapAsm)
 		{
-			ImGui::TextColored(first == true ? CYAN : WHITE, line.second.c_str());
+			ImGui::TextColored(first == true ? CYAN : WHITE, "%s", line.second.c_str());
 			first = false;
 		}
 	}
@@ -475,10 +471,6 @@ void Frontend::DrawCPUInfoWindow()
 
 void Frontend::DrawVramViewer()
 {
-	auto& io = ImGui::GetIO();
-	auto& style = ImGui::GetStyle();
-	auto viewport = ImGui::GetMainViewport();
-	
 	static bool showGrid = true;
 	static bool showScreen = true;
 

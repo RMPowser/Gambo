@@ -30,7 +30,6 @@ Input::~Input()
 
 void Input::Check() const
 {
-	auto& io = ImGui::GetIO();
 	auto& P1 = core->ram->Get(HWAddr::P1);
 	auto p1Before = P1;
 
