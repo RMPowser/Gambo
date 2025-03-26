@@ -390,8 +390,13 @@ void PPU::DrawObjPixel()
 				// this is the position of the pixel data within the tile data
 				u8 tilePixelDataOffset = tileRow * 2; // each row takes up two bytes of memory
 
+				// Bit 0 of tileindex for 8x16 objects should be ignored
+				u8 tileIndex = objHeight == 16 
+					? ((obj.tileIndex & 0b11111110) + isSecondTile)
+					: (obj.tileIndex + isSecondTile);
+
 				// this is the address of the actual graphic data for the tile the obj is currently using
-				u16 tileDataAddr = tileDataBaseAddr + ((obj.tileIndex + isSecondTile) * 16); // 16 bits per row of pixels within the tile
+				u16 tileDataAddr = tileDataBaseAddr + (tileIndex * 16); // 16 bits per row of pixels within the tile
 
 				// get the two bytes that hold the color data for this pixel
 				u8 data0 = core->Read(tileDataAddr + tilePixelDataOffset);
