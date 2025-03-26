@@ -3,7 +3,7 @@
 
 class GamboCore;
 
-enum class LCDCBits
+enum LCDCBits
 {
 	BGAndWindowEnable = 0,
 	OBJEnable = 1,
@@ -47,12 +47,11 @@ public:
 	PPU(GamboCore* c);
 	~PPU();
 
-	bool Tick(u8 cycles);
+	bool RunFor(int cycles);
 	void Reset();
 	const std::array<SDL_Color, GamboScreenSize>& GetScreen() const;
 	void Enable();
 	void Disable();
-	bool IsEnabled() const;
 	PPUMode GetMode() const;
 
 private:
@@ -67,7 +66,6 @@ private:
 	GamboCore* core;
 	PPUMode mode;
 	bool isBlankFrame;
-	bool isEnabled;
 	int cyclesCounter;
 	int modeCounterForVBlank;
 	int pixelCounter;				// keeps track of the pixel on the current scanline. resets every scanline.

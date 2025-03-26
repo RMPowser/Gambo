@@ -45,11 +45,7 @@ void GamboCore::Run()
 		{
 			input->Check();
 			int cycles = cpu->RunFor(1);
-			vblank = ppu->Tick(cycles);
-
-			totalCycles += cycles;
-			if (totalCycles > 702240)
-				vblank = true;
+			vblank = ppu->RunFor(cycles);
 
 			//if (cpu->GetPC() == 0x00A4)
 			//{
@@ -65,7 +61,7 @@ void GamboCore::Run()
 		do
 		{
 			int cycles = cpu->RunFor(1);
-			ppu->Tick(cycles);
+			ppu->RunFor(cycles);
 		} while (!cpu->IsCurrentInstructionFinished());
 
 		step = false;
@@ -78,11 +74,7 @@ void GamboCore::Run()
 		while (!vblank)
 		{
 			int cycles = cpu->RunFor(1);
-			vblank = ppu->Tick(cycles);
-
-			totalCycles += cycles;
-			if (totalCycles > 702240)
-				vblank = true;
+			vblank = ppu->RunFor(cycles);
 
 			//if (cpu->GetPC() == 0x00A4)
 			//{

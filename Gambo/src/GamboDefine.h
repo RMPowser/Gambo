@@ -180,7 +180,7 @@ static SDL_Color GameBoyColors[5]
 
 static const auto DesiredFPS = 60;
 
-constexpr u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask)
+constexpr u8 GetBits(u8 reg, u8 bitIndex, u8 bitMask = 0b1)
 {
 	return (reg & (bitMask << bitIndex)) >> bitIndex;
 }

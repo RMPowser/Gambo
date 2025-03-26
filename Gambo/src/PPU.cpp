@@ -31,7 +31,7 @@ u8& PPU::Get(u16 addr)
 	return core->ram->Get(addr);
 }
 
-bool PPU::Tick(u8 cycles)
+bool PPU::RunFor(int cycles)
 {
 	const u8& LCDC	= Get(HWAddr::LCDC);
 	u8& STAT		= Get(HWAddr::STAT);
@@ -43,141 +43,153 @@ bool PPU::Tick(u8 cycles)
 	//STAT bit 7 is always 1
 	STAT |= 0b10000000;
 
-	if (isEnabled)
+	while (cycles > 0)
 	{
-		switch (mode)
+		if (GetBits(LCDC, LCDCBits::LCDEnable))
 		{
-			case PPUMode::HBlank:
+			switch (mode)
 			{
-				if (cyclesCounter >= 204)
+				case PPUMode::HBlank:
 				{
-					cyclesCounter -= 204;
-					mode = PPUMode::OAMScan;
-					LY++;
-
-					if (LY == 144)
+					if (cyclesCounter >= 204)
 					{
-						isBlankFrame = false;
-						mode = PPUMode::VBlank;
-						modeCounterForVBlank = cyclesCounter;
-						core->cpu->RequestInterrupt(InterruptFlags::VBlank);
+						cyclesCounter -= 204;
+						cycles = cyclesCounter;
+						mode = PPUMode::OAMScan;
+						LY++;
 
-						if (GetBits(STAT, (u8)STATBits::Mode1StatInterruptEnable, 0b1))
-							core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
+						if (LY == 144)
+						{
+							isBlankFrame = false;
+							mode = PPUMode::VBlank;
+							modeCounterForVBlank = cyclesCounter;
+							core->cpu->RequestInterrupt(InterruptFlags::VBlank);
 
-						vblank = true;
+							if (GetBits(STAT, (u8)STATBits::Mode1StatInterruptEnable, 0b1))
+								core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 
-						windowLY = 0;
+							vblank = true;
+
+							windowLY = 0;
+						}
+						else
+						{
+							if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
+								core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
+						}
 					}
-					else
+					break;
+				}
+				case PPUMode::VBlank:
+				{
+					modeCounterForVBlank += cycles;
+					if (modeCounterForVBlank >= 456 && LY > 0)
 					{
+						modeCounterForVBlank -= 456;
+						LY++;
+					}
+
+					if (cyclesCounter >= 4104 && LY >= 153)
+					{
+						LY = 0;
+					}
+
+					if (cyclesCounter >= 4560)
+					{
+						cyclesCounter -= 4560;
+						cycles = cyclesCounter;
+						mode = PPUMode::OAMScan;
 						if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
 							core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 					}
+					break;
 				}
-				break;
-			}
-			case PPUMode::VBlank:
-			{
-				modeCounterForVBlank += cycles;
-				if (modeCounterForVBlank >= 456)
+				case PPUMode::OAMScan:
 				{
-					modeCounterForVBlank -= 456;
-					LY++;
-				}
-
-				if (cyclesCounter >= 4104 && LY >= 154)
-				{
-					LY = 0;
-				}
-
-				if (cyclesCounter >= 4560)
-				{
-					cyclesCounter -= 4560;
-					mode = PPUMode::OAMScan;
-					if (GetBits(STAT, (u8)STATBits::Mode2StatInterruptEnable, 0b1))
-						core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
-				}
-				break;
-			}
-			case PPUMode::OAMScan:
-			{
-				if (cyclesCounter >= 80)
-				{
-					cyclesCounter -= 80;
-					SCX = Get(HWAddr::SCX);
-					mode = PPUMode::Draw;
-					scanlineComplete = false;
-
-					// 8x8 or 8x16?
-					objHeight = GetBits(LCDC, (u8)LCDCBits::OBJSize, 0b1) ? 16 : 8;
-					objsToDraw.clear();
-
-					for (u16 i = 0; i < OAMSize; i += sizeof(OAM_entry))
+					if (cyclesCounter >= 80)
 					{
-						auto entry = reinterpret_cast<OAM_entry&>(core->ram->Get(HWAddr::OAM + i));
+						cyclesCounter -= 80;
+						cycles = cyclesCounter;
+						SCX = Get(HWAddr::SCX);
+						mode = PPUMode::Draw;
+						scanlineComplete = false;
 
-						// do we want to draw this obj?
-						int tileRow = LY - (entry.ypos - 16);
-						if (tileRow >= 0 && tileRow < objHeight)
+						// 8x8 or 8x16?
+						objHeight = GetBits(LCDC, (u8)LCDCBits::OBJSize, 0b1) ? 16 : 8;
+						objsToDraw.clear();
+
+						for (u16 i = 0; i < OAMSize; i += sizeof(OAM_entry))
 						{
-							objsToDraw.push_back(entry);
+							auto entry = reinterpret_cast<OAM_entry&>(Get(HWAddr::OAM + i));
 
-							// only draw the first ten entries per scanline
-							if (objsToDraw.size() >= 10)
+							// do we want to draw this obj?
+							int tileRow = LY - (entry.ypos - 16);
+							if (tileRow >= 0 && tileRow < objHeight)
+							{
+								objsToDraw.push_back(entry);
+
+								// only draw the first ten entries per scanline
+								if (objsToDraw.size() >= 10)
+									break;
+							}
+						}
+
+						std::reverse(objsToDraw.begin(), objsToDraw.end());
+					}
+					break;
+				}
+				case PPUMode::Draw:
+				{
+					if (pixelCounter < GamboScreenWidth)
+					{
+						int drawCount = cycles;
+						for (int i = 0; i < drawCount; i++)
+						{
+							DrawBGOrWindowPixel();
+							DrawObjPixel();
+							pixelCounter++;
+							cycles--;
+							if (pixelCounter >= GamboScreenWidth)
 								break;
 						}
+						cycles++;
 					}
 
-					std::reverse(objsToDraw.begin(), objsToDraw.end());
-				}
-				break;
-			}
-			case PPUMode::Draw:
-			{
-				if (pixelCounter < GamboScreenWidth && LY <= GamboScreenHeight)
-				{
-					for (int i = 0; i < cycles; i++)
+					if (cyclesCounter >= GamboScreenWidth && !scanlineComplete)
 					{
-						DrawBGOrWindowPixel();
-						DrawObjPixel();
-						pixelCounter++;
-						if (pixelCounter >= GamboScreenWidth)
-							break;
+						scanlineComplete = true;
 					}
-				}
 
-				if (cyclesCounter >= GamboScreenWidth && !scanlineComplete)
-				{
-					scanlineComplete = true;
-				}
+					if (cyclesCounter >= 172)
+					{
+						pixelCounter = 0;
+						cyclesCounter -= 172;
+						cycles = cyclesCounter;
+						mode = PPUMode::HBlank;
 
-				if (cyclesCounter >= 172)
-				{
-					pixelCounter = 0;
-					cyclesCounter -= 172;
-					mode = PPUMode::HBlank;
-
-					if (GetBits(STAT, (u8)STATBits::Mode0StatInterruptEnable, 0b1))
-						core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
+						if (GetBits(STAT, (u8)STATBits::Mode0StatInterruptEnable, 0b1))
+							core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
+					}
+					break;
 				}
-				break;
+			}
+		}
+		else // lcd and ppu are disabled
+		{
+			if (cyclesCounter >= 70224) // cycles for a full screen
+			{
+				cyclesCounter -= 70224;
+				cycles = cyclesCounter;
+				vblank = true;
 			}
 		}
 
-	}
-	else // lcd and ppu are disabled
-	{
-		if (cyclesCounter >= 70224) // cycles for a full screen
-		{
-			cyclesCounter -= 70224;
-			vblank = true;
-		}
+		cycles--;
 	}
 
-	// write mode to STAT and update LY
-	Get(HWAddr::STAT) = (STAT & 0b11111100) | ((u8)mode & 0b11);
-	Get(HWAddr::LY) = LY;
+	// write mode to STAT
+	core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
+	core->ram->Set(HWAddr::LY, LY);
 	CheckForLYCStatInterrupt();
 
 	return vblank;
@@ -185,9 +197,8 @@ bool PPU::Tick(u8 cycles)
 
 void PPU::Reset()
 {
-	mode = PPUMode::VBlank;
+	mode = PPUMode::OAMScan;
 	isBlankFrame = true;
-	isEnabled = false;
 	cyclesCounter = 0;
 	modeCounterForVBlank = 0;
 	pixelCounter = 0;
@@ -208,7 +219,6 @@ const std::array<SDL_Color, GamboScreenSize>& PPU::GetScreen() const
 void PPU::Enable()
 {
 	Reset();
-	isEnabled = true;
 
 	if (GetBits(Get(HWAddr::STAT), (u8)STATBits::Mode2StatInterruptEnable, 0b1))
 		core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
@@ -219,11 +229,6 @@ void PPU::Disable()
 	Reset();
 }
 
-bool PPU::IsEnabled() const
-{
-	return isEnabled;
-}
-
 PPUMode PPU::GetMode() const
 {
 	return mode;
@@ -231,7 +236,7 @@ PPUMode PPU::GetMode() const
 
 void PPU::CheckForLYCStatInterrupt()
 {
-	if (isEnabled)
+	if (GetBits(Get(HWAddr::LCDC), LCDCBits::LCDEnable))
 	{
 		u8& STAT = Get(HWAddr::STAT);
 
