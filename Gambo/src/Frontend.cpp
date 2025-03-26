@@ -106,7 +106,7 @@ void Frontend::Run()
 
 		// limit fps
 		std::this_thread::sleep_until(t - 5ms);
-		while (clock::now() <= t) { /* wait	*/ }
+		while (clock::now() < t) { /* wait	*/ }
 	}
 
 	//gamboThread.join();
