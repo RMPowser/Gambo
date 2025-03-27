@@ -342,19 +342,15 @@ void Cartridge::Load(std::filesystem::path path)
 {
 	Reset();
 
-	std::ifstream input(path, std::ios::binary | std::ios::ate);
+	std::ifstream input(path, std::ios::binary);
 	if (input.is_open())
 	{
-		input.seekg(0, std::ios::beg);
-
 		// reserve enough room for the header
 		rom.resize(0x150);
 
 		// read in the header
-		for (size_t i = 0; i < rom.size(); i++)
-		{
-			input >> std::noskipws >> rom[i];
-		}
+		input.read(reinterpret_cast<char*>(rom.data()), 0x150);
+
 		DeserializeHeader();
 		isLoaded = true;
 
@@ -364,7 +360,7 @@ void Cartridge::Load(std::filesystem::path path)
 
 		// read in the entire rom
 		input.seekg(0, std::ios::beg);
-		rom.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+		input.read(reinterpret_cast<char*>(rom.data()), GetRomSize());
 		input.close();
 
 		// set paths
@@ -664,7 +660,7 @@ void Cartridge::LoadSave()
 	ram.clear();
 	ram.resize(GetRamSize());
 
-	saveFile.read((char*)ram.data(), GetRamSize());
+	saveFile.read(reinterpret_cast<char*>(ram.data()), GetRamSize());
 	
 	saveFile.close();
 }
@@ -676,7 +672,7 @@ void Cartridge::Save()
 		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
 	}
 
-	saveFile.write((const char*)ram.data(), GetRamSize());
+	saveFile.write(reinterpret_cast<char*>(ram.data()), GetRamSize());
 
 	saveFile.close();
 }
