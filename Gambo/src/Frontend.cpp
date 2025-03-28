@@ -43,7 +43,7 @@ Frontend::Frontend()
 	auto& style = ImGui::GetStyle();
 	style.WindowBorderSize = 0;
 	style.WindowPadding = { 0, 0 }; // window padding will be handled manually
-	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
+	style.Colors[ImGuiCol_WindowBg] = BLACK;
 	clear_color = BLACK;
 
 	// Setup Platform/Renderer backends in imgui
@@ -431,6 +431,9 @@ void Frontend::DrawGamboWindow()
 
 void Frontend::DrawCPUInfoWindow()
 {
+	auto& style = ImGui::GetStyle();
+	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
+
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
 	ImGui::Begin(CPUInfoWindowTitle, nullptr, ImGuiWindowFlags_NoResize);
@@ -467,12 +470,17 @@ void Frontend::DrawCPUInfoWindow()
 	ImGui::PopStyleVar(1);
 
 	ImGui::End();
+
+	style.Colors[ImGuiCol_WindowBg] = BLACK;
 }
 
 void Frontend::DrawVramViewer()
 {
 	static bool showGrid = true;
 	static bool showScreen = true;
+
+	auto& style = ImGui::GetStyle();
+	style.Colors[ImGuiCol_WindowBg] = VERY_DARK_GREY;
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
@@ -666,6 +674,8 @@ void Frontend::DrawVramViewer()
 	ImGui::PopStyleVar(1);
 
 	ImGui::End();
+
+	style.Colors[ImGuiCol_WindowBg] = BLACK;
 }
 
 void Frontend::SetGamboRunning()
