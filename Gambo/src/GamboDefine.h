@@ -166,7 +166,6 @@ enum ColorIndex
 	LightGray,
 	DarkGray,
 	Black,
-	Transparent // for use in sprites
 };
 
 static SDL_Color GameBoyColors[5]
@@ -175,7 +174,6 @@ static SDL_Color GameBoyColors[5]
 	{ 139, 172, 15, 255 },
 	{ 48, 98, 48, 255 },
 	{ 15, 56, 15, 255 },
-	{ 255, 255, 255, 0 }, // transparent for use in sprites
 };
 
 static const auto DesiredFPS = 60;

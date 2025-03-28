@@ -15,14 +15,14 @@ enum LCDCBits
 	LCDEnable = 7,
 };
 
-enum class OBPBits
+enum OBPBits
 {
 	OBPColorForIndex1 = 0,
 	OBPColorForIndex2 = 2,
 	OBPColorForIndex3 = 4,
 };
 
-enum class STATBits
+enum STATBits
 {
 	modeFlag = 0,
 	LYC_equals_LYFlag = 2,
@@ -75,12 +75,25 @@ private:
 	int SCX;						// this is not read only, but it does have specific behaviour when it comes to reading
 	std::array<SDL_Color, GamboScreenSize> screen;
 
-	struct OAM_entry
+	class OAM_entry
 	{
+	public:
 		u8 ypos;
 		u8 xpos;
 		u8 tileIndex; // from 0x8000 to 0x8FFF
 		u8 flags;
+
+		enum Flags
+		{
+			CGB_Palette0 = 0,
+			CGB_Palette1 = 1,
+			CGB_Palette2 = 2,
+			Bank = 3,
+			DMG_Palette = 4,
+			X_Flip = 5,
+			Y_Flip = 6,
+			Priority = 7,
+		};
 	};
 
 	std::vector<OAM_entry> objsToDraw;
