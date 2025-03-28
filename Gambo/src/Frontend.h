@@ -30,6 +30,7 @@ private:
 	bool done = false;
 	bool integerScale = true;
 	bool maintainAspectRatio = true;
+	bool scaleChanged = false;
 
 	// helpers
 	void DrawGamboWindow();

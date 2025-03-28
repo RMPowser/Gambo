@@ -159,6 +159,9 @@ void Frontend::BeginFrame()
 
 void Frontend::UpdateUI()
 {
+	auto& style = ImGui::GetStyle();
+	style.WindowBorderSize = debugMode ? 1 : 0;
+
 	DrawGamboWindow();
 	if (debugMode)
 	{
@@ -246,9 +249,9 @@ void Frontend::DrawGamboWindow()
 
 	auto gamboWindowFlags = debugMode
 		?
-		ImGuiWindowFlags_AlwaysAutoResize |
+		//ImGuiWindowFlags_AlwaysAutoResize |
 		//ImGuiWindowFlags_NoBackground |
-		ImGuiWindowFlags_NoResize |
+		//ImGuiWindowFlags_NoResize |
 		//ImGuiWindowFlags_NoTitleBar |
 		//ImGuiWindowFlags_NoDecoration |
 		//ImGuiWindowFlags_NoCollapse |
@@ -344,22 +347,8 @@ void Frontend::DrawGamboWindow()
 						ss << i + 1 << "x";
 						if (ImGui::MenuItem(ss.str().c_str(), nullptr, &scale[i]))
 						{
-							ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-
 							PixelScale = i + 1;
-							windowSize.x = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
-							windowSize.y = !debugMode
-								? (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight
-								: (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight + titleBarHeight + 13;
-							ImGui::SetWindowSize(windowSize);
-
-							if (!debugMode)
-							{
-								SDL_RestoreWindow(window);
-								SDL_SetWindowSize(window, windowSize.x, windowSize.y);
-							}
-
-							ImGui::PopStyleVar(1);
+							scaleChanged = true;
 						}
 					}
 					ImGui::EndMenu();
@@ -367,10 +356,13 @@ void Frontend::DrawGamboWindow()
 				ImGui::EndMenu();
 			}
 
+#if defined (_DEBUG)
 			if (ImGui::Checkbox("Debug Mode", &debugMode))
 			{
 				SDL_MaximizeWindow(window);
+				scaleChanged = true;
 			}
+#endif
 
 			ImGui::Checkbox("60 fps", &fps60);
 
@@ -381,9 +373,27 @@ void Frontend::DrawGamboWindow()
 
 		ImGui::PopStyleVar(1);
 
-		ImVec2 gamboScreenSize = !debugMode 
-			? ImVec2(viewport->Size.x - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - menuBarHeight)
-			: ImVec2(windowSize.x - (style.WindowPadding.x * 2), windowSize.y - (style.WindowPadding.y * 2) - menuBarHeight - titleBarHeight);
+		if (scaleChanged)
+		{
+			scaleChanged = false;
+
+			windowSize.x = (GamboScreenWidth * PixelScale) + (style.WindowPadding.x * 2);
+			windowSize.y = debugMode
+				? (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight + titleBarHeight 
+				: (GamboScreenHeight * PixelScale) + (style.WindowPadding.y * 2) + menuBarHeight;
+
+			if (!debugMode)
+			{
+				SDL_RestoreWindow(window);
+				SDL_SetWindowSize(window, windowSize.x, windowSize.y);
+			}
+		}
+
+		ImGui::SetWindowSize(windowSize);
+
+		ImVec2 gamboScreenSize = debugMode
+			? ImVec2(windowSize.x - (style.WindowPadding.x * 2), windowSize.y - (style.WindowPadding.y * 2) - menuBarHeight - titleBarHeight )
+			: ImVec2(viewport->Size.x - (style.WindowPadding.x * 2), viewport->Size.y - (style.WindowPadding.y * 2) - menuBarHeight);
 
 
 		if (integerScale)
@@ -401,8 +411,11 @@ void Frontend::DrawGamboWindow()
 				gamboScreenSize.y = gamboScreenSize.x * (1 / GamboAspectRatio);
 		}
 		
+		ImVec2 cursPos;
+		cursPos.x = floor(ImGui::GetCursorPos().x + (ImGui::GetContentRegionAvail().x - gamboScreenSize.x) * 0.5f);
+		cursPos.y = floor(ImGui::GetCursorPos().y + (ImGui::GetContentRegionAvail().y - gamboScreenSize.y) * 0.5f);
+		ImGui::SetCursorPos(cursPos);
 
-		ImGui::SetCursorPos(ImGui::GetCursorPos() + (ImGui::GetContentRegionAvail() - gamboScreenSize) * 0.5f);
 		void* pixels = nullptr;
 		int pitch = 0;
 		SDL_LockTexture(gamboTexture, NULL, &pixels, &pitch);
