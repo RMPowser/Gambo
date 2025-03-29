@@ -28,10 +28,11 @@ Frontend::Frontend()
 	window = SDL_CreateWindow(MainWindowTitle, 1280, 720, window_flags);
 	SDL_assert_release(window);
 
-	// init sdl renderer with vsync on
+	// init software sdl renderer with vsync on
+	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 	renderer = SDL_CreateRenderer(window, nullptr);
-	SDL_SetRenderVSync(renderer, 1);
 	SDL_assert_release(renderer);
+	SDL_SetRenderVSync(renderer, 1);
 
 	// Setup ImGui context
 	IMGUI_CHECKVERSION();
