@@ -33,6 +33,11 @@ u8& PPU::Get(u16 addr)
 
 bool PPU::RunFor(int cycles)
 {
+	static int scxExtraCycles = 0;
+	static int objExtraCycles = 0;
+	static bool firstEnterDrawMode = true;
+	static bool firstEnterOAMScan = true;
+
 	const u8& LCDC	= Get(HWAddr::LCDC);
 	u8& STAT		= Get(HWAddr::STAT);
 
@@ -51,29 +56,40 @@ bool PPU::RunFor(int cycles)
 			{
 				case PPUMode::HBlank:
 				{
-					if (cyclesCounter >= 204)
+					if (cyclesCounter >= 204 - scxExtraCycles)
 					{
 						cyclesCounter -= 204;
 						cycles = cyclesCounter;
-						mode = PPUMode::OAMScan;
 						LY++;
+						core->ram->Set(HWAddr::LY, LY);
+						CheckForLYCStatInterrupt();
+
 
 						if (LY == 144)
 						{
 							isBlankFrame = false;
-							mode = PPUMode::VBlank;
 							modeCounterForVBlank = cyclesCounter;
+
+							mode = PPUMode::VBlank;
+							core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
+
+							vblank = true;
 							core->cpu->RequestInterrupt(InterruptFlags::VBlank);
 
 							if (GetBits(STAT, STATBits::Mode1StatInterruptEnable))
 								core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 
-							vblank = true;
 
 							windowLY = 0;
+							WYEqualsLYTriggered = false;
 						}
 						else
 						{
+							firstEnterOAMScan = true;
+
+							mode = PPUMode::OAMScan;
+							core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
+
 							if (GetBits(STAT, STATBits::Mode2StatInterruptEnable))
 								core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 						}
@@ -82,23 +98,32 @@ bool PPU::RunFor(int cycles)
 				}
 				case PPUMode::VBlank:
 				{
-					modeCounterForVBlank += cycles;
+					modeCounterForVBlank++;
 					if (modeCounterForVBlank >= 456 && LY > 0)
 					{
 						modeCounterForVBlank -= 456;
+						cycles = modeCounterForVBlank;
 						LY++;
+						core->ram->Set(HWAddr::LY, LY);
+						CheckForLYCStatInterrupt();
 					}
 
 					if (cyclesCounter >= 4104 && LY >= 153)
 					{
 						LY = 0;
+						core->ram->Set(HWAddr::LY, LY);
+						CheckForLYCStatInterrupt();
 					}
 
 					if (cyclesCounter >= 4560)
 					{
 						cyclesCounter -= 4560;
 						cycles = cyclesCounter;
+
+						firstEnterOAMScan = true;
 						mode = PPUMode::OAMScan;
+						core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
+
 						if (GetBits(STAT, STATBits::Mode2StatInterruptEnable))
 							core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 					}
@@ -106,17 +131,30 @@ bool PPU::RunFor(int cycles)
 				}
 				case PPUMode::OAMScan:
 				{
+					if (firstEnterOAMScan)
+					{
+						firstEnterOAMScan = false;
+						if (!WYEqualsLYTriggered)
+						{
+							WYEqualsLYTriggered = Get(HWAddr::WY) == LY;
+						}
+					}
+
 					if (cyclesCounter >= 80)
 					{
 						cyclesCounter -= 80;
 						cycles = cyclesCounter;
 						SCX = Get(HWAddr::SCX);
+
 						mode = PPUMode::Draw;
+						core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
+
 						scanlineComplete = false;
+						firstEnterDrawMode = true;
 
 						// 8x8 or 8x16?
 						objHeight = GetBits(LCDC, LCDCBits::OBJSize) ? 16 : 8;
-						objsToDraw.clear();
+						objs.clear();
 
 						for (u16 i = 0; i < OAMSize; i += sizeof(OAM_entry))
 						{
@@ -132,23 +170,28 @@ bool PPU::RunFor(int cycles)
 								continue;
 							}
 
-							objsToDraw.push_back(entry);
+							objs.push_back(entry);
 
 							// TODO: determine the extra cycles this object will take
 
 
 							// only draw the first ten entries per scanline
-							if (objsToDraw.size() >= 10)
+							if (objs.size() >= 10)
 								break;
 						}
-
-						std::reverse(objsToDraw.begin(), objsToDraw.end());
 					}
 					break;
 				}
 				case PPUMode::Draw:
 				{
-					if (pixelCounter < GamboScreenWidth)
+					// background scrolling costs SCX % 8 cycles at the start of drawing mode
+					if (firstEnterDrawMode)
+					{
+						firstEnterDrawMode = false;
+						scxExtraCycles = SCX % 8;
+					}
+
+					if ((cyclesCounter >= 12 + scxExtraCycles) && pixelCounter < GamboScreenWidth)
 					{
 						int drawCount = cycles;
 						for (int i = 0; i < drawCount; i++)
@@ -166,17 +209,14 @@ bool PPU::RunFor(int cycles)
 						cycles++;
 					}
 
-					if (cyclesCounter >= GamboScreenWidth && !scanlineComplete)
-					{
-						scanlineComplete = true;
-					}
-
-					if (cyclesCounter >= 172)
+					if (cyclesCounter >= 172 + scxExtraCycles)
 					{
 						pixelCounter = 0;
 						cyclesCounter -= 172;
 						cycles = cyclesCounter;
+
 						mode = PPUMode::HBlank;
+						core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
 
 						if (GetBits(STAT, STATBits::Mode0StatInterruptEnable))
 							core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
@@ -198,11 +238,6 @@ bool PPU::RunFor(int cycles)
 		cycles--;
 	}
 
-	// write mode to STAT
-	core->ram->Set(HWAddr::STAT, (STAT & 0b11111100) | ((u8)mode & 0b11));
-	core->ram->Set(HWAddr::LY, LY);
-	CheckForLYCStatInterrupt();
-
 	return vblank;
 }
 
@@ -217,6 +252,7 @@ void PPU::Reset()
 	LY = 0; 
 	windowLY = 0;
 	screen.fill(blankingColor);
+	WYEqualsLYTriggered = false;
 
 	Get(HWAddr::LY) = LY;
 	Get(HWAddr::STAT) = (Get(HWAddr::STAT) & 0b11111100) | ((u8)mode & 0b11);
@@ -285,7 +321,7 @@ void PPU::DrawBGOrWindowPixel()
 		}
 
 		// check if the window is enabled. future behavior depends on this.
-		bool usingWindow = (GetBits(LCDC, (u8)LCDCBits::WindowEnable, 0b1) && WY <= LY);
+		bool usingWindow = GetBits(LCDC, (u8)LCDCBits::WindowEnable, 0b1) && WYEqualsLYTriggered && (pixelCounter + 7 >= WX);
 
 		// figure out which tile map we're using according to the previous check.
 		auto tileMapBitSelect = usingWindow ? LCDCBits::WindowTileMapArea : LCDCBits::BGTileMapArea;
@@ -296,7 +332,7 @@ void PPU::DrawBGOrWindowPixel()
 		bool isSigned = tileDataBaseAddr == 0x9000;
 
 		// this is the x,y coordinates of the pixel in the 256x256pixel tile map. also update the top 5 bits of SCX here
-		u8 pixelMapPosX = (usingWindow && pixelCounter >= WX - 7) ? pixelCounter : pixelCounter + (SCX | (Get(HWAddr::SCX) & 0b11111000));
+		u8 pixelMapPosX = usingWindow ? (pixelCounter + 7 - WX) : pixelCounter + (SCX | (Get(HWAddr::SCX) & 0b11111000));
 		u8 pixelMapPosY = usingWindow ? (windowLY) : (LY + SCY);
 		
 		// this is the x,y indices of the tile within the map
@@ -336,8 +372,7 @@ void PPU::DrawBGOrWindowPixel()
 	}
 	else
 	{
-		// if the screen is off, just draw a white pixel
-		screen[pixelIndex] = blankingColor;
+		screen[pixelIndex] = GameBoyColors[GetBits(BGP, 0, 0b11)];;
 	}
 }
 
@@ -357,85 +392,103 @@ void PPU::DrawObjPixel()
 		if (isBlankFrame)
 			return;
 
+		OAM_entry* objToDraw = nullptr;
+
 		// find the obj we need to draw at this pixel, if any
-		for (auto& obj : objsToDraw)
+		for (auto& obj : objs)
 		{
 			int pixelIndexToDrawWithinTileRow = pixelCounter - (obj.xpos - ObjWidth);
 			if (pixelIndexToDrawWithinTileRow >= 0 && pixelIndexToDrawWithinTileRow < 8)
 			{
-				int& bgPixel = reinterpret_cast<int&>(screen[pixelIndex]);
-				int& color0 = reinterpret_cast<int&>(GameBoyColors[GetBits(BGP, 0, 0b11)]);
-
-				// early out if BG is over this pixel unless BG pixel is BGP color 0
-				if (GetBits(obj.flags, OAM_entry::Flags::Priority) && bgPixel != color0)
+				if (objToDraw == nullptr)
 				{
-					continue;
+					objToDraw = &obj;
 				}
-
-				// gather flags
-				const u8 palette = GetBits(obj.flags, OAM_entry::Flags::DMG_Palette) ? OBP1 : OBP0;
-				const bool isXFlip = GetBits(obj.flags, OAM_entry::Flags::X_Flip);
-				const bool isYFlip = GetBits(obj.flags, OAM_entry::Flags::Y_Flip);
-
-				// base address for obj tile data is always 0x8000
-				u16 tileDataBaseAddr = 0x8000;
-
-				// this is the row within the tile we want to draw
-				u8 tileRow = LY - (obj.ypos - 16);
-
-				// check if the row is part of the second tile if 8x16 is enabled
-				bool isSecondTile = objHeight == 16 && tileRow >= 8;
-
-				// adjust the row to be within the bounds of one tile according to the previous check
-				if (isSecondTile)
-					tileRow -= 8;
-					
-				// check if tile data should be interpreted as flipped
-				if (isXFlip)
-					pixelIndexToDrawWithinTileRow = 7 - pixelIndexToDrawWithinTileRow;
-				if (isYFlip)
+				else if (obj.xpos < objToDraw->xpos)
 				{
-					tileRow = 7 - tileRow;
-
-					if (objHeight == 16)
-					{
-						isSecondTile = !isSecondTile;
-					}
+					objToDraw = &obj;
 				}
-
-				// this is the position of the pixel data within the tile data
-				u8 tilePixelDataOffset = tileRow * 2; // each row takes up two bytes of memory
-
-				// Bit 0 of tileindex for 8x16 objects should be ignored
-				u8 tileIndex = objHeight == 16 
-					? ((obj.tileIndex & 0b11111110) + isSecondTile)
-					: (obj.tileIndex + isSecondTile);
-
-				// this is the address of the actual graphic data for the tile the obj is currently using
-				u16 tileDataAddr = tileDataBaseAddr + (tileIndex * 16); // 16 bits per row of pixels within the tile
-
-				// get the two bytes that hold the color data for this pixel
-				u8 data0 = core->Read(tileDataAddr + tilePixelDataOffset);
-				u8 data1 = core->Read(tileDataAddr + tilePixelDataOffset + 1);
-
-				// pixel 0 in the tile is bit 7 of both data0 and data1. Pixel 1 is bit 6 of both. Pixel 2 is bit 5, etc...
-				u8 colorBitIndex = 7 - pixelIndexToDrawWithinTileRow;
-
-				// combine data0 and data1 to get the color id for this pixel
-				bool colorBit0 = data0 & (1 << colorBitIndex);
-				bool colorBit1 = data1 & (1 << colorBitIndex);
-				u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
-
-				// if the colorIndex is 0, just use whatever is in the bg already 
-				if (colorIndex == 0)
-					continue;
-
-				// now that we have the color id, get the actual color from the palette
-				u8 color = GetBits(palette, colorIndex * 2, 0b11); // each color is a 2bit value
-
-				// draw an actual color
-				screen[pixelIndex] = GameBoyColors[color];
 			}
+		}
+
+
+
+		if (objToDraw)
+		{
+			int pixelIndexToDrawWithinTileRow = pixelCounter - (objToDraw->xpos - ObjWidth);
+
+			int& bgPixel = reinterpret_cast<int&>(screen[pixelIndex]);
+			int& color0 = reinterpret_cast<int&>(GameBoyColors[GetBits(BGP, 0, 0b11)]);
+
+			// early out if BG is over this pixel unless BG pixel is BGP color 0
+			if (GetBits(objToDraw->flags, OAM_entry::Flags::Priority) && bgPixel != color0)
+			{
+				return;
+			}
+
+			// gather flags
+			const u8 palette = GetBits(objToDraw->flags, OAM_entry::Flags::DMG_Palette) ? OBP1 : OBP0;
+			const bool isXFlip = GetBits(objToDraw->flags, OAM_entry::Flags::X_Flip);
+			const bool isYFlip = GetBits(objToDraw->flags, OAM_entry::Flags::Y_Flip);
+
+			// base address for obj tile data is always 0x8000
+			u16 tileDataBaseAddr = 0x8000;
+
+			// this is the row within the tile we want to draw
+			u8 tileRow = LY - (objToDraw->ypos - 16);
+
+			// check if the row is part of the second tile if 8x16 is enabled
+			bool isSecondTile = objHeight == 16 && tileRow >= 8;
+
+			// adjust the row to be within the bounds of one tile according to the previous check
+			if (isSecondTile)
+				tileRow -= 8;
+					
+			// check if tile data should be interpreted as flipped
+			if (isXFlip)
+				pixelIndexToDrawWithinTileRow = 7 - pixelIndexToDrawWithinTileRow;
+			if (isYFlip)
+			{
+				tileRow = 7 - tileRow;
+
+				if (objHeight == 16)
+				{
+					isSecondTile = !isSecondTile;
+				}
+			}
+
+			// this is the position of the pixel data within the tile data
+			u8 tilePixelDataOffset = tileRow * 2; // each row takes up two bytes of memory
+
+			// Bit 0 of tileindex for 8x16 objects should be ignored
+			u8 tileIndex = objHeight == 16 
+				? ((objToDraw->tileIndex & 0b11111110) + isSecondTile)
+				: (objToDraw->tileIndex + isSecondTile);
+
+			// this is the address of the actual graphic data for the tile the obj is currently using
+			u16 tileDataAddr = tileDataBaseAddr + (tileIndex * 16); // 16 bits per row of pixels within the tile
+
+			// get the two bytes that hold the color data for this pixel
+			u8 data0 = core->Read(tileDataAddr + tilePixelDataOffset);
+			u8 data1 = core->Read(tileDataAddr + tilePixelDataOffset + 1);
+
+			// pixel 0 in the tile is bit 7 of both data0 and data1. Pixel 1 is bit 6 of both. Pixel 2 is bit 5, etc...
+			u8 colorBitIndex = 7 - pixelIndexToDrawWithinTileRow;
+
+			// combine data0 and data1 to get the color id for this pixel
+			bool colorBit0 = data0 & (1 << colorBitIndex);
+			bool colorBit1 = data1 & (1 << colorBitIndex);
+			u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
+
+			// if the colorIndex is 0, just use whatever is in the bg already 
+			if (colorIndex == 0)
+				return;
+
+			// now that we have the color id, get the actual color from the palette
+			u8 color = GetBits(palette, colorIndex * 2, 0b11); // each color is a 2bit value
+
+			// draw an actual color
+			screen[pixelIndex] = GameBoyColors[color];
 		}
 	}
 }

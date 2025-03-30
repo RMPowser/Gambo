@@ -73,6 +73,7 @@ private:
 	int LY;							// this is read only which is why we keep a local copy and write it into ram
 	int windowLY;					// same as LY but for the window. internal only, meaning not accessible to any other components of the game boy.
 	int SCX;						// this is not read only, but it does have specific behaviour when it comes to reading
+	bool WYEqualsLYTriggered;
 	std::array<SDL_Color, GamboScreenSize> screen;
 
 	class OAM_entry
@@ -96,6 +97,6 @@ private:
 		};
 	};
 
-	std::vector<OAM_entry> objsToDraw;
+	std::vector<OAM_entry> objs;
 	u8 objHeight;
 };
