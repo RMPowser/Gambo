@@ -40,18 +40,11 @@ void GamboCore::Run()
 	if (running)
 	{
 		bool vblank = false;
-		int totalCycles = 0;
 		while (!vblank)
 		{
 			input->Check();
 			int cycles = cpu->RunFor(1);
 			vblank = ppu->RunFor(cycles);
-
-			//if (cpu->GetPC() == 0x00A4)
-			//{
-			//	running = false;
-			//	break;
-			//}
 		}
 		
 		disassemble = true;
@@ -70,17 +63,10 @@ void GamboCore::Run()
 	else if (stepFrame)
 	{
 		bool vblank = false;
-		int totalCycles = 0;
 		while (!vblank)
 		{
 			int cycles = cpu->RunFor(1);
 			vblank = ppu->RunFor(cycles);
-
-			//if (cpu->GetPC() == 0x00A4)
-			//{
-			//	running = false;
-			//	break;
-			//}
 		}
 
 		stepFrame = false;
@@ -191,6 +177,8 @@ void GamboCore::InsertCartridge(std::filesystem::path filePath)
 	Reset();
 
 	cart->Load(filePath);
+
+	running = true;
 }
 
 void GamboCore::SetUseBootRom(bool b)
