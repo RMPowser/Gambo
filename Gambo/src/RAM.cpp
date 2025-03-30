@@ -149,7 +149,7 @@ void RAM::Reset()
 		ram[HWAddr::LYC]	= 0x00;
 		ram[HWAddr::DMA]	= 0xFF;
 		ram[HWAddr::BGP]	= 0xFC;
-		ram[HWAddr::OBP0]	= 0x00;
+		ram[HWAddr::OBP0]	= 0xFF;
 		ram[HWAddr::OBP1]	= 0x00;
 		ram[HWAddr::WY]		= 0x00;
 		ram[HWAddr::WX]		= 0x00;
