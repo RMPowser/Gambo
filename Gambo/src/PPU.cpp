@@ -26,7 +26,7 @@ void PPU::Write(u16 addr, u8 data)
 	core->Write(addr, data);
 }
 
-u8& PPU::Get(u16 addr)
+const u8& PPU::Get(u16 addr)
 {
 	return core->ram->Get(addr);
 }
@@ -38,15 +38,15 @@ bool PPU::RunFor(int cycles)
 	static bool firstEnterDrawMode = true;
 	static bool firstEnterOAMScan = true;
 
-	const u8& LCDC	= Get(HWAddr::LCDC);
-	u8& STAT		= Get(HWAddr::STAT);
+	auto& LCDC = Get(HWAddr::LCDC);
+	auto& STAT = Get(HWAddr::STAT);
 
 	bool vblank = false;
 
 	cyclesCounter += cycles;
 
 	//STAT bit 7 is always 1
-	STAT |= 0b10000000;
+	core->ram->Set(HWAddr::STAT, STAT | 0b10000000);
 
 	while (cycles > 0)
 	{
@@ -160,7 +160,7 @@ bool PPU::RunFor(int cycles)
 
 						for (u16 i = 0; i < OAMSize; i += sizeof(OAM_entry))
 						{
-							entries.push_back(reinterpret_cast<OAM_entry&>(Get(HWAddr::OAM + i)));
+							entries.push_back(reinterpret_cast<const OAM_entry&>(Get(HWAddr::OAM + i)));
 						}
 
 						for (auto& entry : entries)
@@ -266,8 +266,8 @@ void PPU::Reset()
 	screen.fill(blankingColor);
 	WYEqualsLYTriggered = false;
 
-	Get(HWAddr::LY) = LY;
-	Get(HWAddr::STAT) = (Get(HWAddr::STAT) & 0b11111100) | ((u8)mode & 0b11);
+	core->ram->Set(HWAddr::LY, LY);
+	core->ram->Set(HWAddr::STAT, (Get(HWAddr::STAT) & 0b11111100) | ((u8)mode & 0b11));
 }
 
 const std::array<SDL_Color, GamboScreenSize>& PPU::GetScreen() const
@@ -297,17 +297,20 @@ void PPU::CheckForLYCStatInterrupt()
 {
 	if (GetBits(Get(HWAddr::LCDC), LCDCBits::LCDEnable))
 	{
-		u8& STAT = Get(HWAddr::STAT);
-
 		if (LY == Get(HWAddr::LYC))
 		{
+			u8 STAT = Get(HWAddr::STAT);
 			SetBit(STAT, STATBits::LYC_equals_LYFlag, true);
+			core->ram->Set(HWAddr::STAT, STAT);
+
 			if (GetBits(STAT, STATBits::LYC_equals_LYStatInterruptEnable))
 				core->cpu->RequestInterrupt(InterruptFlags::LCDStat);
 		}
 		else
 		{
+			u8 STAT = Get(HWAddr::STAT);
 			SetBit(STAT, STATBits::LYC_equals_LYFlag, false);
+			core->ram->Set(HWAddr::STAT, STAT);
 		}
 	}
 }

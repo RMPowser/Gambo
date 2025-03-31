@@ -78,7 +78,7 @@ void RAM::Write(u16 addr, u8 data)
 		ram[addr] = 0;
 }
 
-u8& RAM::Get(u16 addr)
+const u8& RAM::Get(u16 addr)
 {
 	return ram[addr];
 }

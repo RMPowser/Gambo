@@ -45,7 +45,7 @@ void CPU::Write(u16 addr, u8 data)
     core->Write(addr, data);
 }
 
-u8& CPU::Get(u16 addr)
+const u8& CPU::Get(u16 addr)
 {
 	return core->ram->Get(addr);
 }
@@ -283,7 +283,7 @@ bool CPU::HandleInterrupt(InterruptFlags f)
 	IME = false;
 
 	// acknowledge the interrupt by clearing its flag
-	Get(HWAddr::IF) &= ~(f);
+	core->ram->Set(HWAddr::IF, Get(HWAddr::IF) & ~(f));
 
 	// push the program counter so we can get back to 
 	// where we left off
@@ -325,11 +325,11 @@ void CPU::UpdateTimers(u8 ticks)
 	if ((DIVCounter += ticks) >= 256)
 	{
 		DIVCounter -= 256;
-		Get(HWAddr::DIV)++; // set directly to prevent reset from Write() logic
+		core->ram->Set(HWAddr::DIV, Get(HWAddr::DIV) + 1); // set directly to prevent reset from Write() logic
 	}
 
 	// if TIMA is enabled
-	u8& TAC = Get(HWAddr::TAC);
+	auto& TAC = Get(HWAddr::TAC);
 	if (TAC & 0b100)
 	{
 		int TIMAFreq = 0;
@@ -353,7 +353,7 @@ void CPU::UpdateTimers(u8 ticks)
 				break;
 		}
 
-		u8& TIMA = Get(HWAddr::TIMA);
+		auto& TIMA = Get(HWAddr::TIMA);
 		TIMACounter += ticks;
 		while (TIMACounter >= TIMAFreq)
 		{
@@ -361,11 +361,11 @@ void CPU::UpdateTimers(u8 ticks)
 			if (TIMA == 0xFF)
 			{
 				// TIMA resets to TMA register value
-				TIMA = Read(HWAddr::TMA);
+				core->ram->Set(HWAddr::TIMA, Read(HWAddr::TMA));
 				RequestInterrupt(InterruptFlags::Timer);
 			}
 			else
-				TIMA++;
+				core->ram->Set(HWAddr::TIMA, TIMA + 1);
 		}
 	}
 }

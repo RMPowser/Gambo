@@ -30,40 +30,42 @@ Input::~Input()
 
 void Input::Check() const
 {
-	auto& P1 = core->ram->Get(HWAddr::P1);
-	auto p1Before = P1;
+	auto newP1 = core->ram->Get(HWAddr::P1);
+	auto p1Before = core->ram->Get(HWAddr::P1);
 
-	if (!GetBits(P1, 4, 1) && !GetBits(P1, 5, 1)) // are we looking at both directions and actions?
+	if (!GetBits(p1Before, 4, 1) && !GetBits(p1Before, 5, 1)) // are we looking at both directions and actions?
 	{
-		SetBit(P1, 0, !(ImGui::IsKeyDown(ImGuiKey_RightArrow)	|| ImGui::IsKeyDown(ImGuiKey_Z)));
-		SetBit(P1, 1, !(ImGui::IsKeyDown(ImGuiKey_LeftArrow)	|| ImGui::IsKeyDown(ImGuiKey_X)));
-		SetBit(P1, 2, !(ImGui::IsKeyDown(ImGuiKey_UpArrow)		|| ImGui::IsKeyDown(ImGuiKey_Backspace)));
-		SetBit(P1, 3, !(ImGui::IsKeyDown(ImGuiKey_DownArrow)	|| ImGui::IsKeyDown(ImGuiKey_Enter)));
+		SetBit(newP1, 0, !(ImGui::IsKeyDown(ImGuiKey_RightArrow)	|| ImGui::IsKeyDown(ImGuiKey_Z)));
+		SetBit(newP1, 1, !(ImGui::IsKeyDown(ImGuiKey_LeftArrow)	|| ImGui::IsKeyDown(ImGuiKey_X)));
+		SetBit(newP1, 2, !(ImGui::IsKeyDown(ImGuiKey_UpArrow)		|| ImGui::IsKeyDown(ImGuiKey_Backspace)));
+		SetBit(newP1, 3, !(ImGui::IsKeyDown(ImGuiKey_DownArrow)	|| ImGui::IsKeyDown(ImGuiKey_Enter)));
 	}
-	else if (!GetBits(P1, 4, 1)) // are we only looking at directions?
+	else if (!GetBits(p1Before, 4, 1)) // are we only looking at directions?
 	{
-		SetBit(P1, 0, !ImGui::IsKeyDown(ImGuiKey_RightArrow));
-		SetBit(P1, 1, !ImGui::IsKeyDown(ImGuiKey_LeftArrow));
-		SetBit(P1, 2, !ImGui::IsKeyDown(ImGuiKey_UpArrow));
-		SetBit(P1, 3, !ImGui::IsKeyDown(ImGuiKey_DownArrow));
+		SetBit(newP1, 0, !ImGui::IsKeyDown(ImGuiKey_RightArrow));
+		SetBit(newP1, 1, !ImGui::IsKeyDown(ImGuiKey_LeftArrow));
+		SetBit(newP1, 2, !ImGui::IsKeyDown(ImGuiKey_UpArrow));
+		SetBit(newP1, 3, !ImGui::IsKeyDown(ImGuiKey_DownArrow));
 	}
-	else if (!GetBits(P1, 5, 1)) // are we only looking at actions?
+	else if (!GetBits(p1Before, 5, 1)) // are we only looking at actions?
 	{
-		SetBit(P1, 0, !ImGui::IsKeyDown(ImGuiKey_Z));
-		SetBit(P1, 1, !ImGui::IsKeyDown(ImGuiKey_X));
-		SetBit(P1, 2, !ImGui::IsKeyDown(ImGuiKey_Backspace));
-		SetBit(P1, 3, !ImGui::IsKeyDown(ImGuiKey_Enter));
+		SetBit(newP1, 0, !ImGui::IsKeyDown(ImGuiKey_Z));
+		SetBit(newP1, 1, !ImGui::IsKeyDown(ImGuiKey_X));
+		SetBit(newP1, 2, !ImGui::IsKeyDown(ImGuiKey_Backspace));
+		SetBit(newP1, 3, !ImGui::IsKeyDown(ImGuiKey_Enter));
 	}
 	else
 	{
 		// nothing is pressed
-		SetBit(P1, 0, 1);
-		SetBit(P1, 1, 1);
-		SetBit(P1, 2, 1);
-		SetBit(P1, 3, 1);
+		SetBit(newP1, 0, 1);
+		SetBit(newP1, 1, 1);
+		SetBit(newP1, 2, 1);
+		SetBit(newP1, 3, 1);
 	}
 
-	if ((p1Before & 0xF) & ~(P1 & 0xF))
+	core->ram->Set(HWAddr::P1, newP1);
+
+	if ((p1Before & 0xF) & ~(newP1 & 0xF))
 	{
 		if (GetBits(core->ram->Read(HWAddr::IE), 4, 1)) // check if joypad interrupt is enabled
 			core->cpu->RequestInterrupt(InterruptFlags::Joypad);

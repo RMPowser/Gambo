@@ -57,7 +57,7 @@ public:
 private:
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
-	u8& Get(u16 addr);
+	const u8& Get(u16 addr);
 
 	void CheckForLYCStatInterrupt();
 	void DrawBGOrWindowPixel(); // draw background
