@@ -46,6 +46,10 @@ public:
 
 	void Run();
 	
+	void AddBreakPoint(const std::string& s);
+	void RemoveBreakPoint(const int index);
+	const std::vector<int>& GetBreakPoints() const;
+
 	u8 Read(u16 addr);
 	void Write(u16 addr, u8 data);
 	void Reset(bool removeCartridge = false);
@@ -96,4 +100,6 @@ private:
 	int screenScale = PixelScale; 
 	bool disassemble = true;
 	bool useBootRom;
+
+	std::vector<int> breakPoints;
 };

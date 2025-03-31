@@ -479,6 +479,33 @@ void Frontend::DrawCPUInfoWindow()
 			ImGui::TextColored(first == true ? CYAN : WHITE, "%s", line.second.c_str());
 			first = false;
 		}
+
+
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+		static char buf[5] = "";
+		ImGui::PushItemWidth(70);
+		if (ImGui::InputText("break point", buf, sizeof(buf), ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue))
+		{
+			gambo.AddBreakPoint(std::string(buf));
+		}
+		ImGui::PopItemWidth();
+
+		auto& gamboBreakPoints = gambo.GetBreakPoints();
+		for (int i = 0; i < gamboBreakPoints.size(); ++i)
+		{
+			ImGui::PushID(i);
+			if (ImGui::SmallButton("x"))
+			{
+				gambo.RemoveBreakPoint(i);
+				i--;
+				ImGui::PopID();
+				continue;
+			}
+
+			ImGui::PopID();
+
+			ImGui::SameLine(); ImGui::TextColored(gamboBreakPoints[i] == state.PC ? CYAN : WHITE, "0x%04X", gamboBreakPoints[i]);
+		}
 	}
 
 	ImGui::PopStyleVar(1);

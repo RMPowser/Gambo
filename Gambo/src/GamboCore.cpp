@@ -43,6 +43,18 @@ void GamboCore::Run()
 		while (!vblank)
 		{
 			input->Check();
+			for (auto& i : breakPoints)
+			{
+				if (i == cpu->GetPC())
+				{
+					running = false; 
+					break;
+				}
+			}
+
+			if (!running)
+				break;
+			
 			int cycles = cpu->RunFor(1);
 			vblank = ppu->RunFor(cycles);
 		}
@@ -72,6 +84,22 @@ void GamboCore::Run()
 		stepFrame = false;
 		disassemble = true;
 	}
+}
+
+void GamboCore::AddBreakPoint(const std::string& s)
+{
+	unsigned int x = std::stoul(s, nullptr, 16);
+	breakPoints.push_back(x);
+}
+
+void GamboCore::RemoveBreakPoint(const int index)
+{
+	breakPoints.erase(breakPoints.begin() + index);
+}
+
+const std::vector<int>& GamboCore::GetBreakPoints() const
+{
+	return breakPoints;
 }
 
 const void* GamboCore::GetScreen() const
