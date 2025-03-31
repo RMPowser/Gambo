@@ -243,7 +243,7 @@ bool PPU::RunFor(int cycles)
 
 void PPU::Reset()
 {
-	mode = PPUMode::OAMScan;
+	mode = PPUMode::HBlank;
 	isBlankFrame = true;
 	cyclesCounter = 0;
 	modeCounterForVBlank = 0;
