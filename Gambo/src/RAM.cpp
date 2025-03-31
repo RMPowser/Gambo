@@ -105,7 +105,7 @@ void RAM::Reset()
 	{
 		ram[HWAddr::P1]		= 0x0F;
 		ram[HWAddr::LCDC]	= 0x00;
-		ram[HWAddr::STAT]	= 0x00;
+		ram[HWAddr::STAT]	= 0x80;
 		ram[HWAddr::SCY]	= 0x00;
 		ram[HWAddr::SCX]	= 0x00;
 		ram[HWAddr::BOOT]	= 0xFE;
