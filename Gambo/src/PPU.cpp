@@ -156,10 +156,15 @@ bool PPU::RunFor(int cycles)
 						objHeight = GetBits(LCDC, LCDCBits::OBJSize) ? 16 : 8;
 						objs.clear();
 
+						std::vector<OAM_entry> entries;
+
 						for (u16 i = 0; i < OAMSize; i += sizeof(OAM_entry))
 						{
-							auto entry = reinterpret_cast<OAM_entry&>(Get(HWAddr::OAM + i));
+							entries.push_back(reinterpret_cast<OAM_entry&>(Get(HWAddr::OAM + i)));
+						}
 
+						for (auto& entry : entries)
+						{
 							int objX = (int)entry.xpos - 8;
 							int objY = (int)entry.ypos - 16;
 							if (objY > LY 
@@ -179,6 +184,13 @@ bool PPU::RunFor(int cycles)
 							if (objs.size() >= 10)
 								break;
 						}
+
+						// sort by lowest xpos and preserve ordering for ties
+						std::stable_sort(objs.begin(), objs.end(),
+							[](const OAM_entry& x, const OAM_entry& y)
+							{
+								return x.xpos < y.xpos;
+							});
 					}
 					break;
 				}
@@ -392,103 +404,87 @@ void PPU::DrawObjPixel()
 		if (isBlankFrame)
 			return;
 
-		OAM_entry* objToDraw = nullptr;
-
 		// find the obj we need to draw at this pixel, if any
-		for (auto& obj : objs)
+		for (const OAM_entry& obj : objs)
 		{
 			int pixelIndexToDrawWithinTileRow = pixelCounter - (obj.xpos - ObjWidth);
 			if (pixelIndexToDrawWithinTileRow >= 0 && pixelIndexToDrawWithinTileRow < 8)
 			{
-				if (objToDraw == nullptr)
+				// gather flags
+				const u8 palette = GetBits(obj.flags, OAM_entry::Flags::DMG_Palette) ? OBP1 : OBP0;
+				const bool isXFlip = GetBits(obj.flags, OAM_entry::Flags::X_Flip);
+				const bool isYFlip = GetBits(obj.flags, OAM_entry::Flags::Y_Flip);
+
+				// base address for obj tile data is always 0x8000
+				u16 tileDataBaseAddr = 0x8000;
+
+				// this is the row within the tile we want to draw
+				u8 tileRow = LY - (obj.ypos - 16);
+
+				// check if the row is part of the second tile if 8x16 is enabled
+				bool isSecondTile = objHeight == 16 && tileRow >= 8;
+
+				// adjust the row to be within the bounds of one tile according to the previous check
+				if (isSecondTile)
+					tileRow -= 8;
+
+				// check if tile data should be interpreted as flipped
+				if (isXFlip)
+					pixelIndexToDrawWithinTileRow = 7 - pixelIndexToDrawWithinTileRow;
+				if (isYFlip)
 				{
-					objToDraw = &obj;
+					tileRow = 7 - tileRow;
+
+					if (objHeight == 16)
+					{
+						isSecondTile = !isSecondTile;
+					}
 				}
-				else if (obj.xpos < objToDraw->xpos)
+
+				// this is the position of the pixel data within the tile data
+				u8 tilePixelDataOffset = tileRow * 2; // each row takes up two bytes of memory
+
+				// Bit 0 of tileindex for 8x16 objects should be ignored
+				u8 tileIndex = objHeight == 16
+					? ((obj.tileIndex & 0b11111110) + isSecondTile)
+					: (obj.tileIndex + isSecondTile);
+
+				// this is the address of the actual graphic data for the tile the obj is currently using
+				u16 tileDataAddr = tileDataBaseAddr + (tileIndex * 16); // 16 bits per row of pixels within the tile
+
+				// get the two bytes that hold the color data for this pixel
+				u8 data0 = core->Read(tileDataAddr + tilePixelDataOffset);
+				u8 data1 = core->Read(tileDataAddr + tilePixelDataOffset + 1);
+
+				// pixel 0 in the tile is bit 7 of both data0 and data1. Pixel 1 is bit 6 of both. Pixel 2 is bit 5, etc...
+				u8 colorBitIndex = 7 - pixelIndexToDrawWithinTileRow;
+
+				// combine data0 and data1 to get the color id for this pixel
+				bool colorBit0 = data0 & (1 << colorBitIndex);
+				bool colorBit1 = data1  & (1 << colorBitIndex);
+				u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
+				
+				// dont draw transparent pixels
+				if (colorIndex != 0)
 				{
-					objToDraw = &obj;
+					int& bgPixel = reinterpret_cast<int&>(screen[pixelIndex]);
+					int& color0 = reinterpret_cast<int&>(GameBoyColors[GetBits(BGP, 0, 0b11)]);
+
+					// early out if BG is over this pixel unless BG pixel is BGP color 0
+					if (GetBits(obj.flags, OAM_entry::Flags::Priority) && bgPixel != color0)
+					{
+						return;
+					}
+
+					// now that we have the color id, get the actual color from the palette
+					u8 color = GetBits(palette, colorIndex * 2, 0b11); // each color is a 2bit value
+
+					// draw an actual color
+					screen[pixelIndex] = GameBoyColors[color];
+
+					return;
 				}
 			}
-		}
-
-
-
-		if (objToDraw)
-		{
-			int pixelIndexToDrawWithinTileRow = pixelCounter - (objToDraw->xpos - ObjWidth);
-
-			int& bgPixel = reinterpret_cast<int&>(screen[pixelIndex]);
-			int& color0 = reinterpret_cast<int&>(GameBoyColors[GetBits(BGP, 0, 0b11)]);
-
-			// early out if BG is over this pixel unless BG pixel is BGP color 0
-			if (GetBits(objToDraw->flags, OAM_entry::Flags::Priority) && bgPixel != color0)
-			{
-				return;
-			}
-
-			// gather flags
-			const u8 palette = GetBits(objToDraw->flags, OAM_entry::Flags::DMG_Palette) ? OBP1 : OBP0;
-			const bool isXFlip = GetBits(objToDraw->flags, OAM_entry::Flags::X_Flip);
-			const bool isYFlip = GetBits(objToDraw->flags, OAM_entry::Flags::Y_Flip);
-
-			// base address for obj tile data is always 0x8000
-			u16 tileDataBaseAddr = 0x8000;
-
-			// this is the row within the tile we want to draw
-			u8 tileRow = LY - (objToDraw->ypos - 16);
-
-			// check if the row is part of the second tile if 8x16 is enabled
-			bool isSecondTile = objHeight == 16 && tileRow >= 8;
-
-			// adjust the row to be within the bounds of one tile according to the previous check
-			if (isSecondTile)
-				tileRow -= 8;
-					
-			// check if tile data should be interpreted as flipped
-			if (isXFlip)
-				pixelIndexToDrawWithinTileRow = 7 - pixelIndexToDrawWithinTileRow;
-			if (isYFlip)
-			{
-				tileRow = 7 - tileRow;
-
-				if (objHeight == 16)
-				{
-					isSecondTile = !isSecondTile;
-				}
-			}
-
-			// this is the position of the pixel data within the tile data
-			u8 tilePixelDataOffset = tileRow * 2; // each row takes up two bytes of memory
-
-			// Bit 0 of tileindex for 8x16 objects should be ignored
-			u8 tileIndex = objHeight == 16 
-				? ((objToDraw->tileIndex & 0b11111110) + isSecondTile)
-				: (objToDraw->tileIndex + isSecondTile);
-
-			// this is the address of the actual graphic data for the tile the obj is currently using
-			u16 tileDataAddr = tileDataBaseAddr + (tileIndex * 16); // 16 bits per row of pixels within the tile
-
-			// get the two bytes that hold the color data for this pixel
-			u8 data0 = core->Read(tileDataAddr + tilePixelDataOffset);
-			u8 data1 = core->Read(tileDataAddr + tilePixelDataOffset + 1);
-
-			// pixel 0 in the tile is bit 7 of both data0 and data1. Pixel 1 is bit 6 of both. Pixel 2 is bit 5, etc...
-			u8 colorBitIndex = 7 - pixelIndexToDrawWithinTileRow;
-
-			// combine data0 and data1 to get the color id for this pixel
-			bool colorBit0 = data0 & (1 << colorBitIndex);
-			bool colorBit1 = data1 & (1 << colorBitIndex);
-			u8 colorIndex = ((int)colorBit1 << 1) | (int)colorBit0;
-
-			// if the colorIndex is 0, just use whatever is in the bg already 
-			if (colorIndex == 0)
-				return;
-
-			// now that we have the color id, get the actual color from the palette
-			u8 color = GetBits(palette, colorIndex * 2, 0b11); // each color is a 2bit value
-
-			// draw an actual color
-			screen[pixelIndex] = GameBoyColors[color];
 		}
 	}
 }
