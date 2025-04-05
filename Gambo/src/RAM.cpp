@@ -58,8 +58,8 @@ void RAM::Write(u16 addr, u8 data)
 		u16 startAddr = data << 8;
 		for (u16 currAddr = startAddr; currAddr < startAddr + 160; currAddr++)
 		{
-			u8 data = Read(currAddr);
-			Write(HWAddr::OAM + (currAddr - startAddr), data);
+			u8 dataToCopy = Read(currAddr);
+			ram[HWAddr::OAM + (currAddr - startAddr)] = dataToCopy;
 		}
 	}
 
