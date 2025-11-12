@@ -20,7 +20,7 @@ bool debugMode = false;
 Frontend::Frontend()
 {
 	// Setup SDL
-	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD));
+	SDL_assert_release(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO));
 
 	// initially create the window as hidden. we will show it when its the correct size
 	// after imgui is initialzed
@@ -77,13 +77,40 @@ Frontend::Frontend()
 
 	// if everything else is ok, we can finally show the window
 	SDL_ShowWindow(window);
+
+	gambo = new GamboCore;
 }
 
 Frontend::~Frontend()
 {
-	if (window != nullptr)
+	if (gambo)
+	{
+		delete gambo;
+		gambo = nullptr;
+	}
+
+	if (gamboTexture)
+	{
+		SDL_DestroyTexture(gamboTexture);
+		gamboTexture = nullptr;
+	}
+
+	if (gamboVramView)
+	{
+		SDL_DestroyTexture(gamboVramView);
+		gamboVramView = nullptr;
+	}
+
+	if (renderer)
+	{
+		SDL_DestroyRenderer(renderer);
+		renderer = nullptr;
+	}
+
+	if (window)
 	{
 		SDL_DestroyWindow(window);
+		window = nullptr;
 	}
 
 	SDL_Quit();
@@ -95,12 +122,12 @@ void Frontend::Run()
 	{
 		using namespace std::chrono;
 		using clock = high_resolution_clock;
-		using framerateGSync = duration<int, std::ratio<100, 5973>>;
-		using framerateVSync = duration<int, std::ratio<100, 6000>>;
+		using framerateGSync = duration<double, std::ratio<GamboCyclesPerFrame, GamboClockSpeed>>;
+		using framerateVSync = duration<int, std::ratio<1, 60>>;
 		
 		time_point t = fps60 ? clock::now() + framerateVSync{1} : clock::now() + framerateGSync{1};
 
-		gambo.Run();
+		gambo->Run();
 		BeginFrame();
 		UpdateUI();
 		EndFrame();
@@ -186,7 +213,7 @@ void Frontend::EndFrame()
 
 	if (done)
 	{
-		gambo.SetDone(true);
+		gambo->SetDone(true);
 	}
 }
 
@@ -203,7 +230,7 @@ void Frontend::HandleKeyboardShortcuts()
 		SetGamboRunning();
 
 	if (ImGui::IsKeyDown(ImGuiMod_Ctrl) && ImGui::IsKeyPressed(ImGuiKey_R))
-		gambo.Reset();
+		gambo->Reset();
 
 	if (debugMode)
 	{
@@ -219,15 +246,15 @@ void Frontend::OpenGameFromFile(std::filesystem::path filePath)
 {
 	if (filePath.extension() == ".gb")
 	{
-		gambo.InsertCartridge(filePath);
+		gambo->InsertCartridge(filePath);
 
-		auto& cart = gambo.GetCartridge();
+		auto& cart = gambo->GetCartridge();
 		if (!cart.IsMapperSupported())
 		{
 			std::stringstream ss;
 			ss << "Gambo does not yet implement mapper " << cart.GetMapperTypeAsString() << ".";
 			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Mapper not supported!", ss.str().c_str(), window);
-			gambo.Reset(true);
+			gambo->Reset(true);
 		}
 		else
 		{
@@ -294,14 +321,14 @@ void Frontend::DrawGamboWindow()
 
 			if (ImGui::BeginMenu("Gambo"))
 			{
-				if (ImGui::MenuItem(!gambo.GetRunning() ? "Play" : "Pause", "Ctrl+P"))
+				if (ImGui::MenuItem(!gambo->GetRunning() ? "Play" : "Pause", "Ctrl+P"))
 				{
 					SetGamboRunning();
 				}
 
 				if (ImGui::MenuItem("Reset", "Ctrl+R"))
 				{
-					gambo.Reset();
+					gambo->Reset();
 				}
 
 				if (debugMode)
@@ -323,9 +350,9 @@ void Frontend::DrawGamboWindow()
 			{
 				ImGui::Separator();
 				
-				static bool useBootRom = gambo.IsUseBootRom();
+				static bool useBootRom = gambo->IsUseBootRom();
 				if (ImGui::MenuItem("Use Boot Rom", nullptr, &useBootRom))
-					gambo.SetUseBootRom(useBootRom);
+					gambo->SetUseBootRom(useBootRom);
 
 				ImGui::Separator();
 
@@ -419,8 +446,8 @@ void Frontend::DrawGamboWindow()
 
 		void* pixels = nullptr;
 		int pitch = 0;
-		SDL_LockTexture(gamboTexture, NULL, &pixels, &pitch);
-		memcpy(pixels, gambo.GetScreen(), GamboScreenWidth * GamboScreenHeight * BytesPerPixel);
+		SDL_LockTexture(gamboTexture, nullptr, &pixels, &pitch);
+		memcpy(pixels, gambo->GetScreen(), GamboScreenWidth * GamboScreenHeight * BytesPerPixel);
 		SDL_UnlockTexture(gamboTexture);
 		ImGui::Image((ImTextureID)gamboTexture, gamboScreenSize);
 
@@ -452,7 +479,7 @@ void Frontend::DrawCPUInfoWindow()
 
 	ImGui::Begin(CPUInfoWindowTitle, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 	{
-		auto state = gambo.GetState();
+		auto state = gambo->GetState();
 		//ImGui::TextColored(WHITE, "%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 		ImGui::TextColored(WHITE, "FLAGS: ");
 		ImGui::SameLine(); ImGui::TextColored(state.flags.Z ? GREEN : RED, "Z");
@@ -486,17 +513,17 @@ void Frontend::DrawCPUInfoWindow()
 		ImGui::PushItemWidth(70);
 		if (ImGui::InputText("break point", buf, sizeof(buf), ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			gambo.AddBreakPoint(std::string(buf));
+			gambo->AddBreakPoint(std::string(buf));
 		}
 		ImGui::PopItemWidth();
 
-		auto& gamboBreakPoints = gambo.GetBreakPoints();
+		auto& gamboBreakPoints = gambo->GetBreakPoints();
 		for (int i = 0; i < gamboBreakPoints.size(); ++i)
 		{
 			ImGui::PushID(i);
 			if (ImGui::SmallButton("x"))
 			{
-				gambo.RemoveBreakPoint(i);
+				gambo->RemoveBreakPoint(i);
 				i--;
 				ImGui::PopID();
 				continue;
@@ -545,7 +572,7 @@ void Frontend::DrawVramViewer()
 			ImDrawList* drawList = ImGui::GetWindowDrawList();
 			ImGuiIO& io = ImGui::GetIO();
 
-			SDL_UpdateTexture(gamboVramView, NULL, gambo.GetVramViewer().GetView().data(), vramViewWidth * BytesPerPixel);
+			SDL_UpdateTexture(gamboVramView, nullptr, gambo->GetVramViewer().GetView().data(), vramViewWidth * BytesPerPixel);
 			ImGui::Image((ImTextureID)gamboVramView, { vramViewWidth, vramViewWidth });
 
 			if (showGrid)
@@ -567,8 +594,8 @@ void Frontend::DrawVramViewer()
 
 			if (showScreen)
 			{
-				u8 SCX = gambo.Read(HWAddr::SCX);
-				u8 SCY = gambo.Read(HWAddr::SCY);
+				u8 SCX = gambo->Read(HWAddr::SCX);
+				u8 SCY = gambo->Read(HWAddr::SCY);
 
 				float gridMaxX = imguiCursorPos.x + vramViewWidth;
 				float gridMaxY = imguiCursorPos.y + vramViewWidth;
@@ -635,16 +662,16 @@ void Frontend::DrawVramViewer()
 			{
 				case 0:
 				{
-					gambo.GetVramViewer().SetTileMapBaseAddr(-1);
+					gambo->GetVramViewer().SetTileMapBaseAddr(-1);
 				}
 				case 1:
 				{
-					gambo.GetVramViewer().SetTileMapBaseAddr(0x9800);
+					gambo->GetVramViewer().SetTileMapBaseAddr(0x9800);
 					break;
 				}
 				case 2:
 				{
-					gambo.GetVramViewer().SetTileMapBaseAddr(0x9C00);
+					gambo->GetVramViewer().SetTileMapBaseAddr(0x9C00);
 					break;
 				}
 			}
@@ -653,17 +680,17 @@ void Frontend::DrawVramViewer()
 			{
 				case 0:
 				{
-					gambo.GetVramViewer().SetTileDataBaseAddr(-1);
+					gambo->GetVramViewer().SetTileDataBaseAddr(-1);
 					break;
 				}
 				case 1:
 				{
-					gambo.GetVramViewer().SetTileDataBaseAddr(0x9000);
+					gambo->GetVramViewer().SetTileDataBaseAddr(0x9000);
 					break;
 				}
 				case 2:
 				{
-					gambo.GetVramViewer().SetTileDataBaseAddr(0x8000);
+					gambo->GetVramViewer().SetTileDataBaseAddr(0x8000);
 					break;
 				}
 			}
@@ -679,11 +706,11 @@ void Frontend::DrawVramViewer()
 			ImGui::SameLine(); ImGui::TextColored(GREEN, "Y:"); 
 			ImGui::SameLine(); ImGui::Text("$%02X", tileY);
 
-			u8 LCDC = gambo.Read(HWAddr::LCDC);
+			u8 LCDC = gambo->Read(HWAddr::LCDC);
 
 
-			u16 tileMapBaseAddr = gambo.GetVramViewer().GetTileMapBaseAddr() != -1 ? gambo.GetVramViewer().GetTileMapBaseAddr() :GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0x1) ? 0x9C00 : 0x9800;
-			u16 tileDataBaseAddr = gambo.GetVramViewer().GetTileDataBaseAddr() != -1 ? gambo.GetVramViewer().GetTileDataBaseAddr() : GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
+			u16 tileMapBaseAddr = gambo->GetVramViewer().GetTileMapBaseAddr() != -1 ? gambo->GetVramViewer().GetTileMapBaseAddr() :GetBits(LCDC, (u8)LCDCBits::BGTileMapArea, 0x1) ? 0x9C00 : 0x9800;
+			u16 tileDataBaseAddr = gambo->GetVramViewer().GetTileDataBaseAddr() != -1 ? gambo->GetVramViewer().GetTileDataBaseAddr() : GetBits(LCDC, (u8)LCDCBits::TileDataArea, 0b1) ? 0x8000 : 0x8800;
 			u16 mapAddr = tileMapBaseAddr + (32 * tileY) + tileX;
 
 			ImGui::TextColored(CYAN, "Map Addr: "); ImGui::SameLine();
@@ -693,12 +720,12 @@ void Frontend::DrawVramViewer()
 
 			if (tileDataBaseAddr == 0x8800)
 			{
-				tileIndex = static_cast<s8> (gambo.Read(mapAddr));
+				tileIndex = static_cast<s8> (gambo->Read(mapAddr));
 				tileIndex += 128;
 			}
 			else
 			{
-				tileIndex = gambo.Read(mapAddr);
+				tileIndex = gambo->Read(mapAddr);
 			}
 
 			ImGui::TextColored(CYAN, "Tile Addr:"); 
@@ -721,19 +748,19 @@ void Frontend::DrawVramViewer()
 
 void Frontend::SetGamboRunning()
 {
-	gambo.SetRunning(!gambo.GetRunning());
-	if (gambo.GetRunning())
-		gambo.SetStep(false);
+	gambo->SetRunning(!gambo->GetRunning());
+	if (gambo->GetRunning())
+		gambo->SetStep(false);
 }
 
 void Frontend::SetGamboStep()
 {
-	gambo.SetRunning(false);
-	gambo.SetStep(true);
+	gambo->SetRunning(false);
+	gambo->SetStep(true);
 }
 
 void Frontend::SetGamboStepFrame()
 {
-	gambo.SetRunning(false);
-	gambo.SetStepFrame(true);
+	gambo->SetRunning(false);
+	gambo->SetStepFrame(true);
 }

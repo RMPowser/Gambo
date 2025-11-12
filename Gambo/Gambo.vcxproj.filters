@@ -84,6 +84,9 @@
     <ClCompile Include="..\imgui\backends\imgui_impl_sdlrenderer3.cpp">
       <Filter>imgui\backends</Filter>
     </ClCompile>
+    <ClCompile Include="src\APU.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\CPU.h">
@@ -157,6 +160,12 @@
     </ClInclude>
     <ClInclude Include="..\imgui\backends\imgui_impl_sdlrenderer3.h">
       <Filter>imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="src\APU.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Register.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

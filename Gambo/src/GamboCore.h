@@ -3,6 +3,7 @@
 
 class CPU;
 class PPU;
+class APU;
 class RAM;
 class Input;
 class Cartridge;
@@ -37,6 +38,7 @@ class GamboCore
 {
 	friend class CPU;
 	friend class PPU;
+	friend class APU;
 	friend class RAM;
 	friend class Input;
 
@@ -89,6 +91,7 @@ private:
 
 	CPU* cpu;
 	PPU* ppu;
+	APU* apu;
 	RAM* ram;
 	Input* input;
 	BootRom* boot;

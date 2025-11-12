@@ -7,6 +7,7 @@
 #include <iterator>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 
 
 std::map<MapperType, std::string> MapperTypeToString {
@@ -547,7 +548,7 @@ u16 Cartridge::GetGlobalChecksum() const
 		return 0;
 
 	// checksum is big endian
-	u16 checksum = header.global_checksum[0] << 7 | header.global_checksum[1];
+	int checksum = header.global_checksum[0] << 7 | header.global_checksum[1];
 	return checksum;
 }
 
@@ -657,11 +658,18 @@ void Cartridge::LoadSave()
 		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary);
 	}
 
-	ram.clear();
-	ram.resize(GetRamSize());
+	if (GetRamSize() == std::filesystem::file_size(savePath))
+	{
+		ram.clear();
+		ram.resize(GetRamSize());
 
-	saveFile.read(reinterpret_cast<char*>(ram.data()), GetRamSize());
-	
+		saveFile.read(reinterpret_cast<char*>(ram.data()), GetRamSize());
+	}
+	else
+	{
+		__debugbreak();
+	}
+
 	saveFile.close();
 }
 

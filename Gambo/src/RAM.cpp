@@ -1,6 +1,7 @@
 #include "RAM.h"
 #include "GamboCore.h"
 #include "PPU.h"
+#include "APU.h"
 #include <random>
 
 #pragma warning(push)
@@ -17,6 +18,11 @@ RAM::~RAM()
 
 const u8 RAM::Read(u16 addr) const
 {
+	if (addr == HWAddr::NR13)
+	{
+		return 0xFF;
+	}
+
 	return ram[addr];
 }
 
@@ -44,10 +50,96 @@ void RAM::Write(u16 addr, u8 data)
 	{
 		u8 curr = ram[addr];
 
-		if (GetBits(data, (u8)LCDCBits::LCDEnable, 0b1) && !GetBits(curr, (u8)LCDCBits::LCDEnable, 0b1))
+		if (GetBits(data, (u8)LCDCBits::LCDEnable) && !GetBits(curr, (u8)LCDCBits::LCDEnable))
 			core->ppu->Enable();
-		else if (!GetBits(data, (u8)LCDCBits::LCDEnable, 0b1) && GetBits(curr, (u8)LCDCBits::LCDEnable, 0b1))
+		else if (!GetBits(data, (u8)LCDCBits::LCDEnable) && GetBits(curr, (u8)LCDCBits::LCDEnable))
 			core->ppu->Disable();
+	}
+
+	if (addr == HWAddr::NR52)
+	{
+		u8 curr = ram[addr];
+
+		if (GetBits(data, (u8)NR52Bits::Audio_Enable) && !GetBits(curr, (u8)NR52Bits::Audio_Enable))
+			core->apu->Enable();
+		else if (!GetBits(data, (u8)NR52Bits::Audio_Enable) && GetBits(curr, (u8)NR52Bits::Audio_Enable))
+			core->apu->Disable();
+
+		// only bit 7 is writeable
+		ram[addr] = data & 0b10000000;
+		return;
+	}
+
+	if (addr == HWAddr::NR12)
+	{
+		if ((data & 0b11111000) == 0b11111000)
+		{
+			core->apu->DisableSquare1();
+		}
+	}
+
+	if (addr == HWAddr::NR22)
+	{
+		if ((data & 0b11111000) == 0b11111000)
+		{
+			core->apu->DisableSquare2();
+		}
+	}
+
+	if (addr == HWAddr::NR32)
+	{
+		if ((data & 0b11111000) == 0b11111000)
+		{
+			//core->apu->DisableWave();
+		}
+	}
+
+	if (addr == HWAddr::NR42)
+	{
+		if ((data & 0b11111000) == 0b11111000)
+		{
+			core->apu->DisableNoise();
+		}
+	}
+
+	if (addr == HWAddr::NR14)
+	{
+		u8 curr = ram[addr];
+
+		if (GetBits(data, NRx4Bits::Trigger))
+		{
+			core->apu->TriggerSquare1();
+		}
+	}
+
+	if (addr == HWAddr::NR24)
+	{
+		u8 curr = ram[addr];
+
+		if (GetBits(data, NRx4Bits::Trigger))
+		{
+			core->apu->TriggerSquare2();
+		}
+	}
+
+	if (addr == HWAddr::NR34)
+	{
+		u8 curr = ram[addr];
+
+		if (GetBits(data, NRx4Bits::Trigger))
+		{
+			core->apu->TriggerWave();
+		}
+	}
+
+	if (addr == HWAddr::NR44)
+	{
+		u8 curr = ram[addr];
+
+		if (GetBits(data, NRx4Bits::Trigger))
+		{
+			core->apu->TriggerNoise();
+		}
 	}
 
 	ram[addr] = data;

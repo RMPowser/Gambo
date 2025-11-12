@@ -1,6 +1,7 @@
 #include "GamboCore.h"
 #include "CPU.h"
 #include "PPU.h"
+#include "APU.h"
 #include "RAM.h"
 #include "Input.h"
 #include "Cartridge.h"
@@ -15,6 +16,7 @@
 GamboCore::GamboCore()
 	: cpu(new CPU(this))
 	, ppu(new PPU(this))
+	, apu(new APU(this))
 	, ram(new RAM(this))
 	, input(new Input(this))
 	, boot(new BootRomDMG())
@@ -29,6 +31,7 @@ GamboCore::~GamboCore()
 {
 	SAFE_DELETE(cpu);
 	SAFE_DELETE(ppu);
+	SAFE_DELETE(apu);
 	SAFE_DELETE(ram);
 	SAFE_DELETE(input);
 	SAFE_DELETE(cart);
@@ -57,6 +60,7 @@ void GamboCore::Run()
 			
 			int cycles = cpu->RunFor(1);
 			vblank = ppu->RunFor(cycles);
+			apu->RunFor(cycles);
 		}
 		
 		disassemble = true;

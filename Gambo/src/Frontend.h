@@ -20,7 +20,7 @@ private:
 	void HandleKeyboardShortcuts();
 	void OpenGameFromFile(std::filesystem::path filePath = FileDialogs::OpenFile(L"Game Boy Rom\0*.gb"));
 
-	GamboCore gambo;
+	GamboCore* gambo;
 	SDL_Texture* gamboTexture = nullptr;
 	SDL_Texture* gamboVramView = nullptr;
 	SDL_Window* window = nullptr;

@@ -19,9 +19,9 @@ namespace FileDialogs
 		ofn.nMaxFile = sizeof(szFile);
 		ofn.lpstrFilter = filters;
 		ofn.nFilterIndex = 1;
-		ofn.lpstrFileTitle = NULL;
+		ofn.lpstrFileTitle = nullptr;
 		ofn.nMaxFileTitle = 0;
-		ofn.lpstrInitialDir = NULL;
+		ofn.lpstrInitialDir = nullptr;
 		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
 		if (GetOpenFileName(&ofn) == TRUE)

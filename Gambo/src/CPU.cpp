@@ -2,6 +2,7 @@
 #include "GamboCore.h"
 #include "PPU.h"
 #include "RAM.h"
+#include "APU.h"
 
 
 CPU::CPU(GamboCore* c)
@@ -325,7 +326,9 @@ void CPU::UpdateTimers(u8 ticks)
 	if ((DIVCounter += ticks) >= 256)
 	{
 		DIVCounter -= 256;
-		core->ram->Set(HWAddr::DIV, Get(HWAddr::DIV) + 1); // set directly to prevent reset from Write() logic
+		
+		const u8 oldDIV = Get(HWAddr::DIV);
+		core->ram->Set(HWAddr::DIV, oldDIV + 1); // set directly to prevent reset from Write() logic
 	}
 
 	// if TIMA is enabled
@@ -694,10 +697,11 @@ u8 CPU::XXX()
 #endif
 
 #if defined(_DEBUG) && defined(_WIN32)
-	__debugbreak();
+	//__debugbreak();
 #endif
 
-	throw;
+	//throw;
+	return 0;
 }
 
 u8 CPU::NOP()

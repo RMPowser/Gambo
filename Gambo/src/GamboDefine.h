@@ -72,6 +72,7 @@ namespace HWAddr
 	static constexpr unsigned short NR50  = 0xFF24;
 	static constexpr unsigned short NR51  = 0xFF25;
 	static constexpr unsigned short NR52  = 0xFF26;
+	static constexpr unsigned short WAVE  = 0xFF30;
 	static constexpr unsigned short LCDC  = 0xFF40;
 	static constexpr unsigned short STAT  = 0xFF41;
 	static constexpr unsigned short SCY   = 0xFF42;
@@ -101,6 +102,8 @@ namespace HWAddr
 	static constexpr unsigned short IE    = 0xFFFF;
 }
 
+inline constexpr auto GamboClockSpeed = 4194304;
+inline constexpr auto GamboCyclesPerFrame = 70224;
 inline constexpr auto GamboScreenWidth = 160;
 inline constexpr auto GamboScreenHeight = 144;
 inline constexpr auto GamboScreenSize = GamboScreenWidth * GamboScreenHeight;
@@ -188,4 +191,9 @@ constexpr void SetBit(u8& reg, u8 bitIndex, bool value)
 	value == true 
 		? reg |= 1 << bitIndex 
 		: reg &= ~(1 << bitIndex);
+}
+
+consteval u64 operator""_hz(const u64 x)
+{
+	return GamboClockSpeed / x;
 }

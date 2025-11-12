@@ -239,9 +239,9 @@ bool PPU::RunFor(int cycles)
 		}
 		else // lcd and ppu are disabled
 		{
-			if (cyclesCounter >= 70224) // cycles for a full screen
+			if (cyclesCounter >= GamboCyclesPerFrame)
 			{
-				cyclesCounter -= 70224;
+				cyclesCounter -= GamboCyclesPerFrame;
 				cycles = cyclesCounter;
 				vblank = true;
 			}
