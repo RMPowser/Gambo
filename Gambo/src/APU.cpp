@@ -286,6 +286,20 @@ APU::AudioChannel::AudioChannel(const GamboCore* _core)
 {
 }
 
+void APU::AudioChannel::StepLength()
+{
+	if (enabled)
+	{
+		if (lengthTimerEnabled)
+		{
+			if (++lengthTimer == 64)
+			{
+				enabled = false;
+			}
+		}
+	}
+}
+
 void APU::AudioChannel::Reset()
 {
 	enabled = false;
@@ -343,18 +357,6 @@ void APU::SquareChannel::StepEnvelope()
 				if (volume > 0)
 					volume--;
 			}
-		}
-	}
-}
-
-void APU::SquareChannel::StepLength()
-{
-	if (enabled)
-	{
-		if (lengthTimerEnabled && lengthTimer > 0)
-		{
-			if (--lengthTimer == 0) 
-				enabled = false;
 		}
 	}
 }
@@ -640,16 +642,6 @@ void APU::NoiseChannel::StepEnvelope()
 	}
 }
 
-void APU::NoiseChannel::StepLength() 
-{
-	if (enabled)
-	{
-		if (lengthTimerEnabled && lengthTimer > 0 && --lengthTimer == 0) {
-			enabled = false;
-		}
-	}
-}
-
 void APU::NoiseChannel::GenerateSample(int channel) 
 {
 	if (!enabled) {
@@ -719,9 +711,12 @@ void APU::WaveChannel::StepLength()
 {
 	if (enabled) 
 	{
-		if (lengthTimerEnabled && lengthTimer > 0 && --lengthTimer == 0) 
+		if (lengthTimerEnabled) 
 		{
-			enabled = false;
+			if (++lengthTimer == 256)
+			{
+				enabled = false;
+			}
 		}
 	}
 }

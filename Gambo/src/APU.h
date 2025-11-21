@@ -136,14 +136,14 @@ private:
 		virtual u16 GetFrequencyTimer() = 0;
 		virtual void StepFrequency() = 0;
 		virtual void StepEnvelope() = 0;
-		virtual void StepLength() = 0;
+		virtual void StepLength();
 		virtual void GenerateSample(int channel) = 0;
 		virtual void Reset();
 
 		bool enabled;
 
 		int frequencyTimer; // loaded from 11 bits. tells us when to step frequency
-		Register<6> lengthTimer; // tells us when to step length
+		Register<6> lengthTimer; // tells us when disable the channel
 		bool lengthTimerEnabled; 
 
 		Register<4> volume;
@@ -165,7 +165,6 @@ private:
 		virtual void Reset() override;
 		virtual void StepFrequency() override;
 		virtual void StepEnvelope() override;
-		virtual void StepLength() override;
 		virtual void GenerateSample(int channel) final override;
 
 		Register<2> dutyCycle; // 2-bit duty cycle (12.5%, 25%, 50%, 75%)
@@ -215,7 +214,6 @@ private:
 		virtual void Reset() final override;
 		virtual void StepFrequency() final override;
 		virtual void StepEnvelope() final override;
-		virtual void StepLength() final override;
 		virtual void GenerateSample(int channel) final override;
 
 	private:
@@ -233,8 +231,8 @@ private:
 		virtual u16 GetFrequencyTimer() final override;
 		virtual void Reset() final override;
 		virtual void StepFrequency() final override;
-		virtual void StepEnvelope() final override {} // Wave channel has no envelope
 		virtual void StepLength() final override;
+		virtual void StepEnvelope() final override {} // Wave channel has no envelope
 		virtual void GenerateSample(int channel) final override;
 
 	private:
