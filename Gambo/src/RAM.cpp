@@ -56,6 +56,10 @@ void RAM::Write(u16 addr, u8 data)
 			core->ppu->Disable();
 	}
 
+
+	ram[addr] = data;
+	
+
 	if (addr == HWAddr::NR52)
 	{
 		u8 curr = ram[addr];
@@ -142,8 +146,6 @@ void RAM::Write(u16 addr, u8 data)
 		}
 	}
 
-	ram[addr] = data;
-	
 	if (addr == HWAddr::DMA)
 	{
 		// do oam dma transfer
