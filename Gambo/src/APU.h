@@ -252,7 +252,6 @@ private:
 	SDL_AudioStream* outputStream;
 	std::vector<float> masterSamples;
 
-	int samplePeriod; // number of cycles before generating a new sample
 	int sampleTimer; // tells us when to generate a new sample
 	int frameTimer; // tells us when to output samples
 	int lengthTimer; // tells us when to tick length

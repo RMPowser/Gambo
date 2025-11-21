@@ -22,6 +22,7 @@ constexpr int noiseFrequencyPeriod = 262144_hz;
 constexpr int lengthPeriod = 256_hz;
 constexpr int volumePeriod = 64_hz;
 constexpr int sweepPeriod = 128_hz;
+constexpr int samplePeriod = GamboClockSpeed / sampleRate;
 
 APU::APU(const GamboCore* core)
 	: core(core)
@@ -32,7 +33,6 @@ APU::APU(const GamboCore* core)
 	, outputMode(AudioOutputMode::Stereo)
 	, outputStream(nullptr)
 	, masterSamples()
-	, samplePeriod(GamboClockSpeed / sampleRate)
 	, sampleTimer(samplePeriod)
 	, frameTimer(GamboCyclesPerFrame)
 	, lengthTimer(lengthPeriod)
