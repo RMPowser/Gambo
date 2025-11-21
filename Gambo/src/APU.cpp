@@ -6,22 +6,22 @@
 #include <numbers>
 #include <array>
 
-static const float dutyWaveforms[4][8] = {
+constexpr float dutyWaveforms[4][8] = {
 	{0, 0, 0, 0, 0, 0, 0, 1}, // 12.5%
 	{1, 0, 0, 0, 0, 0, 0, 1}, // 25%
 	{1, 1, 1, 0, 0, 0, 0, 1}, // 50%
 	{0, 1, 1, 1, 1, 1, 1, 0}  // 75%
 };
 
-static const float waveVolumeScales[4] = { 0.0, 1.0, 0.5, 0.25 };
+constexpr float waveVolumeScales[4] = { 0.0, 1.0, 0.5, 0.25 };
 
-static const int sampleRate = 32768;
-static const int squareFrequencyPeriod = 1048576_hz;
-static const int waveFrequencyPeriod = 2097152_hz;
-static const int noiseFrequencyPeriod = 262144_hz;
-static const int lengthPeriod = 256_hz;
-static const int volumePeriod = 64_hz;
-static const int sweepPeriod = 128_hz;
+constexpr int sampleRate = 32768;
+constexpr int squareFrequencyPeriod = 1048576_hz;
+constexpr int waveFrequencyPeriod = 2097152_hz;
+constexpr int noiseFrequencyPeriod = 262144_hz;
+constexpr int lengthPeriod = 256_hz;
+constexpr int volumePeriod = 64_hz;
+constexpr int sweepPeriod = 128_hz;
 
 APU::APU(const GamboCore* core)
 	: core(core)
@@ -590,7 +590,7 @@ u16 APU::NoiseChannel::GetFrequencyTimer()
 {
 	const u8& NR43 = core->ram->Get(HWAddr::NR43);
 
-	// Get the clock shift value (Bits 4–7)
+	// Get the clock shift value (Bits 4ï¿½7)
 	int clockShift = GetBits(NR43, NR43Bits::ClockShift, 0b1111);
 
 	float divider = frequencyDivider == 0 ? 0.5 : frequencyDivider;
@@ -735,7 +735,7 @@ void APU::WaveChannel::GenerateSample(int channel)
 		return;
 	}
 
-	// Fetch 4-bit sample from Wave RAM (NR30–NR3F)
+	// Fetch 4-bit sample from Wave RAM (NR30ï¿½NR3F)
 	u8 waveByte = core->ram->Get(HWAddr::WAVE + (waveIndex / 2)); // Each byte holds 2 samples
 	u8 waveSample = (waveIndex % 2 == 0) ? (waveByte >> 4) : (waveByte & 0x0F); // Upper 4 bits or lower 4 bits
 
