@@ -286,6 +286,27 @@ APU::AudioChannel::AudioChannel(const GamboCore* _core)
 {
 }
 
+void APU::AudioChannel::StepEnvelope()
+{
+	if (enabled)
+	{
+		if (envelopePeriod > 0 && ++envelopeTimer == envelopePeriod)
+		{
+			envelopeTimer = 0;
+			if (envelopeDirection)
+			{
+				if (volume < 15)
+					volume++;
+			}
+			else
+			{
+				if (volume > 0)
+					volume--;
+			}
+		}
+	}
+}
+
 void APU::AudioChannel::StepLength()
 {
 	if (enabled)
@@ -336,27 +357,6 @@ void APU::SquareChannel::StepFrequency()
 		{
 			frequencyTimer = GetFrequencyTimer();
 			++dutyStep;
-		}
-	}
-}
-
-void APU::SquareChannel::StepEnvelope()
-{
-	if (enabled)
-	{
-		if (envelopePeriod > 0 && --envelopeTimer == 0)
-		{
-			envelopeTimer = envelopePeriod;
-			if (envelopeDirection)
-			{
-				if (volume < 15)
-					volume++;
-			}
-			else
-			{
-				if (volume > 0)
-					volume--;
-			}
 		}
 	}
 }
@@ -617,27 +617,6 @@ void APU::NoiseChannel::StepFrequency()
 				lfsr.SetBit(7, xorResult);
 			}
 			lfsr >>= 1;
-		}
-	}
-}
-
-void APU::NoiseChannel::StepEnvelope() 
-{
-	if (enabled)
-	{
-		if (envelopePeriod > 0 && --envelopeTimer == 0) 
-		{
-			envelopeTimer = envelopePeriod;
-			if (envelopeDirection)
-			{
-				if (volume < 15) 
-					volume++;
-			}
-			else 
-			{
-				if (volume > 0) 
-					volume--;
-			}
 		}
 	}
 }

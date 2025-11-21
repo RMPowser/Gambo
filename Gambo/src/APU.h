@@ -135,7 +135,7 @@ private:
 		virtual void Trigger() = 0;
 		virtual u16 GetFrequencyTimer() = 0;
 		virtual void StepFrequency() = 0;
-		virtual void StepEnvelope() = 0;
+		virtual void StepEnvelope();
 		virtual void StepLength();
 		virtual void GenerateSample(int channel) = 0;
 		virtual void Reset();
@@ -164,7 +164,6 @@ private:
 
 		virtual void Reset() override;
 		virtual void StepFrequency() override;
-		virtual void StepEnvelope() override;
 		virtual void GenerateSample(int channel) final override;
 
 		Register<2> dutyCycle; // 2-bit duty cycle (12.5%, 25%, 50%, 75%)
@@ -213,7 +212,6 @@ private:
 		virtual u16 GetFrequencyTimer() final override;
 		virtual void Reset() final override;
 		virtual void StepFrequency() final override;
-		virtual void StepEnvelope() final override;
 		virtual void GenerateSample(int channel) final override;
 
 	private:
