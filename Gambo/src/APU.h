@@ -121,6 +121,8 @@ public:
 	void TriggerNoise();
 	void DisableNoise();
 
+	void AdjustStreamLatency();
+
 private:
 	void StepFrequency();
 	void StepEnvelope();
@@ -250,6 +252,7 @@ private:
 
 	AudioOutputMode outputMode;
 	SDL_AudioStream* outputStream;
+	int desiredLatency; // in ms
 	std::vector<float> masterSamples;
 
 	int sampleTimer; // tells us when to generate a new sample
@@ -257,4 +260,6 @@ private:
 	int lengthTimer; // tells us when to tick length
 	int volumeTimer; // tells us when to tick volume envelope
 	int sweepTimer; // tells us when to tick square1 sweep
+
+	using SampleType = decltype(masterSamples)::value_type;
 };

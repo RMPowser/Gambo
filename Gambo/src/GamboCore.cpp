@@ -63,6 +63,8 @@ void GamboCore::Run()
 			apu->RunFor(cycles);
 		}
 		
+		apu->AdjustStreamLatency();
+
 		disassemble = true;
 	}
 	else if (step)

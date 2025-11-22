@@ -5,6 +5,7 @@
 #include <vector>
 #include <numbers>
 #include <array>
+#include <chrono>
 
 constexpr float dutyWaveforms[4][8] = {
 	{0, 0, 0, 0, 0, 0, 0, 1}, // 12.5%
@@ -32,6 +33,7 @@ APU::APU(const GamboCore* core)
 	, noise(core)
 	, outputMode(AudioOutputMode::Stereo)
 	, outputStream(nullptr)
+	, desiredLatency(32)
 	, masterSamples()
 	, sampleTimer(samplePeriod)
 	, frameTimer(GamboCyclesPerFrame)
@@ -199,6 +201,66 @@ void APU::DisableNoise()
 {
 	noise.enabled = false;
 	noise.Reset();
+}
+
+void APU::AdjustStreamLatency()
+{
+	using namespace std::chrono;
+	using clock = std::chrono::high_resolution_clock;
+	using namespace std::chrono_literals;
+
+	static auto lastTime = clock::now();
+	static double latencyErrorIntegral = 0.0;
+
+
+	double dt = duration<double>(clock::now() - lastTime).count();
+
+	SDL_AudioSpec outputSpec;
+	SDL_GetAudioStreamFormat(outputStream, nullptr, &outputSpec);
+
+	double bytes = SDL_GetAudioStreamAvailable(outputStream);
+	double samples = bytes / sizeof(SampleType);
+	double buffered_ms = (samples / (outputSpec.channels * outputSpec.freq)) * 1000;
+
+	// >0 = buffer too full
+	double error_ms = buffered_ms - desiredLatency;
+
+	// PID controller gains. these are arbitrary and tuned experimentally
+	double Kp = 0.0005; // proportional change per ms of error
+	double Ki = 0.00005; // integral gain per (ms * sec)
+
+	// deadband with soft taper near zero to avoid chatter
+	double deadband_ms = 2;
+	if (std::abs(error_ms) < deadband_ms)
+	{
+		error_ms *= std::abs(error_ms) / deadband_ms; // quadratic fade to 0
+	}
+	
+	// integral with anti-windup
+	latencyErrorIntegral += error_ms * dt;
+	const double Imax = desiredLatency * 10;  // ms * sec
+	latencyErrorIntegral = std::clamp(latencyErrorIntegral, -Imax, Imax);
+
+	// compute target ratio. 1.0 is neutral. >1 speeds up. <1 slows down
+	double ratioDelta = (Kp * error_ms) + (Ki * latencyErrorIntegral);
+	double targetRatio = 1.0 + ratioDelta;
+
+	// slew-limit to suppress pitch flutter (cap change per second)
+	const double maxSlewPerSec = 0.025; // 2.5% per s
+	const double maxStep = maxSlewPerSec * dt;
+
+	double currentRatio = SDL_GetAudioStreamFrequencyRatio(outputStream);
+	double step = std::clamp(targetRatio - currentRatio, -maxStep, +maxStep);
+	double newRatio = currentRatio + step;
+
+	// clamp for safety to avoid audible artifacts
+	targetRatio = std::clamp(targetRatio, 0.95, 1.05);
+
+	SDL_SetAudioStreamFrequencyRatio(outputStream, targetRatio);
+
+	//SDL_Log("APU latency: %.2f ms | error: %.2f ms | ratio: %.5f", buffered_ms, error_ms, targetRatio);
+
+	lastTime = clock::now();
 }
 
 void APU::StepFrequency()
