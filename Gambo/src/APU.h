@@ -215,9 +215,11 @@ private:
 		virtual void GenerateSample(int channel) final override;
 
 	private:
-		Register<16> lfsr; // Linear Feedback Shift Register (15-bit)
+		Register<16> lfsr; // Linear Feedback Shift Register
 
-		int frequencyDivider; // Frequency divider from NR43
+		int clockShift; // from NR43
+		int widthMode; // from NR43
+		int frequencyDivider; // from NR43
 
 		using super = AudioChannel;
 	};

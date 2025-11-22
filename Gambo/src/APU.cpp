@@ -558,6 +558,8 @@ u16 APU::SquareChannel2::GetFrequencyTimer()
 APU::NoiseChannel::NoiseChannel(const GamboCore* core)
 	: super(core)
 	, lfsr(0)
+	, clockShift(0)
+	, widthMode(0)
 	, frequencyDivider(0)
 {
 }
@@ -566,6 +568,8 @@ void APU::NoiseChannel::Reset()
 {
 	super::Reset();
 	lfsr = 0;
+	clockShift = 0;
+	widthMode = 0;
 	frequencyDivider = 0;
 }
 
@@ -584,20 +588,16 @@ void APU::NoiseChannel::Trigger()
 	envelopeTimer = envelopePeriod;
 
 	const u8& NR43 = core->ram->Get(HWAddr::NR43);
+	clockShift = GetBits(NR43, NR43Bits::ClockShift, 0b1111);
+	widthMode = GetBits(NR43, NR43Bits::LFSRWidth);
 	frequencyDivider = GetBits(NR43, NR43Bits::ClockDivider, 0b111);
-	lfsr = 0xFFFF;
+	lfsr = 0;
 }
 
 u16 APU::NoiseChannel::GetFrequencyTimer()
 {
-	const u8& NR43 = core->ram->Get(HWAddr::NR43);
+	float divider = frequencyDivider == 0 ? 0.5f : frequencyDivider;
 
-	// Get the clock shift value (Bits 4�7)
-	int clockShift = GetBits(NR43, NR43Bits::ClockShift, 0b1111);
-
-	float divider = frequencyDivider == 0 ? 0.5 : frequencyDivider;
-
-	// Calculate frequency timer
 	return (divider * (int)std::pow(2, clockShift)) * noiseFrequencyPeriod;
 }
 
@@ -610,11 +610,11 @@ void APU::NoiseChannel::StepFrequency()
 			frequencyTimer = GetFrequencyTimer(); 
 
 			// Advance the LFSR
-			bool xorResult = (lfsr.GetBits(0)) ^ (lfsr.GetBits(1));
-			lfsr.SetBit(15, xorResult);
+			bool xnorResult = lfsr.GetBits(0) == lfsr.GetBits(1);
+			lfsr.SetBit(15, xnorResult);
 			if (GetBits(core->ram->Get(HWAddr::NR43), NR43Bits::LFSRWidth)) 
 			{
-				lfsr.SetBit(7, xorResult);
+				lfsr.SetBit(7, xnorResult);
 			}
 			lfsr >>= 1;
 		}
@@ -629,7 +629,7 @@ void APU::NoiseChannel::GenerateSample(int channel)
 		return;
 	}
 
-	float waveformOutput = lfsr.GetBits(0) ? -1 : 1;
+	float waveformOutput = lfsr.GetBits(0) ? 0 : 1;
 	waveformOutput *= (float)volume / 15.0f; // Apply volume
 
 	const u8& NR51 = core->ram->Get(HWAddr::NR51);
