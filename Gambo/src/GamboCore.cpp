@@ -42,6 +42,11 @@ void GamboCore::Run()
 {
 	if (running)
 	{
+		using namespace std::chrono;
+		using clock = high_resolution_clock;
+
+		static auto timeStart = clock::now();
+
 		bool vblank = false;
 		while (!vblank)
 		{
@@ -66,6 +71,12 @@ void GamboCore::Run()
 		apu->AdjustStreamLatency();
 
 		disassemble = true;
+
+		if (clock::now() - timeStart >= 5s)
+		{
+			cart->Save();
+			timeStart = clock::now();
+		}
 	}
 	else if (step)
 	{

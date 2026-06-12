@@ -77,13 +77,13 @@ public:
 	const BaseMapper* GetMapper() const;
 	bool IsMapperSupported() const;
 	bool IsLoaded() const;
+	void Save();
 
 private:
 	void DeserializeHeader();
 	void InitializeMapper();
 	void LoadSave();
-	void Save();
-
+	bool HasRTC() const;
 	
 	BaseMapper* mapper;
 	bool mapperSupported;

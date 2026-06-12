@@ -366,7 +366,7 @@ void Cartridge::Load(std::filesystem::path path)
 
 		// set paths
 		filePath = path;
-		savePath = path.replace_extension(".sav"); // use the same extension everyone else uses
+		savePath = path.replace_extension(".gambo.sav");
 		
 		// init the mapper
 		InitializeMapper();
@@ -573,6 +573,33 @@ bool Cartridge::IsLoaded() const
 	return isLoaded;
 }
 
+void Cartridge::Save()
+{
+	if (GetRamSize() == 0)
+	{
+		return;
+	}
+
+	if (!saveFile.is_open())
+	{
+		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
+	}
+
+	saveFile.write(reinterpret_cast<char*>(ram.data()), GetRamSize());
+
+	if (HasRTC())
+	{
+		MBC3& mbc3 = *dynamic_cast<MBC3*>(mapper);
+		saveFile << mbc3.clock.seconds;
+		saveFile << mbc3.clock.minutes;
+		saveFile << mbc3.clock.hours;
+		saveFile << mbc3.clock.dayLow;
+		saveFile << mbc3.clock.dayHigh;
+	}
+
+	saveFile.close();
+}
+
 void Cartridge::DeserializeHeader()
 {
 	for (size_t i = 0; i < header.title.size(); i++)
@@ -648,9 +675,11 @@ void Cartridge::LoadSave()
 {
 	if (!std::filesystem::exists(savePath))
 	{
-		// create save file
+		// create new save file
 		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
 		saveFile.close();
+
+		return;
 	}
 
 	if (!saveFile.is_open())
@@ -658,29 +687,41 @@ void Cartridge::LoadSave()
 		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary);
 	}
 
-	if (GetRamSize() == std::filesystem::file_size(savePath))
-	{
-		ram.clear();
-		ram.resize(GetRamSize());
+	size_t ramSize = GetRamSize();
+	size_t saveFileSize = std::filesystem::file_size(savePath);
 
-		saveFile.read(reinterpret_cast<char*>(ram.data()), GetRamSize());
-	}
-	else
+	ram.clear();
+	ram.resize(ramSize);
+
+	saveFile.read(reinterpret_cast<char*>(ram.data()), std::min(ramSize, saveFileSize));
+	
+	if (HasRTC())
 	{
-		__debugbreak();
+		MBC3& mbc3 = *dynamic_cast<MBC3*>(mapper);
+		saveFile >> mbc3.clock.seconds;
+		saveFile >> mbc3.clock.minutes;
+		saveFile >> mbc3.clock.hours;
+		saveFile >> mbc3.clock.dayLow;
+		saveFile >> mbc3.clock.dayHigh;
 	}
 
 	saveFile.close();
 }
 
-void Cartridge::Save()
+bool Cartridge::HasRTC() const
 {
-	if (!saveFile.is_open())
+	if (!isLoaded)
+		return false;
+
+	using enum MapperType;
+
+	switch (header.type)
 	{
-		saveFile.open(savePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
+		case MBC3_TIMER_BATTERY:
+		case MBC3_TIMER_RAM_BATTERY:
+			return true;
+		
+		default:
+			return false;
 	}
-
-	saveFile.write(reinterpret_cast<char*>(ram.data()), GetRamSize());
-
-	saveFile.close();
 }

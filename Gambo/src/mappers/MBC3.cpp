@@ -9,11 +9,7 @@ MBC3::MBC3(Cartridge* cart)
 	, romBankNumber(0)
 	, ramBankNumber(0)
 	, mappedRTCRegister(MappedRegister::NONE)
-	, rtcS(0)
-	, rtcM(0)
-	, rtcH(0)
-	, rtcDL(0)
-	, rtcDH(0)
+	, clock{ 0, 0, 0, 0, 0 }
 	, isHalted(false)
 	, wasZeroWritten(0)
 	, isLatched(false)
@@ -61,11 +57,11 @@ u8 MBC3::Read(u16 addr)
 				tm* localTime = localtime(&currentTime);
 
 				// tm_sec includes leap seconds. ie: 0-60 instead of 0-59. need to account for that.
-				rtcS = localTime->tm_sec == 60 ? 59 : localTime->tm_sec;
-				rtcM = localTime->tm_min;
-				rtcH = localTime->tm_hour;
-				rtcDL = localTime->tm_yday & 0xFF;
-				rtcDH = localTime->tm_yday & 0x100;
+				clock.seconds = localTime->tm_sec == 60 ? 59 : localTime->tm_sec;
+				clock.minutes = localTime->tm_min;
+				clock.hours = localTime->tm_hour;
+				clock.dayLow = localTime->tm_yday & 0xFF;
+				clock.dayHigh = localTime->tm_yday & 0x100;
 			}
 
 			switch (mappedRTCRegister)
@@ -78,23 +74,23 @@ u8 MBC3::Read(u16 addr)
 				}
 				case MBC3::MappedRegister::RTC_S:
 				{
-					return rtcS;
+					return clock.seconds;
 				}
 				case MBC3::MappedRegister::RTC_M:
 				{
-					return rtcM;
+					return clock.minutes;
 				}
 				case MBC3::MappedRegister::RTC_H:
 				{
-					return rtcH;
+					return clock.hours;
 				}
 				case MBC3::MappedRegister::RTC_DL:
 				{
-					return rtcDL;
+					return clock.dayLow;
 				}
 				case MBC3::MappedRegister::RTC_DH:
 				{
-					return rtcDH;
+					return clock.dayHigh;
 				}
 			}
 		}
@@ -171,7 +167,6 @@ void MBC3::Write(u16 addr, u8 data)
 		// writing to cartridge ram or rtc registers
 		if (ramAndRTCEnabled)
 		{
-
 			switch (mappedRTCRegister)
 			{
 				case MBC3::MappedRegister::NONE:
@@ -184,28 +179,28 @@ void MBC3::Write(u16 addr, u8 data)
 				}
 				case MBC3::MappedRegister::RTC_S:
 				{
-					rtcS = data;
+					clock.seconds = data;
 					break;
 				}
 				case MBC3::MappedRegister::RTC_M:
 				{
-					rtcM = data;
+					clock.minutes = data;
 					break;
 				}
 				case MBC3::MappedRegister::RTC_H:
 				{
-					rtcH = data;
+					clock.hours = data;
 					break;
 				}
 				case MBC3::MappedRegister::RTC_DL:
 				{
-					rtcDL = data;
+					clock.dayLow = data;
 					break;
 				}
 				case MBC3::MappedRegister::RTC_DH:
 				{
-					rtcDH = data;
-					isHalted = GetBits(rtcDH, 6, 0b1);
+					clock.dayHigh = data;
+					isHalted = GetBits(clock.dayHigh, 6, 0b1);
 					break;
 				}
 			}

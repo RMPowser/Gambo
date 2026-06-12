@@ -303,28 +303,42 @@ void APU::OutputSamples()
 
 	masterSamples.resize(square1.samples.size());
 
-	for (size_t i = 0; i < square1.samples.size(); i += 2)
+	if (square1.samples.size() == square2.samples.size()
+		&& square1.samples.size() == wave.samples.size()
+		&& square1.samples.size() == noise.samples.size())
 	{
-		float leftChannel = square1.samples[i];
-		float rightChannel = square1.samples[i + 1];
+		for (size_t i = 0; i < square1.samples.size(); i += 2)
+		{
+			float leftChannel = square1.samples[i];
+			float rightChannel = square1.samples[i + 1];
 
-		leftChannel += square2.samples[i];
-		rightChannel += square2.samples[i + 1];
+			leftChannel += square2.samples[i];
+			rightChannel += square2.samples[i + 1];
 
-		leftChannel += wave.samples[i];
-		rightChannel += wave.samples[i + 1];
+			leftChannel += wave.samples[i];
+			rightChannel += wave.samples[i + 1];
 
-		leftChannel += noise.samples[i];
-		rightChannel += noise.samples[i + 1];
+			leftChannel += noise.samples[i];
+			rightChannel += noise.samples[i + 1];
 
-		leftChannel *= masterVolumeLeft;
-		rightChannel *= masterVolumeRight;
+			leftChannel *= masterVolumeLeft;
+			rightChannel *= masterVolumeRight;
 
-		leftChannel /= 4;
-		rightChannel /= 4;
+			leftChannel /= 4;
+			rightChannel /= 4;
 
-		masterSamples[i] = leftChannel;
-		masterSamples[i + 1] = rightChannel;
+			masterSamples[i] = leftChannel;
+			masterSamples[i + 1] = rightChannel;
+		}
+	}
+	else
+	{
+		SDL_Log("Not all audio streams were the same size:");
+		SDL_Log("channel1: %d", square1.samples.size());
+		SDL_Log("channel2: %d", square2.samples.size());
+		SDL_Log("wave: %d", wave.samples.size());
+		SDL_Log("noise: %d", noise.samples.size());
+		throw;
 	}
 
 	SDL_PutAudioStreamData(outputStream, masterSamples.data(), (int)masterSamples.size() * sizeof(decltype(masterSamples)::value_type));
